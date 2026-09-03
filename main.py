@@ -1087,6 +1087,19 @@ def get_link_info(
             "clean_ip",
             "",
         ),
+        "socks5_host": link.get("socks5_host", ""),
+        "socks5_port": int(link.get("socks5_port") or 0),
+        "socks5_user": link.get("socks5_user", ""),
+        "socks5_pass": link.get("socks5_pass", ""),
+        "socks5_uri": (
+            (
+                "socks5://"
+                + (f"{link.get('socks5_user','')}:{link.get('socks5_pass','')}@" if link.get("socks5_user") else "")
+                + f"{link.get('socks5_host')}:{int(link.get('socks5_port') or 0)}"
+            )
+            if link.get("socks5_host") and int(link.get("socks5_port") or 0) > 0
+            else ""
+        ),
         "vless": vless_link_for_link(
             link,
             uid,
@@ -1392,11 +1405,13 @@ async def ensure_default_link():
 # ============================================================
 
 
+MAX_CLEAN_IPS = 20
+
 def parse_clean_ips(value) -> list[str]:
-    """چند ایپی تمیز؛ هر خط یا جدا با کاما"""
+    """چند ایپی تمیز؛ هر خط یا جدا با کاما — حداکثر ۲۰"""
     if value is None:
         return []
-    raw = str(value).replace(",", "\n")
+    raw = str(value).replace(",", chr(10))
     seen = set()
     result = []
     for line in raw.splitlines():
@@ -1407,6 +1422,8 @@ def parse_clean_ips(value) -> list[str]:
             continue
         seen.add(ip)
         result.append(ip)
+        if len(result) >= MAX_CLEAN_IPS:
+            break
     return result
 
 
@@ -1425,6 +1442,10 @@ async def make_link(
     connection_limit: int = 0,
     fragment: str = "off",
     clean_ip: str = "",
+    socks5_host: str = "",
+    socks5_port: int = 0,
+    socks5_user: str = "",
+    socks5_pass: str = "",
 ):
 
     if protocol not in PROTOCOLS:
@@ -1528,6 +1549,10 @@ async def make_link(
                 clean_ip
                 or ""
             ).strip()[:120],
+        "socks5_host": (socks5_host or "").strip()[:200],
+        "socks5_port": int(socks5_port or 0),
+        "socks5_user": (socks5_user or "").strip()[:100],
+        "socks5_pass": (socks5_pass or "").strip()[:100],
     }
 
     async with LINKS_LOCK:
@@ -3208,6 +3233,11 @@ async def create_link_api(
             connection_limit=connection_limit,
             fragment=fragment,
             clean_ip=clean_ip,
+            socks5_host=str(body.get("socks5_host") or "").strip()[:200],
+            socks5_port=safe_int(body.get("socks5_port"), 0, 0, 65535),
+            socks5_user=str(body.get("socks5_user") or "").strip()[:100],
+            socks5_pass=str(body.get("socks5_pass") or "").strip()[:100],
+
         )
 
         created.append(
@@ -6615,6 +6645,62 @@ th{
     }
 }
 
+
+/* Professional scrollbar */
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:999px}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,.45);border:2px solid transparent;background-clip:padding-box}
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) rgba(255,255,255,.03)}
+
+.modal{
+    max-height:min(88vh,820px);
+    overflow:auto;
+}
+.modal .form-grid{
+    gap:12px;
+}
+.modal .field label{
+    font-size:10px;
+    letter-spacing:.02em;
+    color:rgba(255,255,255,.42);
+    margin-bottom:6px;
+}
+.modal input,
+.modal select,
+.modal textarea{
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.08);
+    background:rgba(0,0,0,.22);
+    transition:border-color .15s ease, background .15s ease;
+}
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus{
+    border-color:rgba(167,139,250,.45);
+    background:rgba(0,0,0,.28);
+    outline:none;
+}
+.modal-hint{
+    margin-top:6px;
+    font-size:10px;
+    color:rgba(255,255,255,.35);
+    line-height:1.7;
+}
+.modal-section{
+    grid-column:1/-1;
+    margin-top:4px;
+    padding-top:12px;
+    border-top:1px solid rgba(255,255,255,.06);
+    font-size:11px;
+    font-weight:700;
+    color:rgba(255,255,255,.55);
+}
+.modal-btn.ghost{
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.08);
+    color:rgba(255,255,255,.85);
+}
 </style>
 
 </head>
@@ -6656,13 +6742,6 @@ class="top-btn primary"
 onclick="openAutoModal()"
 ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
 ساخت خودکار
-</button>
-
-<button
-class="top-btn tg-proxy"
-onclick="createTelegramProxy()"
-><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 5L2 12.5l7 1.5L18 8l-7 7.5 1.5 6.5L21 5Z"/></svg>
-ساخت پروکسی تلگرام
 </button>
 
 <button
@@ -7280,84 +7359,53 @@ Aggressive
 
 
 <div class="field">
-
-<label>
-Port
-</label>
-
-<input
-id="manualPort"
-type="number"
-min="1"
-max="65535"
-value="443"
-/>
-
+<label>Port</label>
+<input id="manualPort" type="number" min="1" max="65535" value="443" />
 </div>
-
-
-<div class="field full">
-
-<label>
-ایپی تمیز
-<span style="opacity:.55;font-weight:500">— هر خط یک IP (Ctrl+Enter خط جدید)</span>
-</label>
-
-<textarea
-id="manualCleanIp"
-rows="4"
-placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8&#10;خالی = دامنه پنل"
-style="direction:ltr;text-align:left;min-height:96px;resize:vertical"
-></textarea>
-
-</div>
-
 
 <div class="field">
-
-<label>
-ALPN
-</label>
-
-<input
-id="manualAlpn"
-value="http/1.1"
-/>
-
+<label>ALPN</label>
+<input id="manualAlpn" value="http/1.1" />
 </div>
 
+<div class="modal-section">ایپی تمیز</div>
 
 <div class="field full">
+<label>ایپی تمیز — هر خط یک IP (حداکثر ۲۰)</label>
+<textarea id="manualCleanIp" rows="3" placeholder="خالی = دامنه پنل&#10;1.2.3.4&#10;5.6.7.8" style="direction:ltr;text-align:left;min-height:84px;resize:vertical"></textarea>
+<div class="modal-hint">بیش از یک IP → یک ردیف در پنل + ساب چندکانفیگه</div>
+</div>
 
-<label>
-یادداشت
-</label>
+<div class="modal-section">پروکسی SOCKS5 (اختیاری)</div>
 
-<textarea
-id="manualNote"
-placeholder="یادداشت اختیاری"
-></textarea>
+<div class="field">
+<label>SOCKS5 Host</label>
+<input id="manualSocksHost" placeholder="127.0.0.1" style="direction:ltr;text-align:left" />
+</div>
+<div class="field">
+<label>SOCKS5 Port</label>
+<input id="manualSocksPort" type="number" min="0" max="65535" placeholder="1080" />
+</div>
+<div class="field">
+<label>SOCKS5 User</label>
+<input id="manualSocksUser" placeholder="اختیاری" style="direction:ltr;text-align:left" />
+</div>
+<div class="field">
+<label>SOCKS5 Password</label>
+<input id="manualSocksPass" type="password" placeholder="اختیاری" style="direction:ltr;text-align:left" />
+</div>
 
+<div class="field full">
+<label>یادداشت</label>
+<textarea id="manualNote" placeholder="اختیاری"></textarea>
 </div>
 
 </div>
 
 <div class="modal-actions">
-
-<button
-class="modal-btn secondary"
-onclick="closeManualModal()"
->
-انصراف
-</button>
-
-<button
-class="modal-btn primary"
-onclick="createManual()"
->
-ساخت کانفیگ
-</button>
-
+<button class="modal-btn secondary" onclick="closeManualModal()">انصراف</button>
+<button class="modal-btn ghost" type="button" onclick="applyBestManualSettings()">بهترین تنظیمات</button>
+<button class="modal-btn primary" onclick="createManual()">ساخت کانفیگ</button>
 </div>
 
 </div>
@@ -7485,78 +7533,19 @@ onclick="closeAutoModal()"
 
 </div>
 
-<div
-style="
-color:rgba(255,255,255,.55);
-font-size:11px;
-line-height:2;
-"
->
-
-کانفیگ خودکار با نام تصادفی
-<code>pxpanel_********</code>
-ساخته می‌شود.
-
-<br>
-
-حجم: <b>نامحدود</b>
-
-<br>
-
-زمان: <b>نامحدود</b>
-
-<br>
-
-IP: <b>نامحدود</b>
-
-<br>
-
-سرعت: <b>نامحدود</b>
-
-<br>
-
-اتصال: <b>نامحدود</b>
-
-<br>
-
-پروتکل:
-<b>VLESS WebSocket</b>
-
-<br>
-
-Port:
-<b>443</b>
-
+<div style="color:rgba(255,255,255,.48);font-size:11px;line-height:1.9;margin-bottom:4px">
+نام تصادفی · حجم/زمان/IP نامحدود · پروتکل VLESS-WS · پورت ۴۴۳
 </div>
 
-<div class="field" style="margin-top:14px">
-<label>ایپی تمیز (اختیاری) — هر خط یک IP</label>
-<textarea
-id="autoCleanIp"
-rows="4"
-placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8"
-style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18);color:#fff;font-family:Vazirmatn,sans-serif;font-size:12px;outline:none;box-sizing:border-box;min-height:96px;resize:vertical"
-></textarea>
-<div style="margin-top:7px;color:rgba(255,255,255,.38);font-size:10px;line-height:1.7">
-هر خط = یک کانفیگ جدا با همان ایپی تمیز. SNI روی دامنه پنل می‌ماند تا پینگ درست باشد.
-</div>
+<div class="field" style="margin-top:12px">
+<label>ایپی تمیز — هر خط یک IP (حداکثر ۲۰، اختیاری)</label>
+<textarea id="autoCleanIp" rows="3" placeholder="خالی بگذارید یا چند IP&#10;1.2.3.4" style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.22);color:#fff;font-family:Vazirmatn,sans-serif;font-size:12px;outline:none;box-sizing:border-box;min-height:84px;resize:vertical"></textarea>
+<div class="modal-hint">SNI روی دامنه پنل می‌ماند</div>
 </div>
 
 <div class="modal-actions">
-
-<button
-class="modal-btn secondary"
-onclick="closeAutoModal()"
->
-انصراف
-</button>
-
-<button
-class="modal-btn primary"
-onclick="createAuto()"
->
-ساخت خودکار
-</button>
+<button class="modal-btn secondary" onclick="closeAutoModal()">انصراف</button>
+<button class="modal-btn primary" onclick="createAuto()">ساخت خودکار</button>
 
 </div>
 
@@ -8542,7 +8531,32 @@ async function createAuto(){
 }
 
 
+function applyBestManualSettings(){
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    set("manualName", "premium");
+    set("manualProtocol", "vless-ws");
+    set("manualVolume", "0");
+    set("manualVolumeUnit", "GB");
+    set("manualDays", "0");
+    set("manualIpLimit", "0");
+    set("manualConnections", "0");
+    set("manualSpeed", "0");
+    set("manualFingerprint", "chrome");
+    set("manualFragment", "off");
+    set("manualPort", "443");
+    set("manualAlpn", "http/1.1");
+    set("manualNote", "بهترین تنظیمات — نامحدود");
+    showToast("بهترین تنظیمات اعمال شد — هنوز ساخته نشده");
+}
+
 async function createManual(){
+
+    const cleanRaw = ((document.getElementById("manualCleanIp") || {}).value || "");
+    const uniq = [...new Set(cleanRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean))];
+    if (uniq.length > 20) {
+        showToast("حداکثر ۲۰ ایپی تمیز مجاز است");
+        return;
+    }
 
     const body = {
 
@@ -8654,6 +8668,11 @@ async function createManual(){
                 )
                 .value
                 .trim(),
+
+        socks5_host: (document.getElementById("manualSocksHost")||{}).value ? document.getElementById("manualSocksHost").value.trim() : "",
+        socks5_port: Number((document.getElementById("manualSocksPort")||{}).value || 0),
+        socks5_user: (document.getElementById("manualSocksUser")||{}).value ? document.getElementById("manualSocksUser").value.trim() : "",
+        socks5_pass: (document.getElementById("manualSocksPass")||{}).value ? document.getElementById("manualSocksPass").value.trim() : "",
 
         alpn:
             document
