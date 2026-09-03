@@ -42,8 +42,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 APP_NAME = "PXpanel"
 APP_VERSION = "12.1.0 Beta"
+
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -189,8 +191,10 @@ CONFIG = {
 
 LINKS: dict = {}
 SUBS: dict = {}
+TG_PROXIES: dict = {}
 SESSIONS: dict = {}
 connections: dict = {}
+TG_PROXIES_LOCK = asyncio.Lock()
 
 stats = {
     "total_bytes": 0,
@@ -1127,6 +1131,13 @@ async def load_state():
             )
         )
 
+        TG_PROXIES.update(
+            data.get(
+                "tg_proxies",
+                {},
+            )
+        )
+
         stored_password = data.get(
             "password_hash"
         )
@@ -1185,9 +1196,10 @@ async def load_state():
             )
 
         logger.info(
-            "State loaded: %d links / %d subscriptions",
+            "State loaded: %d links / %d subscriptions / %d tg-proxies",
             len(LINKS),
             len(SUBS),
+            len(TG_PROXIES),
         )
 
     except Exception as exc:
@@ -1215,6 +1227,9 @@ async def save_state():
 
                 "subs":
                     dict(SUBS),
+
+                "tg_proxies":
+                    dict(TG_PROXIES),
 
                 "password_hash":
                     AUTH[
@@ -3943,285 +3958,293 @@ async def info_page(
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://onlinegpt.ir/package/packages/tailwind/tailwind.js"></script>
+<script>
+tailwind.config = {{
+  theme: {{
+    extend: {{
+      fontFamily: {{
+        vazir: ['Vazirmatn', 'system-ui', 'sans-serif']
+      }},
+      colors: {{
+        dark: {{
+          950: '#05060a',
+          900: '#0a0c12',
+          800: '#11141c',
+          700: '#1a1e2a',
+          600: '#252a38'
+        }}
+      }}
+    }}
+  }}
+}}
+</script>
 <style>
-:root{{
-  --bg:#05060a;
-  --card:rgba(255,255,255,.035);
-  --card-hover:rgba(255,255,255,.055);
-  --border:rgba(255,255,255,.08);
-  --border-soft:rgba(255,255,255,.05);
-  --text:#f1f3f9;
-  --muted:rgba(255,255,255,.45);
-  --muted2:rgba(255,255,255,.28);
-  --green:#34d399;
-  --green-soft:rgba(52,211,153,.12);
-  --blue:#60a5fa;
-  --blue-soft:rgba(96,165,250,.12);
-  --orange:#f59e0b;
-  --orange-soft:rgba(245,158,11,.12);
-  --red:#fb7185;
-  --purple:#a78bfa;
-  --purple-soft:rgba(167,139,250,.12);
-  --radius:22px;
-  --radius-sm:14px;
-}}
-*{{box-sizing:border-box;margin:0;padding:0}}
-html,body{{min-height:100%;background:var(--bg)}}
-body{{
-  font-family:"Vazirmatn",system-ui,sans-serif;
-  color:var(--text);
-  padding:28px 16px;
-  background:
-    radial-gradient(ellipse 80% 50% at 10% -10%,rgba(96,165,250,.18),transparent 50%),
-    radial-gradient(ellipse 60% 40% at 95% 20%,rgba(167,139,250,.14),transparent 45%),
-    radial-gradient(ellipse 50% 30% at 70% 100%,rgba(52,211,153,.08),transparent 40%),
-    var(--bg);
-  line-height:1.6;
-}}
-.page{{width:min(880px,100%);margin:0 auto}}
-.shell{{
-  position:relative;
-  overflow:hidden;
-  border:1px solid var(--border);
-  background:linear-gradient(165deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 100%);
-  backdrop-filter:blur(32px);
-  -webkit-backdrop-filter:blur(32px);
-  border-radius:28px;
-  box-shadow:0 40px 80px -20px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03) inset;
-}}
-.shell::before{{
-  content:"";
-  position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(135deg,rgba(255,255,255,.05) 0%,transparent 40%,rgba(255,255,255,.02) 100%);
-  border-radius:inherit;
-}}
-
-/* Hero */
-.hero{{padding:28px 28px 22px;border-bottom:1px solid var(--border-soft)}}
-.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:18px}}
-.brand{{display:flex;align-items:center;gap:14px}}
-.brand-icon{{
-  width:48px;height:48px;
-  display:grid;place-items:center;
-  border-radius:16px;
-  background:linear-gradient(145deg,rgba(96,165,250,.18),rgba(167,139,250,.1));
-  border:1px solid rgba(96,165,250,.22);
-  color:#93c5fd;font-weight:900;font-size:15px;
-  box-shadow:0 8px 24px -6px rgba(96,165,250,.25);
-}}
-.hero h1{{margin:0;font-size:22px;font-weight:900;letter-spacing:-.4px}}
-.hero-meta{{margin-top:5px;color:var(--muted);font-size:11px;word-break:break-all;opacity:.85}}
-.status{{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:9px 14px;border-radius:999px;
-  font-size:12px;font-weight:800;white-space:nowrap;
-}}
-.status i{{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor}}
-.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.1)}}
-.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.25);background:rgba(251,113,133,.1)}}
-
-/* Notice */
-.notice{{
-  margin-top:20px;display:flex;gap:12px;align-items:flex-start;
-  padding:14px 16px;
-  border:1px solid rgba(167,139,250,.2);
-  background:linear-gradient(120deg,rgba(167,139,250,.12),rgba(96,165,250,.05));
-  border-radius:16px;
-  color:rgba(255,255,255,.65);font-size:12px;line-height:1.85;
-}}
-.notice-icon{{
-  width:28px;height:28px;flex:0 0 28px;
-  display:grid;place-items:center;border-radius:10px;
-  background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.2);
-  color:#c4b5fd;font-size:13px;font-weight:800;
-}}
-.notice strong{{color:#ddd6fe}}
-
-/* Dashboard */
-.dashboard{{display:grid;grid-template-columns:1.4fr .6fr;gap:14px;padding:20px 20px 8px}}
-.usage-card,.side-card{{
-  border:1px solid var(--border);
-  background:var(--card);
-  border-radius:var(--radius);
-}}
-.usage-card{{padding:22px}}
-.section-kicker{{
-  font-size:10px;color:var(--muted2);font-weight:800;
-  letter-spacing:1px;text-transform:uppercase;
-}}
-.section-title{{margin-top:5px;font-size:15px;font-weight:900}}
-.usage-line{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:18px}}
-.usage-number{{font-size:26px;font-weight:900;letter-spacing:-.6px}}
-.usage-number span{{font-size:13px;color:var(--muted);font-weight:600}}
-.usage-percent{{font-size:15px;font-weight:900;color:#86efac}}
-.track{{
-  height:10px;margin-top:14px;border-radius:999px;
-  background:rgba(255,255,255,.06);overflow:hidden;
-  border:1px solid rgba(255,255,255,.04);
-}}
-.track span{{
-  display:block;height:100%;width:{usage_percent}%;
-  border-radius:inherit;
-  background:linear-gradient(90deg,#34d399 0%,#f59e0b 100%);
-  box-shadow:0 0 18px rgba(52,211,153,.3);
-  transition:width .4s ease;
-}}
-.usage-bottom{{
-  display:flex;justify-content:space-between;gap:10px;
-  margin-top:12px;color:var(--muted);font-size:11px;
-}}
-.side-card{{padding:18px}}
-.side-row{{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:12px 0;border-bottom:1px solid var(--border-soft);
-}}
-.side-row:last-child{{border-bottom:0;padding-bottom:0}}
-.side-label{{font-size:11px;color:var(--muted)}}
-.side-value{{font-size:12px;font-weight:800}}
-
-/* Stats */
-.stats{{
-  display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
-  padding:12px 20px 8px;
-}}
-.metric{{
-  position:relative;overflow:hidden;
-  padding:16px;border-radius:18px;
-  border:1px solid var(--border);background:var(--card);
-  transition:background .2s,border-color .2s;
-}}
-.metric:hover{{background:var(--card-hover);border-color:rgba(255,255,255,.12)}}
-.metric::before{{
-  content:"";position:absolute;inset:0;
-  background:linear-gradient(145deg,rgba(255,255,255,.03),transparent 60%);
-  pointer-events:none;
-}}
-.metric .dot{{
-  width:9px;height:9px;border-radius:50%;margin-bottom:10px;
-  background:var(--c);box-shadow:0 0 16px color-mix(in srgb,var(--c) 50%,transparent);
-}}
-.metric-label{{color:var(--muted);font-size:11px}}
-.metric-value{{margin-top:6px;font-size:14px;font-weight:900;color:var(--c);word-break:break-word}}
-.metric.green{{--c:#34d399}}
-.metric.orange{{--c:#f59e0b}}
-.metric.blue{{--c:#60a5fa}}
-.metric.purple{{--c:#a78bfa}}
-
-/* Content sections */
-.content{{padding:8px 20px 24px}}
-.section{{
-  margin-top:14px;padding:20px;
-  border:1px solid var(--border);background:var(--card);
-  border-radius:var(--radius);
-}}
-.section-head{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:4px}}
-.section-head .section-title{{margin:0;font-size:15px}}
-.section-sub{{color:var(--muted);font-size:11px}}
-.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}}
-.info-item{{
-  padding:14px;border-radius:var(--radius-sm);
-  border:1px solid var(--border-soft);background:rgba(0,0,0,.18);
-}}
-.info-label{{font-size:11px;color:var(--muted)}}
-.info-value{{margin-top:6px;font-size:12px;font-weight:700;color:rgba(255,255,255,.88);word-break:break-word}}
-.code{{direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#c4b5fd;font-weight:500}}
-
-/* Links */
-.link-card{{
-  display:flex;align-items:center;justify-content:space-between;gap:14px;
-  padding:14px;border-radius:var(--radius-sm);
-  border:1px solid var(--border-soft);background:rgba(0,0,0,.18);
-  margin-top:10px;transition:border-color .2s,background .2s;
-}}
-.link-card:first-of-type{{margin-top:14px}}
-.link-card:hover{{border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}}
-.link-main{{min-width:0;flex:1}}
-.link-name{{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:.3px}}
-.link-url{{
-  margin-top:5px;direction:ltr;text-align:left;
-  font-family:ui-monospace,Consolas,monospace;font-size:11px;
-  color:#c4b5fd;word-break:break-all;line-height:1.5;
-}}
-.copy-hint{{
-  flex:0 0 auto;font-size:10px;font-weight:700;
-  color:var(--muted2);padding:6px 10px;border-radius:8px;
-  background:rgba(255,255,255,.04);border:1px solid var(--border-soft);
-}}
-
-/* Downloads */
-.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}}
-.download{{
-  display:flex;align-items:center;gap:12px;min-height:72px;
-  padding:14px;text-decoration:none;color:#fff;
-  border:1px solid var(--border);background:var(--card);
-  border-radius:16px;
-  transition:transform .2s ease,border-color .2s,background .2s,box-shadow .2s;
-}}
-.download:hover{{
-  transform:translateY(-3px);
-  border-color:rgba(96,165,250,.3);
-  background:linear-gradient(145deg,rgba(96,165,250,.1),rgba(255,255,255,.03));
-  box-shadow:0 12px 28px -8px rgba(96,165,250,.2);
-}}
-.app-icon{{
-  width:34px;height:34px;flex:0 0 34px;
-  display:grid;place-items:center;border-radius:11px;
-  background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.18);
-  color:#93c5fd;font-size:12px;font-weight:900;
-}}
-.download strong{{display:block;font-size:12px;font-weight:800}}
-.download span{{display:block;margin-top:3px;color:var(--muted);font-size:10px}}
-
-/* Channel */
-.channel{{
-  margin-top:18px;padding:14px 16px;text-align:center;
-  border:1px solid rgba(52,211,153,.15);background:rgba(52,211,153,.06);
-  border-radius:14px;color:var(--muted);font-size:12px;
-}}
-.channel b{{color:#6ee7b7}}
-
-/* Responsive */
-@media(max-width:760px){{
-  body{{padding:12px}}
-  .hero{{padding:20px 18px 16px}}
-  .dashboard{{grid-template-columns:1fr;padding:14px}}
-  .stats{{grid-template-columns:repeat(2,1fr);padding:8px 14px}}
-  .content{{padding:6px 14px 18px}}
-  .downloads{{grid-template-columns:1fr}}
-  .hero-row{{align-items:flex-start;flex-direction:column}}
-  .info-grid{{grid-template-columns:1fr}}
-}}
+  body {{ font-family: 'Vazirmatn', system-ui, sans-serif; }}
+  .font-mono {{ font-family: ui-monospace, Consolas, monospace; }}
 </style>
 </head>
-<body>
-<div class="page"><div class="shell">
-<section class="hero">
-<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
-<div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
-</section>
+<body class="bg-dark-950 text-slate-100 min-h-screen p-4 md:p-7">
+  <div class="max-w-3xl mx-auto">
+    <div class="bg-dark-900/80 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl">
 
-<section class="dashboard">
-<div class="usage-card"><div class="section-kicker">Traffic Overview</div><div class="section-title">مصرف سرویس</div><div class="usage-line"><div class="usage-number">{escape_html(fmt_bytes(used))} <span>/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div><div class="usage-percent">{usage_percent}%</div></div><div class="track"><span></span></div><div class="usage-bottom"><span>باقی‌مانده: {escape_html(remaining_value)}</span><span>زمان: {escape_html(expiry_remaining)}</span></div></div>
-<div class="side-card"><div class="section-kicker">Service</div><div class="side-row"><span class="side-label">انقضا</span><span class="side-value">{escape_html(expiry_display)}</span></div><div class="side-row"><span class="side-label">IP Limit</span><span class="side-value">{escape_html(ip_limit)}</span></div><div class="side-row"><span class="side-label">Connection</span><span class="side-value">{escape_html(connection_limit)}</span></div><div class="side-row"><span class="side-label">Speed</span><span class="side-value">{escape_html(speed_limit)}</span></div></div>
-</section>
+      <!-- Hero -->
+      <div class="px-6 pt-6 pb-5 border-b border-white/5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-400/25 flex items-center justify-center text-blue-300 font-black text-sm">
+              PX
+            </div>
+            <div>
+              <h1 class="text-xl font-black tracking-tight">{escape_html(snapshot.get("label","PXpanel"))}</h1>
+              <p class="text-[11px] text-slate-400 mt-1 break-all">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</p>
+            </div>
+          </div>
+          <div class="status {status_class} inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full bg-current"></span>
+            {status_text}
+          </div>
+        </div>
 
-<section class="stats">
-<div class="metric green"><div class="dot"></div><div class="metric-label">مصرف فعلی</div><div class="metric-value">{escape_html(fmt_bytes(used))}</div></div>
-<div class="metric orange"><div class="dot"></div><div class="metric-label">باقی‌مانده</div><div class="metric-value">{escape_html(remaining_value)}</div></div>
-<div class="metric blue"><div class="dot"></div><div class="metric-label">اتصالات فعال</div><div class="metric-value">{len(unique_ips_for_uuid(uid))}</div></div>
-<div class="metric purple"><div class="dot"></div><div class="metric-label">زمان باقی‌مانده</div><div class="metric-value">{escape_html(expiry_remaining)}</div></div>
-</section>
+        <div class="mt-5 flex gap-3 items-start p-3.5 rounded-2xl border border-violet-400/20 bg-gradient-to-l from-violet-500/10 to-blue-500/5">
+          <div class="w-7 h-7 shrink-0 rounded-lg bg-violet-500/15 border border-violet-400/20 flex items-center justify-center text-violet-300 text-xs font-bold">!</div>
+          <div class="text-xs text-slate-300/80 leading-7">
+            <strong class="text-violet-200">اطلاعیه اتصال</strong><br>
+            لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید.
+            <strong class="text-violet-200">کانال تلگرام: logic_sec</strong>
+          </div>
+        </div>
+      </div>
 
-<div class="content">
-<section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
+      <!-- Dashboard -->
+      <div class="grid grid-cols-1 md:grid-cols-[1.4fr_0.6fr] gap-3.5 p-5 pb-2">
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+          <div class="text-[10px] font-extrabold tracking-widest text-slate-500 uppercase">Traffic Overview</div>
+          <div class="text-[15px] font-black mt-1">مصرف سرویس</div>
+          <div class="flex items-end justify-between gap-3 mt-4">
+            <div class="text-2xl font-black tracking-tight">
+              {escape_html(fmt_bytes(used))}
+              <span class="text-sm text-slate-400 font-semibold">/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
+            </div>
+            <div class="text-sm font-black text-emerald-300">{usage_percent}%</div>
+          </div>
+          <div class="h-2.5 mt-3.5 rounded-full bg-white/5 border border-white/5 overflow-hidden">
+            <div class="h-full rounded-full bg-gradient-to-l from-amber-400 to-emerald-400" style="width:{usage_percent}%"></div>
+          </div>
+          <div class="flex justify-between gap-2 mt-3 text-[11px] text-slate-400">
+            <span>باقی‌مانده: {escape_html(remaining_value)}</span>
+            <span>زمان: {escape_html(expiry_remaining)}</span>
+          </div>
+        </div>
 
-<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+          <div class="text-[10px] font-extrabold tracking-widest text-slate-500 uppercase mb-1">Service</div>
+          <div class="divide-y divide-white/5">
+            <div class="flex items-center justify-between py-2.5">
+              <span class="text-[11px] text-slate-400">انقضا</span>
+              <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
+            </div>
+            <div class="flex items-center justify-between py-2.5">
+              <span class="text-[11px] text-slate-400">IP Limit</span>
+              <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
+            </div>
+            <div class="flex items-center justify-between py-2.5">
+              <span class="text-[11px] text-slate-400">Connection</span>
+              <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
+            </div>
+            <div class="flex items-center justify-between py-2.5">
+              <span class="text-[11px] text-slate-400">Speed</span>
+              <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-<section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
+      <!-- Stats -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 px-5 pt-2 pb-2">
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+          <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 mb-2.5"></div>
+          <div class="text-[11px] text-slate-400">مصرف فعلی</div>
+          <div class="mt-1.5 text-sm font-black text-emerald-400 break-words">{escape_html(fmt_bytes(used))}</div>
+        </div>
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+          <div class="w-2.5 h-2.5 rounded-full bg-amber-400 mb-2.5"></div>
+          <div class="text-[11px] text-slate-400">باقی‌مانده</div>
+          <div class="mt-1.5 text-sm font-black text-amber-400 break-words">{escape_html(remaining_value)}</div>
+        </div>
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+          <div class="w-2.5 h-2.5 rounded-full bg-blue-400 mb-2.5"></div>
+          <div class="text-[11px] text-slate-400">اتصالات فعال</div>
+          <div class="mt-1.5 text-sm font-black text-blue-400 break-words">{len(unique_ips_for_uuid(uid))}</div>
+        </div>
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+          <div class="w-2.5 h-2.5 rounded-full bg-violet-400 mb-2.5"></div>
+          <div class="text-[11px] text-slate-400">زمان باقی‌مانده</div>
+          <div class="mt-1.5 text-sm font-black text-violet-400 break-words">{escape_html(expiry_remaining)}</div>
+        </div>
+      </div>
 
-<div class="channel">پشتیبانی و اطلاعیه‌ها · <b>کانال تلگرام: logic_sec</b></div>
-</div></div></div>
-</body></html>"""
+      <!-- Content -->
+      <div class="px-5 pb-6 space-y-3.5">
+
+        <!-- Technical Details -->
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+          <div class="flex items-end justify-between gap-3 mb-1">
+            <div class="text-[15px] font-black">جزئیات فنی</div>
+            <div class="text-[11px] text-slate-400">Configuration Details</div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3.5">
+            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+              <div class="text-[11px] text-slate-400">Protocol</div>
+              <div class="mt-1.5 text-xs font-bold text-violet-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("protocol","vless-ws"))}</div>
+            </div>
+            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+              <div class="text-[11px] text-slate-400">Fingerprint</div>
+              <div class="mt-1.5 text-xs font-bold text-violet-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("fingerprint","chrome"))}</div>
+            </div>
+            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+              <div class="text-[11px] text-slate-400">IP Limit</div>
+              <div class="mt-1.5 text-xs font-bold">{escape_html(ip_limit)}</div>
+            </div>
+            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+              <div class="text-[11px] text-slate-400">Connection Limit</div>
+              <div class="mt-1.5 text-xs font-bold">{escape_html(connection_limit)}</div>
+            </div>
+            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+              <div class="text-[11px] text-slate-400">Speed Limit</div>
+              <div class="mt-1.5 text-xs font-bold">{escape_html(speed_limit)}</div>
+            </div>
+            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+              <div class="text-[11px] text-slate-400">تاریخ انقضا</div>
+              <div class="mt-1.5 text-xs font-bold">{escape_html(expiry_display)}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Service Links (Professional + Copy) -->
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+          <div class="flex items-end justify-between gap-3 mb-1">
+            <div class="text-[15px] font-black">لینک‌های سرویس</div>
+            <div class="text-[11px] text-slate-400">Copy / Import</div>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <!-- VLESS -->
+            <div class="group flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-white/8 bg-black/25 hover:bg-white/[0.04] hover:border-violet-400/25 transition-colors duration-200">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <span class="text-[10px] font-extrabold tracking-wide text-violet-300/90 uppercase">VLESS</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-300/80 font-bold">Direct</span>
+                </div>
+                <div id="vless-url" class="font-mono text-[11px] text-violet-200/90 break-all leading-relaxed dir-ltr text-left select-all">
+                  {escape_html(vless_url)}
+                </div>
+              </div>
+              <button type="button" onclick="copyText('vless-url', this)"
+                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-400/25 text-violet-200 text-xs font-bold hover:bg-violet-500/25 hover:border-violet-400/40 active:scale-[0.98] transition-all duration-150">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span class="copy-label">کپی</span>
+              </button>
+            </div>
+
+            <!-- SUBSCRIPTION -->
+            <div class="group flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-white/8 bg-black/25 hover:bg-white/[0.04] hover:border-blue-400/25 transition-colors duration-200">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <span class="text-[10px] font-extrabold tracking-wide text-blue-300/90 uppercase">Subscription</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-300/80 font-bold">SUB</span>
+                </div>
+                <div id="sub-url" class="font-mono text-[11px] text-blue-200/90 break-all leading-relaxed dir-ltr text-left select-all">
+                  {escape_html(sub_url)}
+                </div>
+              </div>
+              <button type="button" onclick="copyText('sub-url', this)"
+                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-200 text-xs font-bold hover:bg-blue-500/25 hover:border-blue-400/40 active:scale-[0.98] transition-all duration-150">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span class="copy-label">کپی</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Downloads -->
+        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+          <div class="flex items-end justify-between gap-3 mb-1">
+            <div class="text-[15px] font-black">دانلود برنامه‌ها</div>
+            <div class="text-[11px] text-slate-400">Official Releases</div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3.5">
+            <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
+              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-400/30 transition-colors duration-200 no-underline text-white">
+              <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center text-blue-300 text-xs font-black">NG</div>
+              <div>
+                <strong class="block text-xs font-extrabold">v2rayNG</strong>
+                <span class="block mt-0.5 text-[10px] text-slate-400">Android</span>
+              </div>
+            </a>
+            <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
+              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-400/30 transition-colors duration-200 no-underline text-white">
+              <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center text-blue-300 text-xs font-black">N</div>
+              <div>
+                <strong class="block text-xs font-extrabold">v2rayN</strong>
+                <span class="block mt-0.5 text-[10px] text-slate-400">Windows / macOS / Linux</span>
+              </div>
+            </a>
+            <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
+              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-400/30 transition-colors duration-200 no-underline text-white">
+              <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center text-blue-300 text-xs font-black">H</div>
+              <div>
+                <strong class="block text-xs font-extrabold">Hiddify</strong>
+                <span class="block mt-0.5 text-[10px] text-slate-400">Android / Windows / macOS / Linux</span>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Channel -->
+        <div class="mt-1 py-3.5 px-4 text-center rounded-xl border border-emerald-400/15 bg-emerald-500/5 text-xs text-slate-400">
+          پشتیبانی و اطلاعیه‌ها · <b class="text-emerald-300">کانال تلگرام: logic_sec</b>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .status.good {{ color: #6ee7b7; border: 1px solid rgba(52,211,153,.25); background: rgba(52,211,153,.1); }}
+    .status.bad {{ color: #fda4af; border: 1px solid rgba(251,113,133,.25); background: rgba(251,113,133,.1); }}
+  </style>
+
+  <script>
+    function copyText(id, btn) {{
+      const el = document.getElementById(id);
+      if (!el) return;
+      const text = el.textContent.trim();
+      navigator.clipboard.writeText(text).then(() => {{
+        const label = btn.querySelector('.copy-label');
+        const original = label.textContent;
+        label.textContent = 'کپی شد!';
+        btn.classList.add('!bg-emerald-500/20', '!border-emerald-400/40', '!text-emerald-200');
+        setTimeout(() => {{
+          label.textContent = original;
+          btn.classList.remove('!bg-emerald-500/20', '!border-emerald-400/40', '!text-emerald-200');
+        }}, 1800);
+      }}).catch(() => {{
+        // fallback
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        try {{ document.execCommand('copy'); }} catch(e) {{}}
+        sel.removeAllRanges();
+        const label = btn.querySelector('.copy-label');
+        label.textContent = 'کپی شد!';
+        setTimeout(() => label.textContent = 'کپی', 1800);
+      }});
+    }}
+  </script>
+</body>
+</html>"""
     return HTMLResponse(info_html)
 
 
@@ -5607,7 +5630,11 @@ async def http_proxy(
 
 
 # ============================================================
-# TELEGRAM PROXY GENERATOR
+# TELEGRAM PROXY GENERATOR + MANAGEMENT
+# ============================================================
+# لینک‌ها روی دامنه/هاست واقعی همین پنل ساخته می‌شوند.
+# برای کارکرد واقعی باید سرویس MTProto (مثل mtg) روی همین سرور
+# با همان secretها روی پورت مشخص اجرا شود.
 # ============================================================
 
 FAKE_TLS_DOMAINS = (
@@ -5619,7 +5646,46 @@ FAKE_TLS_DOMAINS = (
     "cdnjs.cloudflare.com",
     "www.amazon.com",
     "www.github.com",
+    "www.divar.ir",
+    "www.aparat.com",
 )
+
+
+def build_tg_links(host: str, port: int, secret: str) -> dict:
+    tg_link = (
+        f"tg://proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+    web_link = (
+        f"https://t.me/proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+    return {
+        "tg_link": tg_link,
+        "web_link": web_link,
+    }
+
+
+def tg_proxy_info(proxy_id: str, proxy: dict, host: str) -> dict:
+    port = int(proxy.get("port") or 443)
+    secret = proxy.get("secret") or ""
+    links = build_tg_links(host, port, secret)
+    return {
+        "id": proxy_id,
+        "label": proxy.get("label") or "",
+        "server": host,
+        "port": port,
+        "secret": secret,
+        "domain": proxy.get("domain") or "",
+        "mode": proxy.get("mode") or "ee",
+        "active": bool(proxy.get("active", True)),
+        "note": proxy.get("note") or "",
+        "created_at": proxy.get("created_at"),
+        "tg_link": links["tg_link"],
+        "web_link": links["web_link"],
+    }
 
 
 @app.post("/api/telegram-proxy")
@@ -5627,41 +5693,141 @@ async def create_telegram_proxy(
     request: Request,
     _=Depends(require_auth),
 ):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
     host = get_host(request)
-    port = 443
+    port = safe_int(body.get("port"), 443, 1, 65535)
+    label = (body.get("label") or "").strip()[:60]
+    note = (body.get("note") or "").strip()[:200]
+    mode = (body.get("mode") or "ee").strip().lower()
+    domain = (body.get("domain") or "").strip().lower()
+
+    if mode not in ("ee", "dd", "plain"):
+        mode = "ee"
+
+    if not domain:
+        domain = secrets.choice(FAKE_TLS_DOMAINS)
 
     raw_secret = secrets.token_hex(16)
-    domain = secrets.choice(FAKE_TLS_DOMAINS)
-    domain_hex = domain.encode("utf-8").hex()
-    secret = f"ee{raw_secret}{domain_hex}"
 
-    tg_link = (
-        f"tg://proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
+    if mode == "ee":
+        domain_hex = domain.encode("utf-8").hex()
+        secret = f"ee{raw_secret}{domain_hex}"
+    elif mode == "dd":
+        secret = f"dd{raw_secret}"
+    else:
+        secret = raw_secret
 
-    web_link = (
-        f"https://t.me/proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
+    if not label:
+        label = f"tg_{secrets.token_hex(3)}"
+
+    proxy_id = secrets.token_hex(8)
+
+    record = {
+        "label": label,
+        "port": port,
+        "secret": secret,
+        "raw_secret": raw_secret,
+        "domain": domain if mode == "ee" else "",
+        "mode": mode,
+        "note": note,
+        "active": True,
+        "created_at": datetime.now().isoformat(),
+    }
+
+    async with TG_PROXIES_LOCK:
+        TG_PROXIES[proxy_id] = record
+
+    await save_state()
+
+    info = tg_proxy_info(proxy_id, record, host)
 
     log_activity(
         "telegram",
-        f"پروکسی تلگرام ساخته شد → {host}:{port} ({domain})",
+        f"پروکسی تلگرام ساخته شد: {label} → {host}:{port}",
         "info",
     )
 
     return {
         "ok": True,
-        "server": host,
-        "port": port,
-        "secret": secret,
-        "domain": domain,
-        "tg_link": tg_link,
-        "web_link": web_link,
+        **info,
     }
+
+
+@app.get("/api/telegram-proxies")
+async def list_telegram_proxies(
+    request: Request,
+    _=Depends(require_auth),
+):
+    host = get_host(request)
+    result = []
+
+    async with TG_PROXIES_LOCK:
+        items = list(TG_PROXIES.items())
+
+    for proxy_id, proxy in items:
+        result.append(tg_proxy_info(proxy_id, proxy, host))
+
+    result.sort(
+        key=lambda item: item.get("created_at") or "",
+        reverse=True,
+    )
+
+    return {
+        "ok": True,
+        "proxies": result,
+        "count": len(result),
+        "server": host,
+    }
+
+
+@app.delete("/api/telegram-proxies/{proxy_id}")
+async def delete_telegram_proxy(
+    proxy_id: str,
+    _=Depends(require_auth),
+):
+    async with TG_PROXIES_LOCK:
+        if proxy_id not in TG_PROXIES:
+            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
+        label = TG_PROXIES[proxy_id].get("label", proxy_id)
+        TG_PROXIES.pop(proxy_id, None)
+
+    await save_state()
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام حذف شد: {label}",
+        "info",
+    )
+
+    return {"ok": True}
+
+
+@app.post("/api/telegram-proxies/{proxy_id}/toggle")
+async def toggle_telegram_proxy(
+    proxy_id: str,
+    _=Depends(require_auth),
+):
+    async with TG_PROXIES_LOCK:
+        if proxy_id not in TG_PROXIES:
+            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
+        current = bool(TG_PROXIES[proxy_id].get("active", True))
+        TG_PROXIES[proxy_id]["active"] = not current
+        active = TG_PROXIES[proxy_id]["active"]
+        label = TG_PROXIES[proxy_id].get("label", proxy_id)
+
+    await save_state()
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام {'فعال' if active else 'غیرفعال'} شد: {label}",
+        "info",
+    )
+
+    return {"ok": True, "active": active}
 
 
 # ============================================================
@@ -5833,6 +5999,7 @@ body{
     color:#fca5a5;
 }
 
+
 .top-btn.tg-proxy{
     background:linear-gradient(135deg,#0ea5e9,#2563eb);
     border-color:transparent;
@@ -5841,6 +6008,153 @@ body{
 }
 .top-btn.tg-proxy:hover{
     filter:brightness(1.08);
+}
+
+.tg-panel{
+    margin-top:14px;
+    border-radius:22px;
+    border:1px solid rgba(255,255,255,.10);
+    background:
+        linear-gradient(145deg, rgba(14,165,233,.08), rgba(37,99,235,.04)),
+        rgba(255,255,255,.035);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:
+        0 10px 40px rgba(0,0,0,.22),
+        inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;
+}
+.tg-panel-head{
+    padding:16px 18px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    background:linear-gradient(90deg, rgba(14,165,233,.10), transparent);
+}
+.tg-panel-title{
+    font-size:13px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.tg-panel-title span.dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#38bdf8;
+    box-shadow:0 0 12px #38bdf8;
+}
+.tg-panel-sub{
+    margin-top:3px;
+    color:rgba(255,255,255,.38);
+    font-size:9.5px;
+}
+.tg-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:12px;
+    padding:14px;
+}
+.tg-card{
+    position:relative;
+    border-radius:18px;
+    padding:14px;
+    border:1px solid rgba(255,255,255,.09);
+    background:
+        linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    transition:.2s ease;
+}
+.tg-card:hover{
+    border-color:rgba(56,189,248,.28);
+    transform:translateY(-2px);
+    box-shadow:0 12px 28px rgba(14,165,233,.12);
+}
+.tg-card.off{
+    opacity:.55;
+    filter:grayscale(.35);
+}
+.tg-card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:10px;
+}
+.tg-card-name{
+    font-size:12px;
+    font-weight:800;
+}
+.tg-card-meta{
+    margin-top:4px;
+    font-size:9px;
+    color:rgba(255,255,255,.38);
+    direction:ltr;
+    text-align:right;
+}
+.tg-badge{
+    display:inline-flex;
+    padding:4px 9px;
+    border-radius:999px;
+    font-size:8px;
+    font-weight:700;
+}
+.tg-badge.on{
+    color:#7dd3fc;
+    background:rgba(14,165,233,.14);
+    border:1px solid rgba(14,165,233,.22);
+}
+.tg-badge.off{
+    color:#fca5a5;
+    background:rgba(239,68,68,.10);
+    border:1px solid rgba(239,68,68,.18);
+}
+.tg-link-box{
+    margin-top:10px;
+    padding:10px 11px;
+    border-radius:12px;
+    background:rgba(0,0,0,.22);
+    border:1px solid rgba(255,255,255,.06);
+    font-family:Consolas,monospace;
+    font-size:9px;
+    direction:ltr;
+    text-align:left;
+    color:#bae6fd;
+    word-break:break-all;
+    line-height:1.6;
+    max-height:52px;
+    overflow:hidden;
+}
+.tg-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:12px;
+}
+.tg-actions .action{
+    flex:1;
+    min-width:70px;
+    justify-content:center;
+}
+.tg-empty{
+    grid-column:1/-1;
+    text-align:center;
+    padding:28px 16px;
+    color:rgba(255,255,255,.40);
+    font-size:11px;
+    line-height:1.9;
+}
+.tg-hint{
+    margin:0 14px 14px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:rgba(14,165,233,.07);
+    border:1px solid rgba(14,165,233,.15);
+    color:rgba(255,255,255,.58);
+    font-size:10px;
+    line-height:1.85;
 }
 
 
@@ -6627,6 +6941,38 @@ class="stat-value"
 </div>
 
 
+
+<div class="tg-panel">
+  <div class="tg-panel-head">
+    <div>
+      <div class="tg-panel-title">
+        <span class="dot"></span>
+        مدیریت پروکسی تلگرام
+      </div>
+      <div class="tg-panel-sub">
+        لینک‌ها روی دامنه واقعی همین سرور ساخته می‌شوند · FakeTLS / Secure
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="top-btn tg-proxy" onclick="openTgCreateModal()">
+        + ساخت پروکسی
+      </button>
+      <button class="top-btn" onclick="refreshTgProxies()">↻ بروزرسانی</button>
+    </div>
+  </div>
+
+  <div id="tgProxyGrid" class="tg-grid">
+    <div class="tg-empty">در حال بارگذاری پروکسی‌ها...</div>
+  </div>
+
+  <div class="tg-hint">
+    <strong style="color:#7dd3fc">راهنما:</strong>
+    هر پروکسی با secret اختصاصی روی <b>هاست همین پنل</b> ساخته می‌شود.
+    برای اتصال واقعی کاربران، سرویس MTProto (مثل <code style="direction:ltr">mtg</code> یا <code style="direction:ltr">teleproxy</code>) باید روی همین سرور با همان secret و پورت اجرا شود.
+    تا آن زمان لینک‌ها آماده اشتراک‌گذاری و مدیریت داخل پنل هستند.
+  </div>
+</div>
+
 <div class="panel">
 
 <div class="panel-head">
@@ -7207,45 +7553,77 @@ onclick="createManual()"
 
 
 
+
 <!-- ===================================================== -->
-<!-- TELEGRAM PROXY MODAL -->
+<!-- TELEGRAM CREATE MODAL -->
 <!-- ===================================================== -->
 
-<div
-id="tgProxyModal"
-class="modal-backdrop"
->
-
-<div class="modal" style="max-width:540px">
-
+<div id="tgCreateModal" class="modal-backdrop">
+<div class="modal" style="max-width:480px">
 <div class="modal-head">
-
-<div class="modal-title">
-پروکسی تلگرام ساخته شد
+<div class="modal-title">ساخت پروکسی تلگرام</div>
+<button class="close" onclick="closeTgCreateModal()">×</button>
 </div>
 
-<button
-class="close"
-onclick="closeTgProxyModal()"
->
-×
-</button>
+<div class="form-grid">
+<div class="field">
+<label>نام پروکسی</label>
+<input id="tgCreateName" placeholder="مثلاً Iran-TG-1" />
+</div>
+<div class="field">
+<label>پورت</label>
+<input id="tgCreatePort" type="number" min="1" max="65535" value="443" />
+</div>
+<div class="field">
+<label>حالت Secret</label>
+<select id="tgCreateMode">
+<option value="ee" selected>FakeTLS (ee) — پیشنهادی</option>
+<option value="dd">Secure (dd)</option>
+<option value="plain">Plain</option>
+</select>
+</div>
+<div class="field">
+<label>دامنه FakeTLS (اختیاری)</label>
+<input id="tgCreateDomain" placeholder="خودکار انتخاب می‌شود" style="direction:ltr;text-align:left" />
+</div>
+<div class="field full">
+<label>یادداشت</label>
+<textarea id="tgCreateNote" placeholder="اختیاری"></textarea>
+</div>
+</div>
 
+<div class="modal-actions">
+<button class="modal-btn secondary" onclick="closeTgCreateModal()">انصراف</button>
+<button class="modal-btn primary" onclick="submitTgCreate()">ساخت و نمایش لینک</button>
+</div>
+</div>
+</div>
+
+
+<!-- ===================================================== -->
+<!-- TELEGRAM RESULT MODAL -->
+<!-- ===================================================== -->
+
+<div id="tgProxyModal" class="modal-backdrop">
+<div class="modal" style="max-width:540px">
+<div class="modal-head">
+<div class="modal-title">پروکسی آماده شد</div>
+<button class="close" onclick="closeTgProxyModal()">×</button>
 </div>
 
 <div style="color:rgba(255,255,255,.55);font-size:11px;line-height:1.9;margin-bottom:14px">
-لینک آماده استفاده در تلگرام. روی لینک بزنید تا خودکار اضافه شود.
+لینک روی دامنه واقعی سرور شما ساخته شده است.
 </div>
 
-<div class="field full" style="margin-bottom:14px">
-<label>لینک مستقیم تلگرام (پیشنهادی)</label>
+<div class="field full" style="margin-bottom:12px">
+<label>لینک مستقیم تلگرام</label>
 <div style="display:flex;gap:8px;align-items:center">
 <input id="tgLinkDirect" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
 <button class="modal-btn primary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkDirect')">کپی</button>
 </div>
 </div>
 
-<div class="field full" style="margin-bottom:14px">
+<div class="field full" style="margin-bottom:12px">
 <label>لینک t.me</label>
 <div style="display:flex;gap:8px;align-items:center">
 <input id="tgLinkWeb" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
@@ -7253,41 +7631,18 @@ onclick="closeTgProxyModal()"
 </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-<div class="field">
-<label>سرور</label>
-<input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field">
-<label>پورت</label>
-<input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field full">
-<label>Secret (FakeTLS)</label>
-<input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field full">
-<label>دامنه FakeTLS</label>
-<input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+<div class="field"><label>سرور</label><input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field"><label>پورت</label><input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field full"><label>Secret</label><input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field full"><label>دامنه / حالت</label><input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
 </div>
 
-<div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.18);border-radius:12px;padding:12px 14px;font-size:10.5px;line-height:1.85;color:rgba(255,255,255,.65)">
-<strong style="color:#7dd3fc">نکته مهم:</strong>
-این لینک با استاندارد FakeTLS ساخته شده است. برای کارکرد واقعی باید روی همین سرور یک سرویس MTProto (مثل mtg یا teleproxy) روی پورت ۴۴۳ در حال اجرا باشد. در غیر این صورت لینک فقط برای اشتراک‌گذاری آماده است.
+<div class="modal-actions">
+<button class="modal-btn secondary" onclick="closeTgProxyModal()">بستن</button>
+<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">کپی لینک اصلی</button>
 </div>
-
-<div class="modal-actions" style="margin-top:18px">
-<button class="modal-btn secondary" onclick="closeTgProxyModal()">
-بستن
-</button>
-<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">
-کپی لینک اصلی
-</button>
 </div>
-
-</div>
-
 </div>
 
 
@@ -8094,8 +8449,11 @@ data-action="delete"
 
     }
 
-}
+    try {
+        await refreshTgProxies();
+    } catch (e) {}
 
+}
 
 async function copyText(text){
 
@@ -8229,6 +8587,20 @@ function closePasswordModal(){
 
 
 
+
+function openTgCreateModal(){
+    document.getElementById("tgCreateName").value = "";
+    document.getElementById("tgCreatePort").value = "443";
+    document.getElementById("tgCreateMode").value = "ee";
+    document.getElementById("tgCreateDomain").value = "";
+    document.getElementById("tgCreateNote").value = "";
+    document.getElementById("tgCreateModal").classList.add("open");
+}
+
+function closeTgCreateModal(){
+    document.getElementById("tgCreateModal").classList.remove("open");
+}
+
 function openTgProxyModal(){
     document.getElementById("tgProxyModal").classList.add("open");
 }
@@ -8237,29 +8609,59 @@ function closeTgProxyModal(){
     document.getElementById("tgProxyModal").classList.remove("open");
 }
 
-async function createTelegramProxy(){
-    showToast("در حال ساخت پروکسی تلگرام...");
+function showTgResult(data){
+    document.getElementById("tgServer").value = data.server || "";
+    document.getElementById("tgPort").value = data.port || "";
+    document.getElementById("tgSecret").value = data.secret || "";
+    document.getElementById("tgDomain").value = (data.domain || data.mode || "");
+    document.getElementById("tgLinkDirect").value = data.tg_link || "";
+    document.getElementById("tgLinkWeb").value = data.web_link || "";
+    openTgProxyModal();
+}
+
+async function submitTgCreate(){
+    const body = {
+        label: document.getElementById("tgCreateName").value.trim(),
+        port: Number(document.getElementById("tgCreatePort").value || 443),
+        mode: document.getElementById("tgCreateMode").value,
+        domain: document.getElementById("tgCreateDomain").value.trim(),
+        note: document.getElementById("tgCreateNote").value.trim(),
+    };
+
+    showToast("در حال ساخت پروکسی...");
+    closeTgCreateModal();
 
     const result = await api("/api/telegram-proxy", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: "{}"
+        body: JSON.stringify(body),
     });
 
+    if (!result || !result.ok) {
+        showToast("خطا در ساخت پروکسی");
+        return;
+    }
+
+    showTgResult(result);
+    showToast("پروکسی ساخته شد");
+    await refreshTgProxies();
+}
+
+async function createTelegramProxy(){
+    // one-click auto create (top button)
+    showToast("در حال ساخت پروکسی تلگرام...");
+    const result = await api("/api/telegram-proxy", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({}),
+    });
     if (!result || !result.ok) {
         showToast("خطا در ساخت پروکسی تلگرام");
         return;
     }
-
-    document.getElementById("tgServer").value = result.server || "";
-    document.getElementById("tgPort").value = result.port || "";
-    document.getElementById("tgSecret").value = result.secret || "";
-    document.getElementById("tgDomain").value = result.domain || "";
-    document.getElementById("tgLinkDirect").value = result.tg_link || "";
-    document.getElementById("tgLinkWeb").value = result.web_link || "";
-
-    openTgProxyModal();
+    showTgResult(result);
     showToast("پروکسی تلگرام آماده شد");
+    await refreshTgProxies();
 }
 
 async function copyTgLink(id){
@@ -8269,6 +8671,74 @@ async function copyTgLink(id){
     }
 }
 
+async function refreshTgProxies(){
+    const data = await api("/api/telegram-proxies");
+    const grid = document.getElementById("tgProxyGrid");
+    if (!grid) return;
+
+    if (!data || !data.ok) {
+        grid.innerHTML = '<div class="tg-empty">خطا در دریافت لیست پروکسی‌ها</div>';
+        return;
+    }
+
+    const list = data.proxies || [];
+    if (!list.length) {
+        grid.innerHTML = `
+          <div class="tg-empty">
+            هنوز پروکسی تلگرامی ساخته نشده است.<br>
+            از دکمه <b>ساخت پروکسی</b> استفاده کنید.
+          </div>`;
+        return;
+    }
+
+    grid.innerHTML = "";
+    for (const p of list) {
+        const card = document.createElement("div");
+        card.className = "tg-card" + (p.active ? "" : " off");
+        const status = p.active
+            ? '<span class="tg-badge on">فعال</span>'
+            : '<span class="tg-badge off">خاموش</span>';
+        card.innerHTML = `
+          <div class="tg-card-top">
+            <div>
+              <div class="tg-card-name">${escapeHtml(p.label || "بدون نام")}</div>
+              <div class="tg-card-meta">${escapeHtml(p.server)}:${p.port} · ${escapeHtml(p.mode || "ee")}</div>
+            </div>
+            ${status}
+          </div>
+          <div class="tg-link-box" title="${escapeHtml(p.tg_link)}">${escapeHtml(p.tg_link)}</div>
+          <div class="tg-actions">
+            <button class="action primary" data-act="copy">کپی لینک</button>
+            <button class="action" data-act="toggle">${p.active ? "خاموش" : "فعال"}</button>
+            <button class="action danger" data-act="del">حذف</button>
+          </div>
+        `;
+        card.querySelectorAll("button[data-act]").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const act = btn.dataset.act;
+                if (act === "copy") {
+                    await copyText(p.tg_link);
+                    return;
+                }
+                btn.disabled = true;
+                try {
+                    if (act === "toggle") {
+                        await api("/api/telegram-proxies/" + p.id + "/toggle", { method: "POST" });
+                        await refreshTgProxies();
+                    } else if (act === "del") {
+                        if (!confirm("این پروکسی حذف شود؟")) return;
+                        await api("/api/telegram-proxies/" + p.id, { method: "DELETE" });
+                        showToast("حذف شد");
+                        await refreshTgProxies();
+                    }
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+        grid.appendChild(card);
+    }
+}
 
 async function createAuto(){
 
