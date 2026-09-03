@@ -6,6 +6,7 @@
 import asyncio
 import base64
 import hashlib
+import ipaddress
 import json
 import logging
 import os
@@ -35,6 +36,7 @@ from fastapi.responses import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 
+
 # ============================================================
 # APP
 # ============================================================
@@ -52,6 +54,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(APP_NAME)
 
+
 # ============================================================
 # TIMEZONE
 # ============================================================
@@ -63,6 +66,7 @@ try:
 
 except Exception:
     IRAN_TZ = None
+
 
 # ============================================================
 # RAILWAY
@@ -93,6 +97,7 @@ DATA_DIR.mkdir(
 DATA_FILE = DATA_DIR / "pixonpanel_state.json"
 SECRET_FILE = DATA_DIR / "pixonpanel_secret.key"
 
+
 # ============================================================
 # FASTAPI
 # ============================================================
@@ -112,6 +117,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ============================================================
 # LOCKS
 # ============================================================
@@ -120,6 +126,7 @@ SAVE_LOCK = asyncio.Lock()
 LINKS_LOCK = asyncio.Lock()
 SUBS_LOCK = asyncio.Lock()
 SESSIONS_LOCK = asyncio.Lock()
+
 
 # ============================================================
 # SECRET
@@ -161,7 +168,9 @@ def load_or_create_secret() -> str:
 
         return secrets.token_urlsafe(48)
 
+
 SECRET_KEY = load_or_create_secret()
+
 
 # ============================================================
 # CONFIG
@@ -175,6 +184,7 @@ CONFIG = {
         "localhost",
     ),
 }
+
 
 # ============================================================
 # STATE
@@ -198,6 +208,7 @@ activity_logs = deque(maxlen=250)
 hourly_traffic = defaultdict(int)
 
 http_client: httpx.AsyncClient | None = None
+
 
 # ============================================================
 # PROTOCOL
@@ -239,7 +250,6 @@ PROTOCOL_ALIASES = {
 }
 
 DEFAULT_PROTOCOL = "vless-ws"
-BEST_PROTOCOL = "xhttp-packet-up"  # بهترین پروتکل
 
 FINGERPRINTS = (
     "chrome",
@@ -255,7 +265,6 @@ FINGERPRINTS = (
 )
 
 DEFAULT_FINGERPRINT = "chrome"
-BEST_FINGERPRINT = "randomized"  # بهترین برای Maximum
 
 DEFAULT_ALPN_BY_PROTOCOL = {
     "vless-ws": "http/1.1",
@@ -270,10 +279,56 @@ MAX_PORT = 65535
 
 DEFAULT_SPEED_LIMIT = 0
 
+# کشورها برای کانفیگ‌های دستی. مقدار کد برای ذخیره‌سازی پایدار است.
+COUNTRIES = {
+    "NL": "🇳🇱 هلند",
+    "DE": "🇩🇪 آلمان",
+    "FR": "🇫🇷 فرانسه",
+    "GB": "🇬🇧 انگلیس",
+    "US": "🇺🇸 آمریکا",
+    "FI": "🇫🇮 فنلاند",
+    "TR": "🇹🇷 ترکیه",
+    "IR": "🇮🇷 ایران",
+    "RU": "🇷🇺 روسیه",
+    "AE": "🇦🇪 امارات",
+    "OTHER": "🌍 سایر",
+}
+DEFAULT_COUNTRY = "OTHER"
+
+
+def normalize_country(country: str | None) -> str:
+    value = str(country or DEFAULT_COUNTRY).strip().upper()
+    return value if value in COUNTRIES else DEFAULT_COUNTRY
+
+
+def normalize_manual_host(value: str | None) -> str:
+    """Validate an entered IP/domain without performing any network scan."""
+    host = str(value or "").strip()
+    if not host:
+        return ""
+    if len(host) > 253:
+        raise ValueError("IP/Host بیش از حد طولانی است")
+    # IPv4/IPv6 را می‌پذیریم؛ برای دامنه نیز کاراکترهای معمول DNS مجازند.
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
+    if " " in host or "/" in host or "\\" in host:
+        raise ValueError("IP/Host واردشده معتبر نیست")
+    labels = host.rstrip(".").split(".")
+    if not labels or any(not label or len(label) > 63 for label in labels):
+        raise ValueError("IP/Host واردشده معتبر نیست")
+    if any(not all(ch.isalnum() or ch == "-" for ch in label) or label.startswith("-") or label.endswith("-") for label in labels):
+        raise ValueError("IP/Host واردشده معتبر نیست")
+    return host
+
+
 def normalize_protocol(protocol: str | None) -> str:
     value = str(protocol or DEFAULT_PROTOCOL).strip().lower()
     value = PROTOCOL_ALIASES.get(value, value)
     return value if value in PROTOCOLS else DEFAULT_PROTOCOL
+
 
 # ============================================================
 # LOGGING
@@ -293,6 +348,7 @@ def log_activity(
         }
     )
 
+
 # ============================================================
 # HELPERS
 # ============================================================
@@ -304,12 +360,13 @@ def escape_html(value) -> str:
             if value is not None
             else ""
         )
-        .replace("&", "&")
-        .replace("<", "<")
-        .replace(">", ">")
-        .replace('"', "")
-        .replace("'", "'")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#039;")
     )
+
 
 def safe_int(
     value,
@@ -330,6 +387,7 @@ def safe_int(
 
     return number
 
+
 def safe_float(
     value,
     default=0.0,
@@ -345,6 +403,7 @@ def safe_float(
         number,
     )
 
+
 def generate_uuid():
     value = secrets.token_hex(16)
 
@@ -355,6 +414,7 @@ def generate_uuid():
         f"{value[16:20]}-"
         f"{value[20:32]}"
     )
+
 
 def auto_config_name() -> str:
     alphabet = (
@@ -369,11 +429,13 @@ def auto_config_name() -> str:
 
     return f"pxpanel_{suffix}"
 
+
 def now_ir():
     if IRAN_TZ:
         return datetime.now(IRAN_TZ)
 
     return datetime.now()
+
 
 def uptime():
     seconds = int(
@@ -399,6 +461,7 @@ def uptime():
         f"{s:02d}"
     )
 
+
 def fmt_bytes(value: int):
     value = int(
         value or 0
@@ -420,6 +483,7 @@ def fmt_bytes(value: int):
     return (
         f"{value / 1024 ** 3:.2f} GB"
     )
+
 
 def parse_size_to_bytes(
     value: float,
@@ -459,6 +523,7 @@ def parse_size_to_bytes(
 
     return int(value)
 
+
 def parse_speed_to_bytes(
     value: float,
     unit: str,
@@ -493,6 +558,7 @@ def parse_speed_to_bytes(
 
     return int(value)
 
+
 def is_link_expired(
     link: dict,
 ):
@@ -513,6 +579,7 @@ def is_link_expired(
 
     except Exception:
         return False
+
 
 def is_link_allowed(
     link: dict | None,
@@ -553,6 +620,7 @@ def is_link_allowed(
 
     return True
 
+
 def unique_ips_for_uuid(
     uuid: str,
 ):
@@ -562,6 +630,7 @@ def unique_ips_for_uuid(
         if connection.get("uuid") == uuid
         and connection.get("ip")
     }
+
 
 def client_ip(
     request: Request,
@@ -589,6 +658,7 @@ def client_ip(
 
     return "unknown"
 
+
 def is_ip_allowed(
     link: dict | None,
     uuid: str,
@@ -614,6 +684,7 @@ def is_ip_allowed(
         return True
 
     return len(ips) < limit
+
 
 def get_host(
     request: Request | None = None,
@@ -649,6 +720,7 @@ def get_host(
 
     return CONFIG["host"]
 
+
 # ============================================================
 # PASSWORD
 # ============================================================
@@ -666,6 +738,7 @@ def hash_password(
         payload
     ).hexdigest()
 
+
 DEFAULT_ADMIN_PASSWORD = os.environ.get(
     "ADMIN_PASSWORD",
     "pxpanel2026",
@@ -678,6 +751,7 @@ AUTH = {
         )
 }
 
+
 # ============================================================
 # LOGIN BRUTE-FORCE PROTECTION
 # ============================================================
@@ -689,6 +763,7 @@ LOGIN_MIN_PASSWORD_LENGTH = 6
 
 LOGIN_FAILURES = defaultdict(deque)
 LOGIN_LOCKED_UNTIL = {}
+
 
 def _cleanup_login_state(ip: str, now: float | None = None):
     now = now if now is not None else time.time()
@@ -708,6 +783,7 @@ def _cleanup_login_state(ip: str, now: float | None = None):
     if not failures:
         LOGIN_FAILURES.pop(ip, None)
 
+
 def login_is_blocked(ip: str):
     now = time.time()
     _cleanup_login_state(ip, now)
@@ -717,6 +793,7 @@ def login_is_blocked(ip: str):
         return True, max(1, int(locked_until - now))
 
     return False, 0
+
 
 def register_login_failure(ip: str):
     now = time.time()
@@ -730,16 +807,18 @@ def register_login_failure(ip: str):
         failures.clear()
         log_activity(
             "auth",
-            f"IP به دلیل تلاشهای متعدد ورود ناموفق به مدت {LOGIN_LOCKOUT_SECONDS // 60} دقیقه مسدود شد: {ip}",
+            f"IP به دلیل تلاش‌های متعدد ورود ناموفق به مدت {LOGIN_LOCKOUT_SECONDS // 60} دقیقه مسدود شد: {ip}",
             "err",
         )
         return True, LOGIN_LOCKOUT_SECONDS
 
     return False, max(0, LOGIN_MAX_ATTEMPTS - len(failures))
 
+
 def clear_login_failures(ip: str):
     LOGIN_FAILURES.pop(ip, None)
     LOGIN_LOCKED_UNTIL.pop(ip, None)
+
 
 # ============================================================
 # SESSION
@@ -754,6 +833,7 @@ SESSION_TTL = (
     * 365
 )
 
+
 async def create_session() -> str:
 
     token = secrets.token_urlsafe(48)
@@ -765,6 +845,7 @@ async def create_session() -> str:
         )
 
     return token
+
 
 async def is_valid_session(
     token: str | None,
@@ -791,6 +872,7 @@ async def is_valid_session(
 
         return True
 
+
 async def destroy_session(
     token: str | None,
 ):
@@ -802,6 +884,7 @@ async def destroy_session(
             token,
             None,
         )
+
 
 async def require_auth(
     request: Request,
@@ -819,6 +902,7 @@ async def require_auth(
         )
 
     return token
+
 
 def set_auth_cookie(
     response,
@@ -849,6 +933,7 @@ def set_auth_cookie(
         secure=is_https,
     )
 
+
 # ============================================================
 # VLESS LINK GENERATION
 # ============================================================
@@ -857,6 +942,7 @@ def generate_vless_link(
     uuid: str, host: str, remark: str = "PXPanel",
     protocol: str = DEFAULT_PROTOCOL, fingerprint: str | None = None,
     alpn: str | None = None, port: int | None = None,
+    sni_host: str | None = None,
 ):
     protocol = normalize_protocol(protocol)
     fp = (fingerprint or DEFAULT_FINGERPRINT).strip().lower()
@@ -864,18 +950,19 @@ def generate_vless_link(
     port_value = safe_int(port, DEFAULT_PORT, MIN_PORT, MAX_PORT)
     alpn_value = (alpn or DEFAULT_ALPN_BY_PROTOCOL.get(protocol, "http/1.1")).strip()
     label = quote(str(remark or "PXPanel"), safe="")
+    tls_host = str(sni_host or host).strip() or host
     if protocol == "vless-ws":
-        q = {"encryption":"none","security":"tls","type":"ws","host":host,"path":f"/ws/{uuid}","sni":host,"fp":fp,"alpn":alpn_value}
+        q = {"encryption":"none","security":"tls","type":"ws","host":tls_host,"path":f"/ws/{uuid}","sni":tls_host,"fp":fp,"alpn":alpn_value}
         return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
     if protocol.startswith("xhttp-"):
         mode = protocol.replace("xhttp-", "")
-        q = {"encryption":"none","security":"tls","type":"xhttp","mode":mode,"host":host,"path":f"/xhttp-siz10/{mode}/{uuid}","sni":host,"fp":fp,"alpn":alpn_value}
+        q = {"encryption":"none","security":"tls","type":"xhttp","mode":mode,"host":tls_host,"path":f"/xhttp-siz10/{mode}/{uuid}","sni":tls_host,"fp":fp,"alpn":alpn_value}
         return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
     if protocol == "vmess-ws":
-        raw = {"v":"2","ps":remark,"add":host,"port":port_value,"id":uuid,"aid":0,"scy":"auto","net":"ws","type":"none","host":host,"path":f"/ws/{uuid}","tls":"tls","sni":host,"fp":fp}
+        raw = {"v":"2","ps":remark,"add":host,"port":port_value,"id":uuid,"aid":0,"scy":"auto","net":"ws","type":"none","host":tls_host,"path":f"/ws/{uuid}","tls":"tls","sni":tls_host,"fp":fp}
         return "vmess://" + base64.b64encode(json.dumps(raw,separators=(",",":"),ensure_ascii=False).encode()).decode()
     if protocol == "trojan-ws":
-        return f"trojan://{uuid}@{host}:{port_value}?security=tls&type=ws&host={quote(host)}&path={quote('/ws/'+uuid)}&sni={quote(host)}#{label}"
+        return f"trojan://{uuid}@{host}:{port_value}?security=tls&type=ws&host={quote(tls_host)}&path={quote('/ws/'+uuid)}&sni={quote(tls_host)}#{label}"
     if protocol == "shadowsocks":
         method = os.getenv("SS_METHOD", "aes-256-gcm")
         userinfo = base64.urlsafe_b64encode(f"{method}:{uuid}".encode()).decode().rstrip("=")
@@ -892,9 +979,11 @@ def vless_link_for_link(
     uid: str,
     host: str,
 ):
+    connect_host = str(link.get("clean_ip") or link.get("manual_host") or host).strip() or host
+    sni_host = str(link.get("sni_host") or host).strip() or host
     return generate_vless_link(
         uid,
-        host,
+        connect_host,
         remark=(
             f"PixonPanel-"
             f"{link.get('label', '')}"
@@ -914,7 +1003,9 @@ def vless_link_for_link(
             "port",
             DEFAULT_PORT,
         ),
+        sni_host=sni_host,
     )
+
 
 def get_link_info(
     link: dict,
@@ -990,6 +1081,10 @@ def get_link_info(
             "port",
             DEFAULT_PORT,
         ),
+        "manual_host": link.get("manual_host", ""),
+        "clean_ip": link.get("clean_ip", ""),
+        "country": normalize_country(link.get("country")),
+        "country_name": link.get("country_name") or COUNTRIES.get(normalize_country(link.get("country")), COUNTRIES[DEFAULT_COUNTRY]),
         "note": link.get(
             "note",
             "",
@@ -1009,6 +1104,7 @@ def get_link_info(
         ),
         "support": SUPPORT_USERNAME,
     }
+
 
 # ============================================================
 # PERSISTENCE
@@ -1108,6 +1204,12 @@ async def load_state():
                 0,
             )
 
+            link.setdefault("manual_host", "")
+            link.setdefault("clean_ip", "")
+            link.setdefault("country", DEFAULT_COUNTRY)
+            link.setdefault("country_name", COUNTRIES.get(link.get("country"), COUNTRIES[DEFAULT_COUNTRY]))
+            link.setdefault("sni_host", link.get("manual_host", ""))
+
         logger.info(
             "State loaded: %d links / %d subscriptions",
             len(LINKS),
@@ -1120,6 +1222,7 @@ async def load_state():
             "Could not load state: %s",
             exc,
         )
+
 
 async def save_state():
 
@@ -1179,11 +1282,13 @@ async def save_state():
                 exc,
             )
 
+
 # ============================================================
 # DEFAULT LINK
 # ============================================================
 
 _default_link_created = False
+
 
 async def ensure_default_link():
 
@@ -1216,7 +1321,7 @@ async def ensure_default_link():
 
             LINKS[uid] = {
                 "label":
-                    "لینک پیشفرض",
+                    "لینک پیش‌فرض",
 
                 "limit_bytes":
                     0,
@@ -1265,6 +1370,12 @@ async def ensure_default_link():
 
                 "fragment":
                     "off",
+
+                "manual_host": "",
+                "clean_ip": "",
+                "country": DEFAULT_COUNTRY,
+                "country_name": COUNTRIES[DEFAULT_COUNTRY],
+                "sni_host": "",
             }
 
             asyncio.create_task(
@@ -1272,6 +1383,7 @@ async def ensure_default_link():
             )
 
     _default_link_created = True
+
 
 # ============================================================
 # LINK MANAGEMENT
@@ -1291,6 +1403,9 @@ async def make_link(
     speed_limit_bytes: int = 0,
     connection_limit: int = 0,
     fragment: str = "off",
+    manual_host: str = "",
+    clean_ip: str = "",
+    country: str = DEFAULT_COUNTRY,
 ):
 
     protocol = normalize_protocol(protocol)
@@ -1309,6 +1424,10 @@ async def make_link(
         <= MAX_PORT
     ):
         port = DEFAULT_PORT
+
+    manual_host = normalize_manual_host(manual_host) if manual_host else ""
+    clean_ip = normalize_manual_host(clean_ip) if clean_ip else ""
+    country = normalize_country(country)
 
     uid = generate_uuid()
 
@@ -1388,6 +1507,12 @@ async def make_link(
                 or "off"
             ).strip().lower(),
 
+        "manual_host": manual_host,
+        "clean_ip": clean_ip,
+        "country": country,
+        "country_name": COUNTRIES.get(country, COUNTRIES[DEFAULT_COUNTRY]),
+        "sni_host": manual_host or "",
+
         "security_profile": "balanced",
         "multi_login": False,
         "protocol_label": PROTOCOL_LABELS.get(protocol, protocol),
@@ -1425,6 +1550,7 @@ async def make_link(
     )
 
     return uid, record
+
 
 async def remove_link(
     uid: str,
@@ -1480,6 +1606,7 @@ async def remove_link(
 
     return label
 
+
 async def set_link_active(
     uid: str,
     active: bool,
@@ -1513,6 +1640,7 @@ async def set_link_active(
     )
 
     return record
+
 
 # ============================================================
 # SUB GROUPS
@@ -1586,6 +1714,7 @@ async def create_sub_group(
         sub_id,
         record,
     )
+
 
 async def set_link_sub(
     uid: str,
@@ -1673,6 +1802,7 @@ async def set_link_sub(
 
     return True
 
+
 async def remove_sub_group(
     sub_id: str,
 ):
@@ -1714,6 +1844,7 @@ async def remove_sub_group(
     )
 
     return name
+
 
 # ============================================================
 # STARTUP
@@ -1766,6 +1897,7 @@ async def startup():
         DATA_DIR,
     )
 
+
 @app.on_event("shutdown")
 async def shutdown():
 
@@ -1773,6 +1905,7 @@ async def shutdown():
 
     if http_client:
         await http_client.aclose()
+
 
 # ============================================================
 # LANDING
@@ -2012,7 +2145,7 @@ PixonPanel
 </div>
 
 <div class="version">
-13.0.1 Beta
+12.1.0 Beta
 </div>
 </div>
 
@@ -2060,7 +2193,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PixonPanel · 13.0.1 Beta
+PixonPanel · 12.1.0 Beta
 </span>
 
 <a
@@ -2078,6 +2211,7 @@ class="support"
 </body>
 </html>
 """
+
 
 @app.get(
     "/",
@@ -2100,6 +2234,7 @@ async def root(
         LANDING_HTML
     )
 
+
 # ============================================================
 # HEALTH
 # ============================================================
@@ -2114,6 +2249,7 @@ async def health():
         "connections": len(connections),
         "uptime": uptime(),
     }
+
 
 # ============================================================
 # LOGIN
@@ -2327,7 +2463,7 @@ P
 </h1>
 
 <div class="version">
-13.0.1 Beta
+12.1.0 Beta
 </div>
 
 <div class="desc">
@@ -2371,6 +2507,7 @@ class="support"
 </html>
 """
 
+
 def login_error_html(
     message: str,
 ):
@@ -2389,6 +2526,7 @@ def login_error_html(
             """
         ),
     )
+
 
 @app.get(
     "/login",
@@ -2410,6 +2548,7 @@ async def login_page(
     return HTMLResponse(
         LOGIN_HTML
     )
+
 
 @app.post("/login")
 async def login_form(
@@ -2478,7 +2617,7 @@ async def login_form(
         minutes = max(1, (retry_after + 59) // 60)
         return HTMLResponse(
             login_error_html(
-                f"به دلیل تلاشهای ناموفق متعدد، ورود موقتاً مسدود شده است. حدود {minutes} دقیقه دیگر دوباره تلاش کنید."
+                f"به دلیل تلاش‌های ناموفق متعدد، ورود موقتاً مسدود شده است. حدود {minutes} دقیقه دیگر دوباره تلاش کنید."
             ),
             status_code=429,
             headers={"Retry-After": str(retry_after)},
@@ -2502,7 +2641,7 @@ async def login_form(
         if locked:
             return HTMLResponse(
                 login_error_html(
-                    "تعداد تلاشهای ناموفق بیش از حد مجاز بود. این IP برای ۱۵ دقیقه مسدود شد."
+                    "تعداد تلاش‌های ناموفق بیش از حد مجاز بود. این IP برای ۱۵ دقیقه مسدود شد."
                 ),
                 status_code=429,
                 headers={"Retry-After": str(LOGIN_LOCKOUT_SECONDS)},
@@ -2551,6 +2690,7 @@ async def login_form(
 
     return response
 
+
 @app.post("/api/login")
 async def api_login(
     request: Request,
@@ -2597,7 +2737,7 @@ async def api_login(
         if locked:
             raise HTTPException(
                 status_code=429,
-                detail="تعداد تلاشهای ناموفق بیش از حد مجاز بود. این IP برای ۱۵ دقیقه مسدود شد.",
+                detail="تعداد تلاش‌های ناموفق بیش از حد مجاز بود. این IP برای ۱۵ دقیقه مسدود شد.",
                 headers={"Retry-After": str(LOGIN_LOCKOUT_SECONDS)},
             )
 
@@ -2634,6 +2774,7 @@ async def api_login(
 
     return response
 
+
 # ============================================================
 # LOGOUT
 # ============================================================
@@ -2660,6 +2801,7 @@ async def logout_page(
 
     return response
 
+
 @app.post("/api/logout")
 async def api_logout(
     request: Request,
@@ -2684,6 +2826,7 @@ async def api_logout(
 
     return response
 
+
 @app.get("/api/me")
 async def api_me(
     request: Request,
@@ -2697,6 +2840,7 @@ async def api_me(
                 )
             )
     }
+
 
 # ============================================================
 # CHANGE PASSWORD
@@ -2784,6 +2928,7 @@ async def api_change_password(
     return {
         "ok": True
     }
+
 
 # ============================================================
 # CREATE LINK
@@ -2908,6 +3053,14 @@ async def create_link_api(
         minimum=0,
     )
 
+    try:
+        manual_host = normalize_manual_host(body.get("manual_host", ""))
+        clean_ip = normalize_manual_host(body.get("clean_ip", ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    country = normalize_country(body.get("country"))
+
     protocol = str(
         body.get(
             "protocol",
@@ -2976,6 +3129,9 @@ async def create_link_api(
         speed_limit_bytes=speed_bytes,
         connection_limit=connection_limit,
         fragment=fragment,
+        manual_host=manual_host,
+        clean_ip=clean_ip,
+        country=country,
     )
 
     host = get_host(request)
@@ -2991,8 +3147,9 @@ async def create_link_api(
 
     return result
 
+
 # ============================================================
-# AUTO CREATE (UPGRADED WITH BEST PROFILE)
+# AUTO CREATE
 # ============================================================
 
 @app.post("/api/links/auto")
@@ -3004,120 +3161,44 @@ async def create_auto_link(
         body = await request.json()
     except Exception:
         body = {}
-    if not isinstance(body, dict): 
-        body = {}
-    
+    if not isinstance(body, dict): body = {}
     host = get_host(request)
-    
-    # دریافت پروتکل از کاربر یا استفاده از پیشفرض
     protocol = normalize_protocol(body.get("protocol", DEFAULT_PROTOCOL))
-    
-    # دریافت پروفایل از کاربر
     profile = str(body.get("profile", "balanced")).strip().lower()
-    
-    # تعریف پروفایل‌ها با تنظیمات کامل و به‌روز
     profiles = {
-        "normal": {
-            "ip": 0,
-            "conn": 0,
-            "speed": 0,
-            "fp": "chrome",
-            "fragment": "off",
-            "protocol": DEFAULT_PROTOCOL,
-            "alpn": "http/1.1",
-            "label": "Normal"
-        },
-        "balanced": {
-            "ip": 2,
-            "conn": 4,
-            "speed": 0,
-            "fp": "chrome",
-            "fragment": "safe",
-            "protocol": DEFAULT_PROTOCOL,
-            "alpn": "http/1.1",
-            "label": "Balanced"
-        },
-        "gaming": {
-            "ip": 1,
-            "conn": 2,
-            "speed": 0,
-            "fp": "chrome",
-            "fragment": "safe",
-            "protocol": DEFAULT_PROTOCOL,
-            "alpn": "http/1.1",
-            "label": "Gaming"
-        },
-        "maximum": {
-            "ip": 0,  # بدون محدودیت IP
-            "conn": 0,  # بدون محدودیت اتصال
-            "speed": 0,  # بدون محدودیت سرعت
-            "fp": "randomized",  # بهترین برای امنیت
-            "fragment": "safe",  # امنیت بالا
-            "protocol": BEST_PROTOCOL,  # بهترین پروتکل: xhttp-packet-up
-            "alpn": "h2,http/1.1",  # ALPN بهینه
-            "label": "Maximum Security"
-        }
+        "normal": {"ip":0,"conn":0,"speed":0,"fp":"chrome","fragment":"off"},
+        "balanced": {"ip":2,"conn":4,"speed":0,"fp":"chrome","fragment":"safe"},
+        "gaming": {"ip":1,"conn":2,"speed":0,"fp":"chrome","fragment":"safe"},
+        "maximum": {"ip":0,"conn":0,"speed":0,"fp":"randomized","fragment":"safe"},
     }
-    
-    # انتخاب پروفایل مورد نظر
     cfg = profiles.get(profile, profiles["balanced"])
-    
-    # اگر پروفایل maximum است، پروتکل را به BEST_PROTOCOL تغییر بده
-    if profile == "maximum":
-        protocol = BEST_PROTOCOL
-        # همچنین اطمینان از اینکه fingerprint روی randomized باشد
-        cfg["fp"] = "randomized"
-        cfg["fragment"] = "safe"
-        cfg["alpn"] = "h2,http/1.1"
-    
-    # ساخت لینک با تنظیمات پروفایل
     uid, link = await make_link(
-        label=body.get("label", f"pxpanel_{profile}_{secrets.token_hex(4)}"),
-        limit_bytes=0, 
-        expires_at=None,
-        ip_limit=cfg["ip"], 
-        speed_limit_bytes=cfg["speed"], 
-        connection_limit=cfg["conn"],
-        note=f"Auto generated by PXPanel | profile={profile} | protocol={protocol}",
-        protocol=protocol, 
-        fingerprint=cfg["fp"],
-        alpn=cfg.get("alpn", DEFAULT_ALPN_BY_PROTOCOL.get(protocol, "http/1.1")), 
-        port=443, 
-        fragment=cfg["fragment"],
+        label=auto_config_name(), limit_bytes=0, expires_at=None,
+        ip_limit=cfg["ip"], speed_limit_bytes=cfg["speed"], connection_limit=cfg["conn"],
+        note=f"Auto generated by PXPanel | profile={profile}",
+        protocol=protocol, fingerprint=cfg["fp"],
+        alpn=DEFAULT_ALPN_BY_PROTOCOL.get(protocol, ""), port=443, fragment=cfg["fragment"],
     )
-    
-    # ذخیره اطلاعات پروفایل در لینک
     link["security_profile"] = profile
-    link["auto_generated"] = True
-    link["protocol"] = protocol  # اطمینان از ذخیره پروتکل صحیح
-    
-    # ساختن نتیجه
-    result = {
-        **get_link_info(link, uid, host), 
-        "ok": True, 
-        "profile": profile,
-        "protocol_used": protocol,
-        "fingerprint_used": cfg["fp"],
-        "security_level": "Maximum" if profile == "maximum" else "Normal"
-    }
-    
-    # لاگ فعالیت
-    log_activity(
-        "link", 
-        f"کانفیگ خودکار «{link['label']}» با پروتکل {PROTOCOL_LABELS.get(protocol, protocol)} و پروفایل {profile} ساخته شد", 
-        "ok"
-    )
-    
+    result = {**get_link_info(link, uid, host), "ok": True, "profile": profile}
+    log_activity("link", f"کانفیگ خودکار «{link['label']}» با {PROTOCOL_LABELS.get(protocol, protocol)} ساخته شد", "ok")
     return result
+
 
 # ============================================================
 # LIST LINKS
 # ============================================================
 
+@app.get("/api/countries")
+async def api_countries(request: Request, _=Depends(require_auth)):
+    return {"countries": [{"id": code, "name": name} for code, name in COUNTRIES.items()]}
+
+
 @app.get("/api/protocols")
 async def api_protocols(request: Request):
     require_auth(request)
     return {"protocols": [{"id": p, "label": PROTOCOL_LABELS.get(p, p)} for p in PROTOCOLS], "default": DEFAULT_PROTOCOL}
+
 
 @app.get("/api/links")
 async def list_links(
@@ -3182,6 +3263,7 @@ async def list_links(
         "links": result
     }
 
+
 # ============================================================
 # LINK INFO API
 # ============================================================
@@ -3215,6 +3297,7 @@ async def link_info_api(
             host,
         ),
     }
+
 
 # ============================================================
 # UPDATE LINK
@@ -3434,33 +3517,235 @@ async def update_link(
             )
 
         if "protocol" in body:
-            protocol = normalize_protocol(body["protocol"])
-            link["protocol"] = protocol
-            link["protocol_label"] = PROTOCOL_LABELS.get(protocol, protocol)
+
+            protocol = str(
+                body.get(
+                    "protocol",
+                    DEFAULT_PROTOCOL,
+                )
+            ).strip()
+
+            link["protocol"] = (
+                protocol
+                if protocol in PROTOCOLS
+                else DEFAULT_PROTOCOL
+            )
 
         if "fragment" in body:
-            fragment = str(body["fragment"]).strip().lower()
-            allowed = {"off", "safe", "balanced", "aggressive"}
-            link["fragment"] = fragment if fragment in allowed else "off"
+
+            fragment = str(
+                body.get(
+                    "fragment",
+                    "off",
+                )
+                or "off"
+            ).strip().lower()
+
+            if fragment not in {
+                "off",
+                "safe",
+                "balanced",
+                "aggressive",
+            }:
+                fragment = "off"
+
+            link["fragment"] = fragment
+
+        if "sub_id" in body:
+
+            link[
+                "sub_id"
+            ] = (
+                body.get(
+                    "sub_id"
+                )
+                or None
+            )
+
+        new_sub = body.get(
+            "sub_id",
+            "UNCHANGED",
+        )
+
+    if new_sub != "UNCHANGED":
+
+        async with SUBS_LOCK:
+
+            if (
+                old_sub
+                and old_sub in SUBS
+            ):
+
+                ids = SUBS[
+                    old_sub
+                ].get(
+                    "link_ids",
+                    [],
+                )
+
+                if uid in ids:
+                    ids.remove(uid)
+
+            if (
+                new_sub
+                and new_sub in SUBS
+            ):
+
+                ids = SUBS[
+                    new_sub
+                ].setdefault(
+                    "link_ids",
+                    [],
+                )
+
+                if uid not in ids:
+                    ids.append(uid)
 
     await save_state()
 
-    host = get_host(request)
+    log_activity(
+        "link",
+        (
+            f"کانفیگ "
+            f"«{label}» "
+            f"ویرایش شد"
+        ),
+        "info",
+    )
+
+    return {
+        "ok": True
+    }
+
+
+# ============================================================
+# RESET USAGE
+# ============================================================
+
+@app.post(
+    "/api/links/{uid}/reset-usage"
+)
+async def reset_link_usage(
+    uid: str,
+    _=Depends(require_auth),
+):
+
+    async with LINKS_LOCK:
+
+        link = LINKS.get(uid)
+
+        if not link:
+            raise HTTPException(
+                status_code=404,
+                detail="link not found",
+            )
+
+        link["used_bytes"] = 0
+
+        label = link.get(
+            "label",
+            uid,
+        )
+
+    await save_state()
 
     log_activity(
         "link",
-        f"کانفیگ «{link.get('label', uid)}» به‌روزرسانی شد",
+        (
+            f"مصرف کانفیگ "
+            f"«{label}» ریست شد"
+        ),
         "info",
     )
 
     return {
         "ok": True,
-        **get_link_info(
-            link,
-            uid,
-            host,
-        ),
+        "uuid": uid,
+        "used_bytes": 0,
     }
+
+
+# ============================================================
+# LINK ACTION
+# ============================================================
+
+@app.post(
+    "/api/links/{uid}/action"
+)
+async def link_action(
+    uid: str,
+    request: Request,
+    _=Depends(require_auth),
+):
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="JSON نامعتبر است",
+        )
+
+    action = str(
+        body.get(
+            "action",
+            "",
+        )
+    ).strip().lower()
+
+    if action == "reset":
+
+        await reset_link_usage(
+            uid,
+            _
+        )
+
+        return {
+            "ok": True,
+            "action": "reset",
+        }
+
+    if action == "enable":
+
+        result = await set_link_active(
+            uid,
+            True,
+        )
+
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail="link not found",
+            )
+
+        return {
+            "ok": True,
+            "action": "enable",
+        }
+
+    if action == "disable":
+
+        result = await set_link_active(
+            uid,
+            False,
+        )
+
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail="link not found",
+            )
+
+        return {
+            "ok": True,
+            "action": "disable",
+        }
+
+    raise HTTPException(
+        status_code=400,
+        detail="unknown action",
+    )
+
 
 # ============================================================
 # DELETE LINK
@@ -3472,9 +3757,7 @@ async def delete_link(
     _=Depends(require_auth),
 ):
 
-    label = await remove_link(
-        uid
-    )
+    label = await remove_link(uid)
 
     if label is None:
         raise HTTPException(
@@ -3484,8 +3767,1686 @@ async def delete_link(
 
     return {
         "ok": True,
-        "deleted": label,
+        "deleted": uid,
     }
+
+
+
+
+def subscription_metadata_headers(used_bytes: int, limit_bytes: int, expires_at, host: str, info_url: str, title: str):
+    """Standard subscription headers understood by v2rayNG/v2rayN/Hiddify and similar clients."""
+    used_bytes = max(0, int(used_bytes or 0))
+    limit_bytes = max(0, int(limit_bytes or 0))
+
+    expire_unix = 0
+    if expires_at:
+        try:
+            dt = datetime.fromisoformat(str(expires_at))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=IRAN_TZ) if IRAN_TZ else dt
+            expire_unix = max(0, int(dt.timestamp()))
+        except Exception:
+            expire_unix = 0
+
+    userinfo = f"upload=0; download={used_bytes}; total={limit_bytes}; expire={expire_unix}"
+
+    return {
+        "profile-title": quote(title, safe=""),
+        "profile-web-page-url": info_url,
+        "support-url": SUPPORT_URL,
+        "profile-update-interval": "12",
+        "subscription-userinfo": userinfo,
+        "content-disposition": 'inline; filename="subscription.txt"',
+    }
+
+# ============================================================
+# SINGLE SUB
+# ============================================================
+
+@app.get("/sub/{uuid}")
+async def subscription_single(
+    uuid: str,
+    request: Request,
+):
+
+    async with LINKS_LOCK:
+        link = LINKS.get(uuid)
+
+    if not is_link_allowed(link):
+        raise HTTPException(
+            status_code=404,
+            detail="not found or inactive",
+        )
+
+    host = get_host(request)
+
+    vless = vless_link_for_link(
+        link,
+        uuid,
+        host,
+    )
+
+    content = (
+        base64
+        .b64encode(
+            vless.encode()
+        )
+        .decode()
+    )
+
+    used = int(link.get("used_bytes", 0) or 0)
+    limit = int(link.get("limit_bytes", 0) or 0)
+    volume_text = f"{fmt_bytes(used)}/{fmt_bytes(limit)}" if limit > 0 else f"{fmt_bytes(used)}/∞"
+    expiry_text = str(link.get("expires_at") or "∞")
+    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PixonPanel')} | کانال تلگرام: logic_sec"
+    headers = subscription_metadata_headers(
+        used,
+        limit,
+        link.get("expires_at"),
+        host,
+        f"https://{host}/info/{uuid}",
+        profile_title,
+    )
+
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers=headers,
+    )
+
+# ============================================================
+# SUB ALL
+# ============================================================
+
+@app.get("/sub-all")
+async def subscription_all(
+    request: Request,
+    _=Depends(require_auth),
+):
+
+    host = get_host(request)
+
+    async with LINKS_LOCK:
+
+        lines = [
+            vless_link_for_link(
+                link,
+                uid,
+                host,
+            )
+
+            for uid, link
+            in LINKS.items()
+
+            if is_link_allowed(link)
+        ]
+
+    content = (
+        base64
+        .b64encode(
+            "\n".join(
+                lines
+            ).encode()
+        )
+        .decode()
+    )
+
+    return Response(
+        content=content,
+        media_type="text/plain",
+    )
+
+
+# ============================================================
+# INFO PAGE
+# ============================================================
+
+@app.get(
+    "/info/{uid}",
+    response_class=HTMLResponse,
+)
+async def info_page(
+    uid: str,
+    request: Request,
+):
+    async with LINKS_LOCK:
+        link = LINKS.get(uid)
+        if not link:
+            return HTMLResponse("<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>", status_code=404)
+        snapshot = dict(link)
+
+    host = get_host(request)
+    vless_url = vless_link_for_link(snapshot, uid, host)
+    sub_url = f"https://{host}/sub/{uid}"
+    used = int(snapshot.get("used_bytes", 0) or 0)
+    limit = int(snapshot.get("limit_bytes", 0) or 0)
+    if limit > 0:
+        usage_percent = max(0, min(100, round((used / limit) * 100, 1)))
+        usage_value = f"{fmt_bytes(used)} / {fmt_bytes(limit)}"
+        remaining_value = fmt_bytes(max(0, limit - used))
+    else:
+        usage_percent = 0
+        usage_value = f"{fmt_bytes(used)} / نامحدود"
+        remaining_value = "نامحدود"
+
+    expires_at = snapshot.get("expires_at")
+    if expires_at:
+        try:
+            expiry_dt = datetime.fromisoformat(str(expires_at))
+            now_dt = datetime.now(expiry_dt.tzinfo) if expiry_dt.tzinfo else datetime.now()
+            seconds = int((expiry_dt - now_dt).total_seconds())
+            if seconds <= 0:
+                expiry_remaining = "منقضی شده"
+            else:
+                days, rem = divmod(seconds, 86400)
+                hours, rem = divmod(rem, 3600)
+                minutes, _ = divmod(rem, 60)
+                expiry_remaining = f"{days} روز و {hours} ساعت" if days else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
+        except Exception:
+            expiry_remaining = "نامشخص"
+        expiry_display = str(expires_at)
+    else:
+        expiry_remaining = "نامحدود"
+        expiry_display = "نامحدود"
+
+    status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
+    status_class = "good" if status_text == "فعال" else "bad"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit",0) else str(snapshot.get("ip_limit"))
+    connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
+    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
+
+    info_html = f"""<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{escape_html(snapshot.get("label","PixonPanel"))} | INFO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{{--bg:#07080d;--panel:rgba(17,19,28,.72);--line:rgba(255,255,255,.08);--muted:rgba(255,255,255,.42);--text:#f6f7fb;--green:#34d399;--blue:#60a5fa;--orange:#f59e0b;--red:#fb7185;--purple:#a78bfa}}
+*{{box-sizing:border-box}}
+html,body{{margin:0;min-height:100%;background:var(--bg)}}
+body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;background:radial-gradient(circle at 15% 0%,rgba(96,165,250,.16),transparent 30%),radial-gradient(circle at 95% 30%,rgba(167,139,250,.13),transparent 28%),radial-gradient(circle at 80% 100%,rgba(52,211,153,.08),transparent 30%),#07080d}}
+.page{{width:min(920px,100%);margin:auto}}
+.shell{{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));backdrop-filter:blur(28px);border-radius:30px;box-shadow:0 35px 100px rgba(0,0,0,.38)}}
+.shell:before{{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.04),transparent 35%,rgba(255,255,255,.02))}}
+.hero{{position:relative;padding:25px 25px 20px;border-bottom:1px solid rgba(255,255,255,.06)}}
+.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:16px}}
+.brand{{display:flex;align-items:center;gap:13px}}
+.brand-icon{{width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(96,165,250,.2);background:linear-gradient(145deg,rgba(96,165,250,.14),rgba(167,139,250,.08));border-radius:15px;color:#93c5fd;font-weight:900;font-size:16px}}
+.hero h1{{margin:0;font-size:21px;font-weight:900;letter-spacing:-.35px}}
+.hero-meta{{margin-top:4px;color:var(--muted);font-size:9px;word-break:break-all}}
+.status{{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:12px;font-size:9px;font-weight:800;white-space:nowrap}}
+.status i{{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}}
+.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.18);background:rgba(52,211,153,.08)}}
+.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.18);background:rgba(251,113,133,.08)}}
+.notice{{margin-top:18px;display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid rgba(167,139,250,.17);background:linear-gradient(120deg,rgba(167,139,250,.10),rgba(96,165,250,.04));border-radius:16px;color:rgba(255,255,255,.62);font-size:9px;line-height:2}}
+.notice-icon{{width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;border-radius:9px;background:rgba(167,139,250,.13);border:1px solid rgba(167,139,250,.18);color:#c4b5fd;font-size:12px}}
+.notice strong{{color:#ddd6fe}}
+.dashboard{{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;padding:16px}}
+.usage-card,.side-card{{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:20px}}
+.usage-card{{padding:18px}}
+.section-kicker{{font-size:8px;color:rgba(255,255,255,.30);font-weight:800;letter-spacing:.7px;text-transform:uppercase}}
+.section-title{{margin-top:4px;font-size:13px;font-weight:900}}
+.usage-line{{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:16px}}
+.usage-number{{font-size:22px;font-weight:900;letter-spacing:-.5px}}
+.usage-number span{{font-size:10px;color:var(--muted);font-weight:600}}
+.usage-percent{{font-size:12px;font-weight:900;color:#86efac}}
+.track{{height:12px;margin-top:12px;border-radius:999px;background:rgba(255,255,255,.055);overflow:hidden;border:1px solid rgba(255,255,255,.035)}}
+.track span{{display:block;height:100%;width:{usage_percent}%;border-radius:inherit;background:linear-gradient(90deg,#34d399,#f59e0b);box-shadow:0 0 20px rgba(52,211,153,.18)}}
+.usage-bottom{{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:8px}}
+.side-card{{padding:14px}}
+.side-row{{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}}
+.side-row:last-child{{border-bottom:0;padding-bottom:0}}
+.side-label{{font-size:8px;color:var(--muted)}}
+.side-value{{font-size:9px;font-weight:800}}
+.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px 16px}}
+.metric{{position:relative;overflow:hidden;padding:14px 14px 13px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}}
+.metric:before{{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.025),transparent 55%)}}
+.metric .dot{{width:8px;height:8px;border-radius:50%;margin-bottom:9px;background:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}}
+.metric-label{{color:var(--muted);font-size:8px}}
+.metric-value{{margin-top:5px;font-size:12px;font-weight:900;color:var(--c);word-break:break-word}}
+.metric.green{{--c:#34d399}} .metric.orange{{--c:#f59e0b}} .metric.blue{{--c:#60a5fa}} .metric.purple{{--c:#a78bfa}}
+.content{{padding:0 16px 18px}}
+.section{{margin-top:10px;padding:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.022);border-radius:20px}}
+.section-head{{display:flex;align-items:end;justify-content:space-between;gap:10px}}
+.section-head .section-title{{margin:0}}
+.section-sub{{color:var(--muted);font-size:8px}}
+.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}}
+.info-item{{padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13)}}
+.info-label{{font-size:8px;color:var(--muted)}}
+.info-value{{margin-top:5px;font-size:9px;font-weight:700;color:rgba(255,255,255,.86);word-break:break-word}}
+.code{{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8.5px;color:#c4b5fd;font-weight:500}}
+.link-card{{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13);margin-top:9px}}
+.link-card:first-child{{margin-top:12px}}
+.link-main{{min-width:0}}
+.link-name{{font-size:8px;color:var(--muted);font-weight:800}}
+.link-url{{margin-top:4px;direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8px;color:#c4b5fd;word-break:break-all}}
+.copy-hint{{flex:0 0 auto;font-size:8px;color:rgba(255,255,255,.28)}}
+.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}}
+.download{{display:flex;align-items:center;gap:10px;min-height:68px;padding:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.07);background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border-radius:16px;transition:transform .2s ease,border-color .2s ease,background .2s ease}}
+.download:hover{{transform:translateY(-2px);border-color:rgba(96,165,250,.28);background:linear-gradient(145deg,rgba(96,165,250,.07),rgba(255,255,255,.02))}}
+.app-icon{{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:10px;background:rgba(96,165,250,.11);border:1px solid rgba(96,165,250,.14);color:#93c5fd;font-size:11px;font-weight:900}}
+.download strong{{display:block;font-size:9px}}
+.download span{{display:block;margin-top:2px;color:var(--muted);font-size:7.5px}}
+.channel{{margin-top:15px;padding:12px 14px;text-align:center;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.045);border-radius:14px;color:var(--muted);font-size:8px}}
+.channel b{{color:#6ee7b7}}
+@media(max-width:760px){{body{{padding:12px}}.dashboard{{grid-template-columns:1fr}}.stats{{grid-template-columns:repeat(2,1fr)}}.downloads{{grid-template-columns:1fr}}.hero-row{{align-items:flex-start;flex-direction:column}}}}
+</style>
+</head>
+<body>
+<div class="page"><div class="shell">
+<section class="hero">
+<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PixonPanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PixonPanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
+<div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
+</section>
+
+<section class="dashboard">
+<div class="usage-card"><div class="section-kicker">Traffic Overview</div><div class="section-title">مصرف سرویس</div><div class="usage-line"><div class="usage-number">{escape_html(fmt_bytes(used))} <span>/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div><div class="usage-percent">{usage_percent}%</div></div><div class="track"><span></span></div><div class="usage-bottom"><span>باقی‌مانده: {escape_html(remaining_value)}</span><span>زمان: {escape_html(expiry_remaining)}</span></div></div>
+<div class="side-card"><div class="section-kicker">Service</div><div class="side-row"><span class="side-label">انقضا</span><span class="side-value">{escape_html(expiry_display)}</span></div><div class="side-row"><span class="side-label">IP Limit</span><span class="side-value">{escape_html(ip_limit)}</span></div><div class="side-row"><span class="side-label">Connection</span><span class="side-value">{escape_html(connection_limit)}</span></div><div class="side-row"><span class="side-label">Speed</span><span class="side-value">{escape_html(speed_limit)}</span></div></div>
+</section>
+
+<section class="stats">
+<div class="metric green"><div class="dot"></div><div class="metric-label">مصرف فعلی</div><div class="metric-value">{escape_html(fmt_bytes(used))}</div></div>
+<div class="metric orange"><div class="dot"></div><div class="metric-label">باقی‌مانده</div><div class="metric-value">{escape_html(remaining_value)}</div></div>
+<div class="metric blue"><div class="dot"></div><div class="metric-label">اتصالات فعال</div><div class="metric-value">{len(unique_ips_for_uuid(uid))}</div></div>
+<div class="metric purple"><div class="dot"></div><div class="metric-label">زمان باقی‌مانده</div><div class="metric-value">{escape_html(expiry_remaining)}</div></div>
+</section>
+
+<div class="content">
+<section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
+
+<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
+
+<section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
+
+<div class="channel">پشتیبانی و اطلاعیه‌ها · <b>کانال تلگرام: logic_sec</b></div>
+</div></div></div>
+</body></html>"""
+    return HTMLResponse(info_html)
+
+
+# ============================================================
+# SUB GROUP API
+# ============================================================
+
+@app.post("/api/subs")
+async def create_sub_api(
+    request: Request,
+    _=Depends(require_auth),
+):
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="JSON نامعتبر است",
+        )
+
+    sub_id, sub = await create_sub_group(
+        name=body.get(
+            "name",
+            "گروه جدید",
+        ),
+        desc=body.get(
+            "desc",
+            "",
+        ),
+        password=body.get(
+            "password",
+            "",
+        ),
+    )
+
+    host = get_host(request)
+
+    return {
+        "sub_id":
+            sub_id,
+
+        **sub,
+
+        "password_hash":
+            None,
+
+        "public_url":
+            (
+                f"https://{host}"
+                f"/p/{sub['uuid_key']}"
+            ),
+
+        "sub_url":
+            (
+                f"https://{host}"
+                f"/sub-group/{sub['uuid_key']}"
+            ),
+    }
+
+
+@app.get("/api/subs")
+async def list_subs_api(
+    request: Request,
+    _=Depends(require_auth),
+):
+
+    host = get_host(request)
+
+    async with SUBS_LOCK:
+        snapshot_subs = dict(SUBS)
+
+    async with LINKS_LOCK:
+        snapshot_links = dict(LINKS)
+
+    result = []
+
+    for sid, sub in snapshot_subs.items():
+
+        link_ids = sub.get(
+            "link_ids",
+            [],
+        )
+
+        active_count = sum(
+            1
+            for lid in link_ids
+            if is_link_allowed(
+                snapshot_links.get(
+                    lid
+                )
+            )
+        )
+
+        total_used = sum(
+            snapshot_links[
+                lid
+            ].get(
+                "used_bytes",
+                0,
+            )
+
+            for lid in link_ids
+
+            if lid in snapshot_links
+        )
+
+        result.append(
+            {
+                "sub_id":
+                    sid,
+
+                **sub,
+
+                "password_hash":
+                    None,
+
+                "has_password":
+                    sub.get(
+                        "password_hash"
+                    ) is not None,
+
+                "links_count":
+                    len(link_ids),
+
+                "active_count":
+                    active_count,
+
+                "total_used_bytes":
+                    total_used,
+
+                "total_used_fmt":
+                    fmt_bytes(
+                        total_used
+                    ),
+
+                "public_url":
+                    (
+                        f"https://{host}"
+                        f"/p/{sub['uuid_key']}"
+                    ),
+
+                "sub_url":
+                    (
+                        f"https://{host}"
+                        f"/sub-group/{sub['uuid_key']}"
+                    ),
+            }
+        )
+
+    result.sort(
+        key=lambda item:
+            item.get(
+                "created_at",
+                "",
+            ),
+        reverse=True,
+    )
+
+    return {
+        "subs": result
+    }
+
+
+@app.patch("/api/subs/{sub_id}")
+async def update_sub_api(
+    sub_id: str,
+    request: Request,
+    _=Depends(require_auth),
+):
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="JSON نامعتبر است",
+        )
+
+    async with SUBS_LOCK:
+
+        if sub_id not in SUBS:
+            raise HTTPException(
+                status_code=404,
+                detail="sub not found",
+            )
+
+        sub = SUBS[sub_id]
+
+        if "name" in body:
+            sub["name"] = str(
+                body["name"]
+            )[:60]
+
+        if "desc" in body:
+            sub["desc"] = str(
+                body["desc"]
+            )[:200]
+
+        if "password" in body:
+
+            password = str(
+                body.get(
+                    "password",
+                    "",
+                )
+            ).strip()
+
+            sub["password_hash"] = (
+                hash_password(password)
+                if password
+                else None
+            )
+
+        if "link_ids" in body:
+
+            sub["link_ids"] = list(
+                body["link_ids"]
+            )
+
+    await save_state()
+
+    return {
+        "ok": True
+    }
+
+
+@app.delete("/api/subs/{sub_id}")
+async def delete_sub_api(
+    sub_id: str,
+    _=Depends(require_auth),
+):
+
+    name = await remove_sub_group(
+        sub_id
+    )
+
+    if name is None:
+        raise HTTPException(
+            status_code=404,
+            detail="sub not found",
+        )
+
+    return {
+        "ok": True,
+        "deleted": sub_id,
+    }
+
+
+@app.post("/api/subs/{sub_id}/links")
+async def assign_link_to_sub(
+    sub_id: str,
+    request: Request,
+    _=Depends(require_auth),
+):
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="JSON نامعتبر است",
+        )
+
+    link_id = str(
+        body.get(
+            "link_id",
+            "",
+        )
+    )
+
+    action = str(
+        body.get(
+            "action",
+            "add",
+        )
+    )
+
+    if action == "add":
+
+        success = await set_link_sub(
+            link_id,
+            sub_id,
+        )
+
+    else:
+
+        success = await set_link_sub(
+            link_id,
+            None,
+        )
+
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="link or sub not found",
+        )
+
+    return {
+        "ok": True
+    }
+
+
+# ============================================================
+# GROUP SUB
+# ============================================================
+
+@app.get("/sub-group/{uuid_key}")
+async def sub_group_subscription(
+    uuid_key: str,
+    request: Request,
+):
+
+    async with SUBS_LOCK:
+
+        sub = next(
+            (
+                item
+                for item
+                in SUBS.values()
+                if item.get(
+                    "uuid_key"
+                ) == uuid_key
+            ),
+            None,
+        )
+
+    if not sub:
+        raise HTTPException(
+            status_code=404,
+            detail="not found",
+        )
+
+    if sub.get(
+        "password_hash"
+    ):
+
+        password = (
+            request.query_params.get(
+                "pw",
+                "",
+            )
+        )
+
+        if (
+            hash_password(password)
+            != sub["password_hash"]
+        ):
+
+            raise HTTPException(
+                status_code=403,
+                detail="wrong password",
+            )
+
+    host = get_host(request)
+
+    async with LINKS_LOCK:
+
+        lines = []
+
+        for link_id in sub.get(
+            "link_ids",
+            [],
+        ):
+
+            link = LINKS.get(
+                link_id
+            )
+
+            if (
+                link
+                and is_link_allowed(
+                    link
+                )
+            ):
+
+                lines.append(
+                    vless_link_for_link(
+                        link,
+                        link_id,
+                        host,
+                    )
+                )
+
+    content = (
+        base64
+        .b64encode(
+            "\n".join(
+                lines
+            ).encode()
+        )
+        .decode()
+    )
+
+    total_used = 0
+    total_limit = 0
+    expiries = []
+    valid_ids = list(sub.get("link_ids", []))
+
+    async with LINKS_LOCK:
+        for link_id in valid_ids:
+            link = LINKS.get(link_id)
+            if not link or not is_link_allowed(link):
+                continue
+            total_used += int(link.get("used_bytes", 0) or 0)
+            total_limit += int(link.get("limit_bytes", 0) or 0)
+            if link.get("expires_at"):
+                expiries.append(str(link.get("expires_at")))
+
+    # For a group subscription, expose aggregate usage/expiry in standard headers.
+    group_limit = total_limit if total_limit > 0 else 0
+    group_expiry = None
+    if expiries:
+        try:
+            group_expiry = min(
+                expiries,
+                key=lambda x: datetime.fromisoformat(x)
+            )
+        except Exception:
+            group_expiry = expiries[0]
+
+    group_volume_text = (
+        f"{fmt_bytes(total_used)}/{fmt_bytes(group_limit)}"
+        if group_limit > 0
+        else f"{fmt_bytes(total_used)}/∞"
+    )
+    group_expiry_text = group_expiry or "∞"
+    group_title = (
+        f"0.0.0.0 | {group_volume_text} | {group_expiry_text} | "
+        f"{sub['name']} | کانال تلگرام: logic_sec"
+    )
+    headers = subscription_metadata_headers(
+        total_used,
+        group_limit,
+        group_expiry,
+        host,
+        f"https://{host}/public-sub/{uuid_key}",
+        group_title,
+    )
+
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers=headers,
+    )
+
+
+# ============================================================
+# PUBLIC GROUP
+# ============================================================
+
+PUBLIC_SUB_HTML = r"""
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width,initial-scale=1"
+>
+
+<title>
+PixonPanel
+</title>
+
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    padding:20px;
+
+    font-family:Arial,sans-serif;
+
+    color:#fff;
+
+    background:
+        radial-gradient(
+            circle at top right,
+            rgba(99,102,241,.17),
+            transparent 30%
+        ),
+        #07070a;
+}
+
+.card{
+    width:100%;
+    max-width:560px;
+
+    padding:28px;
+    border-radius:25px;
+
+    background:rgba(255,255,255,.045);
+
+    border:
+        1px solid
+        rgba(255,255,255,.08);
+
+    backdrop-filter:blur(25px);
+}
+
+h1{
+    margin-top:0;
+}
+
+.text{
+    color:rgba(255,255,255,.55);
+    line-height:2;
+    font-size:13px;
+}
+
+.url{
+    margin-top:20px;
+    padding:14px;
+
+    border-radius:13px;
+
+    background:rgba(0,0,0,.22);
+
+    color:#c4b5fd;
+
+    direction:ltr;
+    word-break:break-all;
+
+    font-family:Consolas,monospace;
+}
+
+.support{
+    display:inline-block;
+    margin-top:18px;
+
+    color:#a78bfa;
+    text-decoration:none;
+}
+
+.version{
+    color:#a78bfa;
+    font-size:11px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>
+PixonPanel
+</h1>
+
+<div class="version">
+12.1.0 Beta
+</div>
+
+<div class="text">
+اشتراک شما آماده است.
+</div>
+
+<div
+class="url"
+id="subUrl"
+></div>
+
+<a
+class="support"
+href="https://t.me/Pixonal"
+target="_blank"
+rel="noopener"
+>
+پشتیبانی @Pixonal
+</a>
+
+</div>
+
+<script>
+
+const url =
+    location.origin +
+    location.pathname.replace(
+        "/p/",
+        "/sub-group/"
+    );
+
+document.getElementById(
+    "subUrl"
+).textContent = url;
+
+</script>
+
+</body>
+</html>
+"""
+
+
+@app.get(
+    "/p/{uuid_key}",
+    response_class=HTMLResponse,
+)
+async def public_sub_page(
+    uuid_key: str,
+):
+
+    async with SUBS_LOCK:
+
+        exists = any(
+            item.get(
+                "uuid_key"
+            ) == uuid_key
+            for item in SUBS.values()
+        )
+
+    if not exists:
+
+        return HTMLResponse(
+            """
+            <h2
+            style="
+            font-family:sans-serif;
+            padding:40px;
+            "
+            >
+            گروه پیدا نشد
+            </h2>
+            """,
+            status_code=404,
+        )
+
+    return HTMLResponse(
+        PUBLIC_SUB_HTML
+    )
+
+
+@app.get("/api/public/sub/{uuid_key}")
+async def public_sub_data(
+    uuid_key: str,
+    request: Request,
+):
+
+    async with SUBS_LOCK:
+
+        entry = next(
+            (
+                (
+                    sid,
+                    item,
+                )
+
+                for sid, item
+                in SUBS.items()
+
+                if item.get(
+                    "uuid_key"
+                ) == uuid_key
+            ),
+            None,
+        )
+
+    if not entry:
+        raise HTTPException(
+            status_code=404,
+            detail="not found",
+        )
+
+    _, sub = entry
+
+    has_password = (
+        sub.get(
+            "password_hash"
+        ) is not None
+    )
+
+    if has_password:
+
+        password = (
+            request
+            .query_params
+            .get(
+                "pw",
+                "",
+            )
+        )
+
+        if (
+            hash_password(password)
+            != sub[
+                "password_hash"
+            ]
+        ):
+
+            return JSONResponse(
+                {
+                    "locked": True,
+                    "name":
+                        sub["name"],
+                }
+            )
+
+    host = get_host(request)
+
+    async with LINKS_LOCK:
+        snapshot = dict(LINKS)
+
+    links_out = []
+
+    active_connections = 0
+
+    for link_id in sub.get(
+        "link_ids",
+        [],
+    ):
+
+        link = snapshot.get(
+            link_id
+        )
+
+        if not link:
+            continue
+
+        allowed = is_link_allowed(
+            link
+        )
+
+        connection_count = sum(
+            1
+            for item in connections.values()
+            if item.get("uuid") == link_id
+        )
+
+        active_connections += (
+            connection_count
+        )
+
+        links_out.append(
+            {
+                "uuid":
+                    link_id,
+
+                "label":
+                    link.get(
+                        "label"
+                    ),
+
+                "active":
+                    allowed,
+
+                "protocol":
+                    link.get(
+                        "protocol",
+                        DEFAULT_PROTOCOL,
+                    ),
+
+                "used_bytes":
+                    link.get(
+                        "used_bytes",
+                        0,
+                    ),
+
+                "used_fmt":
+                    fmt_bytes(
+                        link.get(
+                            "used_bytes",
+                            0,
+                        )
+                    ),
+
+                "limit_bytes":
+                    link.get(
+                        "limit_bytes",
+                        0,
+                    ),
+
+                "limit_fmt":
+                    (
+                        "∞"
+                        if not link.get(
+                            "limit_bytes",
+                            0,
+                        )
+                        else fmt_bytes(
+                            link[
+                                "limit_bytes"
+                            ]
+                        )
+                    ),
+
+                "expires_at":
+                    link.get(
+                        "expires_at"
+                    ),
+
+                "vless_link":
+                    vless_link_for_link(
+                        link,
+                        link_id,
+                        host,
+                    ),
+
+                "sub_url":
+                    (
+                        f"https://{host}"
+                        f"/sub/{link_id}"
+                    ),
+
+                "info_url":
+                    (
+                        f"https://{host}"
+                        f"/info/{link_id}"
+                    ),
+
+                "connections":
+                    connection_count,
+
+                "ip_limit":
+                    link.get(
+                        "ip_limit",
+                        0,
+                    ),
+
+                "speed_limit_bytes":
+                    link.get(
+                        "speed_limit_bytes",
+                        0,
+                    ),
+
+                "connection_limit":
+                    link.get(
+                        "connection_limit",
+                        0,
+                    ),
+            }
+        )
+
+    total_used = sum(
+        item["used_bytes"]
+        for item in links_out
+    )
+
+    return {
+        "locked": False,
+
+        "name":
+            sub["name"],
+
+        "desc":
+            sub.get(
+                "desc",
+                "",
+            ),
+
+        "sub_url":
+            (
+                f"https://{host}"
+                f"/sub-group/{uuid_key}"
+            ),
+
+        "active_connections":
+            active_connections,
+
+        "total_used_fmt":
+            fmt_bytes(
+                total_used
+            ),
+
+        "support":
+            SUPPORT_USERNAME,
+
+        "links":
+            links_out,
+    }
+
+
+# ============================================================
+# STATS
+# ============================================================
+
+@app.get("/stats")
+async def get_stats(
+    _=Depends(require_auth),
+):
+
+    async with LINKS_LOCK:
+        snapshot = dict(LINKS)
+
+    return {
+        "service":
+            APP_NAME,
+
+        "version":
+            APP_VERSION,
+
+        "active_connections":
+            len(connections),
+
+        "total_traffic_mb":
+            round(
+                stats[
+                    "total_bytes"
+                ]
+                / (
+                    1024 ** 2
+                ),
+                2,
+            ),
+
+        "total_traffic_bytes":
+            stats[
+                "total_bytes"
+            ],
+
+        "total_requests":
+            stats[
+                "total_requests"
+            ],
+
+        "total_errors":
+            stats[
+                "total_errors"
+            ],
+
+        "uptime":
+            uptime(),
+
+        "timestamp":
+            datetime.now().isoformat(),
+
+        "hourly":
+            dict(
+                hourly_traffic
+            ),
+
+        "recent_errors":
+            list(
+                error_logs
+            )[-10:],
+
+        "links_count":
+            len(snapshot),
+
+        "active_links":
+            sum(
+                1
+                for link
+                in snapshot.values()
+                if is_link_allowed(
+                    link
+                )
+            ),
+
+        "expired_links":
+            sum(
+                1
+                for link
+                in snapshot.values()
+                if is_link_expired(
+                    link
+                )
+            ),
+
+        "subs_count":
+            len(SUBS),
+    }
+
+
+@app.get("/api/activity")
+async def get_activity(
+    _=Depends(require_auth),
+):
+
+    return {
+        "logs":
+            list(
+                activity_logs
+            )[-150:]
+    }
+
+
+# ============================================================
+# CONNECTIONS
+# ============================================================
+
+@app.get("/api/connections")
+async def get_connections(
+    _=Depends(require_auth),
+):
+
+    async with LINKS_LOCK:
+        snapshot = dict(LINKS)
+
+    grouped = {}
+
+    for connection in connections.values():
+
+        ip = connection.get(
+            "ip",
+            "نامشخص",
+        )
+
+        link = snapshot.get(
+            connection.get(
+                "uuid"
+            )
+        )
+
+        label = (
+            link.get(
+                "label"
+            )
+            if link
+            else "نامشخص"
+        )
+
+        group = grouped.get(ip)
+
+        if group is None:
+
+            group = {
+                "ip":
+                    ip,
+
+                "sessions":
+                    0,
+
+                "bytes":
+                    0,
+
+                "labels":
+                    set(),
+
+                "transports":
+                    set(),
+
+                "first_connected_at":
+                    connection.get(
+                        "connected_at"
+                    ),
+
+                "last_connected_at":
+                    connection.get(
+                        "connected_at"
+                    ),
+            }
+
+            grouped[ip] = group
+
+        group["sessions"] += 1
+
+        group["bytes"] += int(
+            connection.get(
+                "bytes",
+                0,
+            )
+            or 0
+        )
+
+        group["labels"].add(
+            label
+        )
+
+        group["transports"].add(
+            connection.get(
+                "transport",
+                DEFAULT_PROTOCOL,
+            )
+        )
+
+    result = []
+
+    for group in grouped.values():
+
+        result.append(
+            {
+                "ip":
+                    group["ip"],
+
+                "sessions":
+                    group["sessions"],
+
+                "labels":
+                    sorted(
+                        group["labels"]
+                    ),
+
+                "label":
+                    (
+                        " · ".join(
+                            sorted(
+                                group["labels"]
+                            )
+                        )
+                        if group["labels"]
+                        else "نامشخص"
+                    ),
+
+                "transports":
+                    sorted(
+                        group["transports"]
+                    ),
+
+                "bytes":
+                    group["bytes"],
+
+                "bytes_fmt":
+                    fmt_bytes(
+                        group["bytes"]
+                    ),
+
+                "connected_at":
+                    group[
+                        "first_connected_at"
+                    ],
+
+                "last_connected_at":
+                    group[
+                        "last_connected_at"
+                    ],
+            }
+        )
+
+    result.sort(
+        key=lambda item:
+            item.get(
+                "last_connected_at"
+            )
+            or "",
+        reverse=True,
+    )
+
+    return {
+        "connections":
+            result,
+
+        "count":
+            len(result),
+
+        "raw_count":
+            len(connections),
+    }
+
+
+# ============================================================
+# OPTIONAL EXISTING PROJECT MODULES
+# ============================================================
+
+# ============================================================
+# IMPORTANT:
+# DO NOT REPLACE THIS VLESS CORE.
+# ============================================================
+
+try:
+
+    from relay_vless import (
+        RELAY_BUF,
+        parse_vless_header,
+        check_and_use,
+        relay_ws_to_tcp,
+        relay_tcp_to_ws,
+        websocket_tunnel,
+    )
+
+    app.add_api_websocket_route(
+        "/ws/{uuid}",
+        websocket_tunnel,
+    )
+
+    logger.info(
+        "VLESS relay loaded."
+    )
+
+except Exception as exc:
+
+    logger.warning(
+        "VLESS relay module unavailable: %s",
+        exc,
+    )
+
+
+# ============================================================
+# XHTTP
+# ============================================================
+
+try:
+
+    from xhttp_siz10 import (
+        router as xhttp_router
+    )
+
+    app.include_router(
+        xhttp_router
+    )
+
+    logger.info(
+        "XHTTP module loaded."
+    )
+
+except Exception as exc:
+
+    logger.warning(
+        "XHTTP module unavailable: %s",
+        exc,
+    )
+
+
+# ============================================================
+# TELEGRAM
+# ============================================================
+
+try:
+
+    from telegram_bot import (
+        start_bot as _tg_start_bot,
+        stop_bot as _tg_stop_bot,
+    )
+
+except Exception:
+
+    async def _tg_start_bot():
+        return None
+
+    async def _tg_stop_bot():
+        return None
+
+
+@app.on_event("startup")
+async def start_optional_telegram():
+
+    try:
+
+        await _tg_start_bot()
+
+        logger.info(
+            "Telegram module initialized."
+        )
+
+    except Exception as exc:
+
+        logger.warning(
+            "Telegram bot disabled/error: %s",
+            exc,
+        )
+
+
+# ============================================================
+# HTTP PROXY
+# ============================================================
+
+_HOP = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "content-encoding",
+    "content-length",
+}
+
+
+@app.api_route(
+    "/proxy/{target_url:path}",
+    methods=[
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "HEAD",
+        "OPTIONS",
+    ],
+)
+async def http_proxy(
+    target_url: str,
+    request: Request,
+):
+
+    if not target_url.startswith("http"):
+        target_url = (
+            "https://"
+            + target_url
+        )
+
+    if http_client is None:
+        raise HTTPException(
+            status_code=503,
+            detail="HTTP client not ready",
+        )
+
+    try:
+
+        body = await request.body()
+
+        headers = {
+            key: value
+            for key, value
+            in request.headers.items()
+            if (
+                key.lower()
+                not in _HOP
+            )
+            and (
+                key.lower()
+                != "host"
+            )
+        }
+
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            content=body,
+        )
+
+        stats["total_bytes"] += len(
+            response.content
+        )
+
+        stats["total_requests"] += 1
+
+        hourly_traffic[
+            now_ir().strftime(
+                "%H:00"
+            )
+        ] += len(
+            response.content
+        )
+
+        output_headers = {
+            key: value
+            for key, value
+            in response.headers.items()
+            if key.lower() not in _HOP
+        }
+
+        return Response(
+            content=response.content,
+            status_code=response.status_code,
+            headers=output_headers,
+        )
+
+    except Exception as exc:
+
+        stats["total_errors"] += 1
+
+        error_logs.append(
+            {
+                "error":
+                    str(exc),
+
+                "url":
+                    target_url,
+
+                "time":
+                    datetime.now().isoformat(),
+            }
+        )
+
+        logger.exception(
+            "Proxy error: %s",
+            target_url,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Proxy error: "
+                f"{exc}"
+            ),
+        )
+
 
 # ============================================================
 # DASHBOARD
@@ -3493,624 +5454,3210 @@ async def delete_link(
 
 DASHBOARD_HTML = r"""
 <!DOCTYPE html>
+
 <html lang="fa" dir="rtl">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>داشبورد | PixonPanel</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
 
-        body {
-            font-family: "Vazirmatn", sans-serif;
-            background: #0a0a0f;
-            color: #fff;
-            min-height: 100vh;
-            padding: 20px;
-        }
+<meta charset="UTF-8">
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+<meta
+name="viewport"
+content="width=device-width,initial-scale=1"
+/>
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
+<title>
+PixonPanel 12.1.0 Beta
+</title>
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+<link
+rel="preconnect"
+href="https://fonts.googleapis.com"
+>
 
-        .logo {
-            width: 42px;
-            height: 42px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 16px;
-            font-weight: 900;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        }
+<link
+rel="preconnect"
+href="https://fonts.gstatic.com"
+crossorigin
+>
 
-        .brand-name {
-            font-size: 18px;
-            font-weight: 800;
-        }
+<link
+href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap"
+rel="stylesheet"
+>
 
-        .version {
-            font-size: 11px;
-            color: #a78bfa;
-        }
+<style>
 
-        .header-actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
+*{
+    box-sizing:border-box;
+}
 
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 12px;
-            font-family: "Vazirmatn", sans-serif;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
+html,
+body{
+    margin:0;
+    min-height:100%;
+}
 
-        .btn-primary {
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            color: #fff;
-        }
+body{
+    min-height:100vh;
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
-        }
+    color:#fff;
 
-        .btn-danger {
-            background: rgba(239, 68, 68, 0.15);
-            color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
+    font-family:"Vazirmatn",sans-serif;
 
-        .btn-danger:hover {
-            background: rgba(239, 68, 68, 0.25);
-        }
+    background:
+        radial-gradient(
+            circle at 10% 0%,
+            rgba(99,102,241,.13),
+            transparent 25%
+        ),
+        radial-gradient(
+            circle at 100% 100%,
+            rgba(139,92,246,.10),
+            transparent 25%
+        ),
+        #07070a;
+}
 
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.06);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
+.wrapper{
+    width:min(
+        1280px,
+        calc(100% - 24px)
+    );
 
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
+    margin:auto;
+    padding:18px 0 50px;
+}
 
-        .btn-success {
-            background: rgba(34, 197, 94, 0.15);
-            color: #86efac;
-            border: 1px solid rgba(34, 197, 94, 0.2);
-        }
+.topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
 
-        .btn-success:hover {
-            background: rgba(34, 197, 94, 0.25);
-        }
+    margin-bottom:15px;
+}
 
-        .btn-sm {
-            padding: 6px 14px;
-            font-size: 12px;
-        }
+.brand{
+    display:flex;
+    align-items:center;
+    gap:11px;
+}
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
+.logo{
+    width:44px;
+    height:44px;
 
-        .stat-card {
-            padding: 20px;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
+    display:flex;
+    align-items:center;
+    justify-content:center;
 
-        .stat-label {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.4);
-            margin-bottom: 5px;
-        }
+    border-radius:14px;
 
-        .stat-value {
-            font-size: 22px;
-            font-weight: 700;
-        }
+    font-weight:900;
 
-        .stat-value.green {
-            color: #86efac;
-        }
-        .stat-value.purple {
-            color: #a78bfa;
-        }
-        .stat-value.blue {
-            color: #60a5fa;
-        }
-        .stat-value.orange {
-            color: #fb923c;
-        }
+    background:
+        linear-gradient(
+            135deg,
+            #6366f1,
+            #8b5cf6
+        );
+}
 
-        .section {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-        }
+.brand-name{
+    font-size:16px;
+    font-weight:900;
+}
 
-        .section-title {
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+.brand-desc{
+    margin-top:2px;
+    color:rgba(255,255,255,.37);
+    font-size:10px;
+}
 
-        .section-title .badge {
-            font-size: 11px;
-            font-weight: 400;
-            color: rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 4px 10px;
-            border-radius: 20px;
-        }
+.brand-version{
+    color:#a78bfa;
+    font-size:9px;
+    margin-top:2px;
+}
 
-        .link-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px 16px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.04);
-            margin-bottom: 10px;
-            transition: all 0.2s;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
+.top-actions{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+}
 
-        .link-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.08);
-        }
+.top-btn{
+    border:1px solid rgba(255,255,255,.08);
 
-        .link-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
+    padding:9px 12px;
 
-        .link-name {
-            font-weight: 600;
-            font-size: 14px;
-        }
+    border-radius:11px;
 
-        .link-protocol {
-            font-size: 11px;
-            color: #a78bfa;
-            background: rgba(99, 102, 241, 0.1);
-            padding: 2px 10px;
-            border-radius: 20px;
-        }
+    color:#fff;
+    background:rgba(255,255,255,.035);
 
-        .link-status {
-            font-size: 11px;
-            padding: 2px 10px;
-            border-radius: 20px;
-        }
+    font-family:"Vazirmatn",sans-serif;
 
-        .link-status.active {
-            color: #86efac;
-            background: rgba(34, 197, 94, 0.1);
-        }
+    font-size:10px;
+    cursor:pointer;
+    text-decoration:none;
+}
 
-        .link-status.inactive {
-            color: #f87171;
-            background: rgba(239, 68, 68, 0.1);
-        }
+.top-btn.primary{
+    background:
+        linear-gradient(
+            135deg,
+            #6366f1,
+            #8b5cf6
+        );
+}
 
-        .link-actions {
-            display: flex;
-            gap: 6px;
-        }
+.top-btn.danger{
+    color:#fca5a5;
+}
 
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: rgba(255, 255, 255, 0.3);
-        }
+.stats-grid{
+    display:grid;
+    grid-template-columns:
+        repeat(6,1fr);
 
-        .empty-state .icon {
-            font-size: 40px;
-            margin-bottom: 12px;
-        }
+    gap:9px;
+}
 
-        .quick-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
+.stat{
+    position:relative;
+    overflow:hidden;
+    padding:14px;
+    border-radius:16px;
 
-        @media (max-width: 640px) {
-            .header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .header-actions {
-                flex-wrap: wrap;
-            }
-            .link-item {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .link-actions {
-                justify-content: flex-start;
-            }
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .section {
-                padding: 16px;
-            }
-        }
-    </style>
+    border:
+        1px solid
+        rgba(255,255,255,.07);
+
+    background:
+        rgba(255,255,255,.03);
+}
+
+.stat-label{
+    color:rgba(255,255,255,.35);
+    font-size:9px;
+}
+
+.stat-value{
+    margin-top:6px;
+
+    font-size:19px;
+    font-weight:900;
+}
+.stat::after{content:"";position:absolute;right:0;bottom:0;left:0;height:2px;background:var(--stat-color,#818cf8);opacity:.8}
+.stat:nth-child(1){--stat-color:#60a5fa}.stat:nth-child(2){--stat-color:#4ade80}.stat:nth-child(3){--stat-color:#f59e0b}.stat:nth-child(4){--stat-color:#a78bfa}.stat:nth-child(5){--stat-color:#fb7185}.stat:nth-child(6){--stat-color:#22d3ee}.stat-value{color:var(--stat-color,#fff)}
+
+
+.panel{
+    margin-top:11px;
+
+    overflow:hidden;
+
+    border-radius:19px;
+
+    border:
+        1px solid
+        rgba(255,255,255,.07);
+
+    background:
+        rgba(255,255,255,.03);
+}
+
+.panel-head{
+    padding:14px 16px;
+
+    display:flex;
+
+    justify-content:space-between;
+    align-items:center;
+
+    gap:10px;
+
+    border-bottom:
+        1px solid
+        rgba(255,255,255,.06);
+}
+
+.panel-title{
+    font-size:12px;
+    font-weight:800;
+}
+
+.panel-sub{
+    color:rgba(255,255,255,.32);
+    font-size:9px;
+    margin-top:3px;
+}
+
+.table-wrap{
+    overflow:auto;
+}
+
+table{
+    width:100%;
+
+    min-width:1120px;
+
+    border-collapse:collapse;
+}
+
+th,
+td{
+    text-align:right;
+
+    padding:12px 13px;
+
+    border-bottom:
+        1px solid
+        rgba(255,255,255,.045);
+
+    font-size:10px;
+}
+
+th{
+    color:rgba(255,255,255,.32);
+    font-weight:500;
+}
+
+.badge{
+    display:inline-flex;
+
+    padding:4px 8px;
+
+    border-radius:999px;
+
+    font-size:8px;
+}
+
+.badge.active{
+    color:#86efac;
+    background:rgba(34,197,94,.08);
+}
+
+.badge.off{
+    color:#fca5a5;
+    background:rgba(239,68,68,.08);
+}
+
+.actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+}
+
+.action{
+    border:0;
+
+    padding:6px 8px;
+
+    border-radius:8px;
+
+    color:rgba(255,255,255,.82);
+
+    background:rgba(255,255,255,.05);
+
+    font-family:"Vazirmatn",sans-serif;
+
+    font-size:8px;
+
+    cursor:pointer;
+}
+
+.action.primary{
+    background:
+        rgba(99,102,241,.18);
+}
+
+.action.danger{
+    color:#fca5a5;
+}
+
+.url-box{
+    max-width:280px;
+
+    direction:ltr;
+    text-align:left;
+
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+
+    color:#c4b5fd;
+
+    font-family:Consolas,monospace;
+
+    font-size:8px;
+}
+
+.pre{
+    margin:0;
+
+    padding:15px;
+
+    max-height:280px;
+
+    overflow:auto;
+
+    color:rgba(255,255,255,.45);
+
+    font-family:Consolas,monospace;
+
+    font-size:9px;
+
+    white-space:pre-wrap;
+}
+
+.download-grid{
+    display:grid;
+
+    grid-template-columns:
+        repeat(3,1fr);
+
+    gap:8px;
+
+    padding:14px;
+}
+
+.download{
+    display:block;
+
+    padding:11px;
+
+    border-radius:12px;
+
+    color:#fff;
+    text-decoration:none;
+
+    border:
+        1px solid
+        rgba(255,255,255,.06);
+
+    background:
+        rgba(255,255,255,.025);
+
+    font-size:10px;
+}
+
+.download span{
+    display:block;
+
+    margin-top:3px;
+
+    color:rgba(255,255,255,.34);
+
+    font-size:8px;
+}
+
+.notice{
+    margin:0 14px 14px;
+
+    padding:14px;
+
+    border-radius:13px;
+
+    background:
+        rgba(99,102,241,.06);
+
+    border:
+        1px solid
+        rgba(99,102,241,.13);
+
+    color:rgba(255,255,255,.62);
+
+    line-height:1.9;
+
+    font-size:10px;
+}
+
+.notice strong{
+    color:#c4b5fd;
+}
+
+.empty{
+    padding:25px;
+
+    text-align:center;
+
+    color:rgba(255,255,255,.30);
+
+    font-size:11px;
+}
+
+.modal-backdrop{
+    position:fixed;
+
+    inset:0;
+
+    z-index:100;
+
+    display:none;
+
+    align-items:center;
+    justify-content:center;
+
+    padding:15px;
+
+    background:
+        rgba(0,0,0,.62);
+
+    backdrop-filter:blur(12px);
+}
+
+.modal-backdrop.open{
+    display:flex;
+}
+
+.modal{
+    width:100%;
+    max-width:720px;
+
+    max-height:
+        calc(100vh - 30px);
+
+    overflow:auto;
+
+    padding:20px;
+
+    border-radius:22px;
+
+    background:#0d0d12;
+
+    border:
+        1px solid
+        rgba(255,255,255,.08);
+
+    box-shadow:
+        0 30px 100px
+        rgba(0,0,0,.55);
+}
+
+.modal-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    margin-bottom:15px;
+}
+
+.modal-title{
+    font-size:14px;
+    font-weight:800;
+}
+
+.close{
+    width:34px;
+    height:34px;
+
+    border:0;
+    border-radius:10px;
+
+    color:#fff;
+    background:rgba(255,255,255,.05);
+
+    cursor:pointer;
+}
+
+.form-grid{
+    display:grid;
+
+    grid-template-columns:
+        repeat(2,1fr);
+
+    gap:9px;
+}
+
+.field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.field.full{
+    grid-column:
+        1 / -1;
+}
+
+.field label{
+    color:rgba(255,255,255,.4);
+    font-size:9px;
+}
+
+.field input,
+.field select,
+.field textarea{
+    width:100%;
+
+    padding:11px;
+
+    border-radius:11px;
+
+    border:
+        1px solid
+        rgba(255,255,255,.07);
+
+    background:
+        rgba(255,255,255,.035);
+
+    color:#fff;
+
+    outline:none;
+
+    font-family:
+        "Vazirmatn",
+        sans-serif;
+
+    font-size:10px;
+}
+
+.field textarea{
+    min-height:90px;
+    resize:vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+    border-color:
+        rgba(99,102,241,.55);
+}
+
+.modal-actions{
+    margin-top:15px;
+
+    display:flex;
+
+    gap:8px;
+}
+
+.modal-btn{
+    flex:1;
+
+    padding:11px;
+
+    border:0;
+    border-radius:11px;
+
+    cursor:pointer;
+
+    font-family:
+        "Vazirmatn",sans-serif;
+
+    color:#fff;
+}
+
+.modal-btn.primary{
+    background:
+        linear-gradient(
+            135deg,
+            #6366f1,
+            #8b5cf6
+        );
+}
+
+.modal-btn.secondary{
+    background:
+        rgba(255,255,255,.05);
+}
+
+.toast{
+    position:fixed;
+
+    left:50%;
+    top:18px;
+    bottom:auto;
+
+    z-index:200;
+
+    padding:11px 14px;
+
+    border-radius:12px;
+
+    background:rgba(20,20,27,.97);
+
+    border:
+        1px solid
+        rgba(255,255,255,.08);
+
+    color:#fff;
+
+    font-size:11px;
+    font-weight:700;
+
+    opacity:0;
+
+    transform:
+        translate(-50%,-140%);
+
+    pointer-events:none;
+
+    transition:
+        .2s ease;
+}
+
+.toast.show{
+    opacity:1;
+
+    transform:
+        translate(-50%,0);
+}
+
+/* LOGIN NOTICE START — DELETE THIS WHOLE BLOCK TO DISABLE THE LOGIN NOTICE */
+.login-notice-backdrop{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.72);backdrop-filter:blur(14px)}
+.login-notice{width:min(620px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:22px;border:1px solid rgba(255,255,255,.10);border-radius:24px;background:linear-gradient(180deg,rgba(24,24,34,.98),rgba(12,12,17,.98));box-shadow:0 30px 100px rgba(0,0,0,.60);animation:noticeIn .28s ease both}
+.login-notice-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}.login-notice-icon{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:rgba(99,102,241,.14);border:1px solid rgba(129,140,248,.22);color:#a5b4fc;font-size:18px}.login-notice h3{margin:0;font-size:15px}.login-notice p{margin:5px 0 0;color:rgba(255,255,255,.42);font-size:9px;line-height:1.9}.notice-downloads{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.notice-download{display:block;padding:12px;border-radius:14px;text-decoration:none;color:#fff;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);transition:.2s ease}.notice-download:hover{transform:translateY(-2px);border-color:rgba(129,140,248,.30);background:rgba(129,140,248,.07)}.notice-download strong{display:block;font-size:10px}.notice-download span{display:block;margin-top:3px;color:rgba(255,255,255,.36);font-size:8px}.login-notice-body{margin-top:14px;padding:14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.62);font-size:10px;line-height:2}.login-notice-body b{color:#fff}.login-notice-actions{margin-top:14px;display:flex;gap:8px}.login-notice-actions button{flex:1;padding:11px;border:0;border-radius:12px;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);font-family:inherit;cursor:pointer}@keyframes noticeIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+/* LOGIN NOTICE END */
+
+/* REGION NOTICE + RESPONSIVE UI OVERRIDES */
+.login-notice-backdrop{
+    padding:clamp(10px,3vw,24px);
+    background:rgba(3,4,9,.76);
+    backdrop-filter:blur(18px) saturate(135%);
+}
+.login-notice{
+    width:min(680px,100%);
+    max-height:min(760px,calc(100vh - 24px));
+    padding:clamp(16px,3vw,24px);
+    border-radius:24px;
+    border:1px solid rgba(167,139,250,.18);
+    background:
+        radial-gradient(circle at 90% 0%,rgba(99,102,241,.13),transparent 32%),
+        linear-gradient(180deg,rgba(25,25,37,.98),rgba(11,11,16,.99));
+    box-shadow:0 35px 110px rgba(0,0,0,.62),inset 0 1px rgba(255,255,255,.04);
+}
+.login-notice-head{align-items:flex-start}
+.login-notice-icon{
+    width:46px;height:46px;min-width:46px;border-radius:15px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(99,102,241,.12);
+    border:1px solid rgba(167,139,250,.22);
+    color:#c4b5fd;
+}
+.login-notice-icon svg{width:24px;height:24px;display:block}
+.login-notice h3{font-size:15px;letter-spacing:-.2px}
+.login-notice p{font-size:10px;line-height:2;color:rgba(255,255,255,.46)}
+.login-notice-body{
+    margin-top:12px;
+    padding:15px;
+    border-radius:16px;
+    background:rgba(99,102,241,.065);
+    border:1px solid rgba(129,140,248,.14);
+    color:rgba(255,255,255,.66);
+    font-size:10px;
+    line-height:2.15;
+}
+.login-notice-body b{color:#fff}
+.region-warning{
+    margin-top:10px;
+    padding:13px 14px;
+    border-radius:15px;
+    border:1px solid rgba(251,191,36,.17);
+    background:rgba(251,191,36,.055);
+    color:rgba(255,255,255,.72);
+    line-height:2.1;
+}
+.region-warning .warning-title{
+    display:flex;align-items:center;gap:8px;
+    color:#fcd34d;font-weight:800;margin-bottom:3px;
+}
+.region-warning svg{width:17px;height:17px;flex:none}
+.notice-downloads{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.notice-download{min-width:0}
+.notice-download strong{font-size:10px}
+.login-notice-actions button{min-height:42px;display:flex;align-items:center;justify-content:center;gap:7px}.login-notice-actions button svg{width:16px;height:16px}
+
+.top-actions{display:flex;align-items:center;justify-content:flex-start;gap:8px;flex-wrap:wrap}
+.top-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.top-btn svg{width:15px;height:15px;flex:none}
+.wrapper{width:min(1180px,calc(100% - 28px));margin-inline:auto}
+.footer{margin-top:22px;padding:12px 2px 4px;opacity:.72}
+
+@media(max-width:760px){
+    .wrapper{width:calc(100% - 20px)}
+    .topbar{gap:12px}
+    .top-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+    .top-btn{width:100%;min-height:40px;padding:9px 10px}
+    .top-btn.danger{grid-column:1 / -1}
+    .notice-downloads{grid-template-columns:1fr}
+    .login-notice{border-radius:20px}
+}
+@media(max-width:430px){
+    .top-actions{grid-template-columns:1fr 1fr}
+    .brand-name{font-size:15px}
+    .brand-desc{font-size:9px}
+    .stats-grid{grid-template-columns:1fr 1fr!important}
+    .login-notice-head{gap:9px}
+    .login-notice-icon{width:40px;height:40px;min-width:40px}
+    .login-notice h3{font-size:14px}
+}
+
+@media(prefers-reduced-motion:reduce){
+    .login-notice{animation:none}
+    .notice-download{transition:none}
+}
+
+@media(max-width:1100px){
+
+    .stats-grid{
+        grid-template-columns:
+            repeat(3,1fr);
+    }
+
+    .download-grid{
+        grid-template-columns:
+            repeat(2,1fr);
+    }
+}
+
+@media(max-width:700px){
+
+    .wrapper{
+        width:
+            calc(100% - 14px);
+    }
+
+    .topbar{
+        align-items:
+            flex-start;
+
+        flex-direction:
+            column;
+    }
+
+    .stats-grid{
+        grid-template-columns:
+            repeat(2,1fr);
+    }
+
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+
+    .field.full{
+        grid-column:auto;
+    }
+
+    .download-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+</style>
+
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="brand">
-                <div class="logo">P</div>
-                <div>
-                    <div class="brand-name">PixonPanel</div>
-                    <div class="version">13.0.1 Beta</div>
-                </div>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-success btn-sm" onclick="createAutoLink('maximum')" title="ساخت با بهترین پروتکل و امنیت Maximum">
-                    ⚡ ساخت خودکار (Maximum)
-                </button>
-                <button class="btn btn-primary btn-sm" onclick="createAutoLink()" title="ساخت خودکار با تنظیمات پیشفرض">
-                    ➕ ساخت خودکار
-                </button>
-                <button class="btn btn-secondary btn-sm" onclick="refreshLinks()">🔄 بروزرسانی</button>
-                <a href="/logout" class="btn btn-danger btn-sm">🚪 خروج</a>
-            </div>
-        </div>
 
-        <!-- Stats -->
-        <div class="stats-grid" id="statsGrid">
-            <div class="stat-card">
-                <div class="stat-label">تعداد کانفیگ‌ها</div>
-                <div class="stat-value purple" id="totalLinks">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">فعال</div>
-                <div class="stat-value green" id="activeLinks">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">غیرفعال / منقضی</div>
-                <div class="stat-value orange" id="inactiveLinks">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">اتصال‌های فعال</div>
-                <div class="stat-value blue" id="activeConnections">0</div>
-            </div>
-        </div>
+<div class="wrapper">
 
-        <!-- Quick Create -->
-        <div class="section">
-            <div class="section-title">
-                <span>ساخت سریع کانفیگ</span>
-                <span class="badge">یک کلیک</span>
-            </div>
-            <div class="quick-actions">
-                <button class="btn btn-success" onclick="createAutoLink('maximum')" style="flex:1;">
-                    ⚡ بهترین پروتکل + امنیت Maximum
-                </button>
-                <button class="btn btn-primary" onclick="createAutoLink('balanced')" style="flex:1;">
-                    ⚖️ Balanced
-                </button>
-                <button class="btn btn-secondary" onclick="createAutoLink('normal')" style="flex:1;">
-                    📦 Normal
-                </button>
-                <button class="btn btn-secondary" onclick="createAutoLink('gaming')" style="flex:1;">
-                    🎮 Gaming
-                </button>
-            </div>
-        </div>
+<div class="topbar">
 
-        <!-- Links List -->
-        <div class="section">
-            <div class="section-title">
-                <span>لیست کانفیگ‌ها</span>
-                <span class="badge" id="linkCount">۰</span>
-            </div>
-            <div id="linksContainer">
-                <div class="empty-state">
-                    <div class="icon">📭</div>
-                    <div>هیچ کانفیگی وجود ندارد</div>
-                    <div style="font-size:13px;margin-top:8px;">با دکمه‌های بالا یک کانفیگ جدید بسازید</div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="brand">
 
-    <script>
-        let links = [];
+<div class="logo">
+P
+</div>
 
-        async function fetchLinks() {
-            try {
-                const res = await fetch('/api/links');
-                if (!res.ok) throw new Error('Failed to fetch');
-                const data = await res.json();
-                links = data.links || [];
-                renderLinks();
-                updateStats();
-            } catch (e) {
-                console.error('Error fetching links:', e);
-            }
-        }
+<div>
 
-        function renderLinks() {
-            const container = document.getElementById('linksContainer');
-            if (!links.length) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">📭</div>
-                        <div>هیچ کانفیگی وجود ندارد</div>
-                        <div style="font-size:13px;margin-top:8px;">با دکمه‌های بالا یک کانفیگ جدید بسازید</div>
-                    </div>
-                `;
-                return;
-            }
+<div class="brand-name">
+PixonPanel
+</div>
 
-            let html = '';
-            links.forEach(link => {
-                const status = link.active && !link.expired ? 'فعال' : 'غیرفعال';
-                const statusClass = link.active && !link.expired ? 'active' : 'inactive';
-                const used = formatBytes(link.used_bytes || 0);
-                const limit = link.limit_bytes > 0 ? formatBytes(link.limit_bytes) : 'نامحدود';
-                const protocolLabel = link.protocol_label || link.protocol || 'نامشخص';
+<div class="brand-desc">
+داشبورد مدیریت سرویس
+</div>
 
-                html += `
-                    <div class="link-item">
-                        <div class="link-info">
-                            <span class="link-name">${escapeHtml(link.label || 'بدون نام')}</span>
-                            <span class="link-protocol">${escapeHtml(protocolLabel)}</span>
-                            <span class="link-status ${statusClass}">${status}</span>
-                            <span style="font-size:12px;color:rgba(255,255,255,0.3);">
-                                ${used} / ${limit}
-                            </span>
-                            ${link.security_profile === 'maximum' ? '🛡️' : ''}
-                            ${link.protocol === 'xhttp-packet-up' ? '⚡' : ''}
-                        </div>
-                        <div class="link-actions">
-                            <button class="btn btn-secondary btn-sm" onclick="copyLink('${link.vless || ''}')">📋 کپی</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteLink('${link.uuid}')">🗑️</button>
-                        </div>
-                    </div>
-                `;
-            });
+<div class="brand-version">
+12.1.0 Beta
+</div>
 
-            container.innerHTML = html;
-            document.getElementById('linkCount').textContent = links.length;
-        }
+</div>
 
-        function updateStats() {
-            const total = links.length;
-            const active = links.filter(l => l.active && !l.expired).length;
-            const inactive = total - active;
-            document.getElementById('totalLinks').textContent = total;
-            document.getElementById('activeLinks').textContent = active;
-            document.getElementById('inactiveLinks').textContent = inactive;
-            document.getElementById('activeConnections').textContent = links.reduce((sum, l) => sum + (l.connected_ips || 0), 0);
-        }
+</div>
 
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
+<div class="top-actions">
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+<button
+class="top-btn primary"
+onclick="openAutoModal()"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
+ساخت خودکار
+</button>
 
-        async function createAutoLink(profile = 'balanced') {
-            try {
-                const res = await fetch('/api/links/auto', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ profile })
-                });
-                if (!res.ok) throw new Error('Failed to create');
-                const data = await res.json();
-                if (data.ok) {
-                    const msg = profile === 'maximum' ? 
-                        `✅ کانفیگ با بهترین پروتکل (xhttp-packet-up) و امنیت Maximum ساخته شد!` :
-                        `✅ کانفیگ با پروفایل ${profile} ساخته شد!`;
-                    alert(msg + '\n' + (data.vless || ''));
-                    await fetchLinks();
+<button
+class="top-btn"
+onclick="openManualModal()"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>
+ساخت دستی
+</button>
+
+<button
+class="top-btn"
+onclick="openPasswordModal()"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+تغییر رمز
+</button>
+
+<a
+href="/logout"
+class="top-btn danger"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5"/><path d="m14 8 4 4-4 4"/><path d="M18 12H9"/></svg>
+خروج
+</a>
+
+</div>
+
+</div>
+
+
+<div class="stats-grid">
+
+<div class="stat">
+<div class="stat-label">
+کل کانفیگ‌ها
+</div>
+<div
+id="totalLinks"
+class="stat-value"
+>
+-
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">
+فعال
+</div>
+<div
+id="activeLinks"
+class="stat-value"
+>
+-
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">
+اتصالات
+</div>
+<div
+id="connections"
+class="stat-value"
+>
+-
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">
+Traffic
+</div>
+<div
+id="traffic"
+class="stat-value"
+>
+-
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">
+Requests
+</div>
+<div
+id="requests"
+class="stat-value"
+>
+-
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">
+Uptime
+</div>
+<div
+id="uptime"
+class="stat-value"
+>
+-
+</div>
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<div class="panel-head">
+
+<div>
+
+<div class="panel-title">
+مدیریت کانفیگ‌ها
+</div>
+
+<div class="panel-sub">
+VLESS / SUB / INFO
+</div>
+
+</div>
+
+<button
+class="top-btn primary"
+onclick="refresh()"
+>
+↻ بروزرسانی
+</button>
+
+</div>
+
+<div class="table-wrap">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>
+نام
+</th>
+
+<th>
+کشور
+</th>
+
+<th>
+IP / Host
+</th>
+
+<th>
+پروتکل
+</th>
+
+<th>
+وضعیت
+</th>
+
+<th>
+مصرف
+</th>
+
+<th>
+زمان
+</th>
+
+<th>
+اتصال
+</th>
+
+<th>
+VLESS
+</th>
+
+<th>
+عملیات
+</th>
+
+</tr>
+
+</thead>
+
+<tbody id="linksTable">
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<div class="panel-head">
+
+<div>
+<div class="panel-title">
+آخرین فعالیت‌ها
+</div>
+</div>
+
+</div>
+
+<pre
+id="logs"
+class="pre"
+>
+در حال بارگذاری...
+</pre>
+
+</div>
+
+
+<div class="panel">
+
+<div class="panel-head">
+
+<div>
+<div class="panel-title">
+دانلود برنامه اتصال
+</div>
+
+<div class="panel-sub">
+Android / iPhone / iPad / Windows
+</div>
+
+</div>
+
+</div>
+
+<div class="download-grid">
+
+<a
+class="download"
+href="https://play.google.com/store/apps/details?id=com.happproxy"
+target="_blank"
+rel="noopener"
+>
+Happ Android
+<span>
+Google Play
+</span>
+</a>
+
+<a
+class="download"
+href="https://dl.v2rayng.org/releases/latest/v2rayNG_2.2.6_arm64-v8a.apk"
+target="_blank"
+rel="noopener"
+>
+v2rayNG
+<span>
+Android APK
+</span>
+</a>
+
+<a
+class="download"
+href="https://play.google.com/store/apps/details?id=dev.hexasoftware.v2box"
+target="_blank"
+rel="noopener"
+>
+V2Box Android
+<span>
+Google Play
+</span>
+</a>
+
+<a
+class="download"
+href="https://apps.apple.com/app/happ-proxy-utility/id6504287215"
+target="_blank"
+rel="noopener"
+>
+Happ
+<span>
+iPhone / iPad
+</span>
+</a>
+
+<a
+class="download"
+href="https://apps.apple.com/app/v2box-v2ray-client/id6446814690"
+target="_blank"
+rel="noopener"
+>
+V2Box
+<span>
+iPhone / iPad
+</span>
+</a>
+
+<a
+class="download"
+href="https://apps.apple.com/app/streisand/id6450534064"
+target="_blank"
+rel="noopener"
+>
+Streisand
+<span>
+iPhone / iPad
+</span>
+</a>
+
+<a
+class="download"
+href="https://apps.apple.com/app/foxray/id6448898396"
+target="_blank"
+rel="noopener"
+>
+FoXray
+<span>
+iPhone / iPad
+</span>
+</a>
+
+<a
+class="download"
+href="https://github.com/2dust/v2rayN/releases/latest"
+target="_blank"
+rel="noopener"
+>
+v2rayN
+<span>
+Windows
+</span>
+</a>
+
+<a
+class="download"
+href="https://happ-proxy.com/"
+target="_blank"
+rel="noopener"
+>
+Happ
+<span>
+Windows
+</span>
+</a>
+
+</div>
+
+<div class="notice">
+
+<strong>
+اطلاعیه مهم | آپدیت برنامه اتصال
+</strong>
+
+<br>
+
+دوستان عزیز ❤️
+برای اینکه کانفیگ‌های جدید بهترین
+سازگاری، پایداری و عملکرد رو داشته باشن،
+لطفاً برنامه‌ای که برای اتصال استفاده می‌کنید
+رو به آخرین نسخه آپدیت کنید. 🔄⚡️
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ===================================================== -->
+<!-- MANUAL MODAL -->
+<!-- ===================================================== -->
+
+<div
+id="manualModal"
+class="modal-backdrop"
+>
+
+<div class="modal">
+
+<div class="modal-head">
+
+<div class="modal-title">
+ساخت کانفیگ دستی
+</div>
+
+<button
+class="close"
+onclick="closeManualModal()"
+>
+×
+</button>
+
+</div>
+
+<div class="form-grid">
+
+<div class="field">
+
+<label>
+نام کانفیگ
+</label>
+
+<input
+id="manualName"
+placeholder="نام کانفیگ"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+پروتکل
+</label>
+
+<select id="manualProtocol">
+
+<option value="vless-ws">VLESS WebSocket</option>
+<option value="xhttp-packet-up">XHTTP Packet Up</option>
+<option value="xhttp-stream-up">XHTTP Stream Up</option>
+<option value="xhttp-stream-one">XHTTP Stream One</option>
+<option value="vmess-ws">VMess WebSocket</option>
+<option value="trojan-ws">Trojan WebSocket</option>
+<option value="shadowsocks">Shadowsocks</option>
+<option value="socks5">SOCKS5</option>
+<option value="http">HTTP Proxy</option>
+<option value="hysteria2">Hysteria 2</option>
+<option value="tuic">TUIC</option>
+<option value="wireguard">WireGuard</option>
+
+</select>
+
+</div>
+
+<div class="field">
+<label>کشور پروکسی</label>
+<select id="manualCountry">
+<option value="NL">🇳🇱 هلند</option>
+<option value="DE">🇩🇪 آلمان</option>
+<option value="FR">🇫🇷 فرانسه</option>
+<option value="GB">🇬🇧 انگلیس</option>
+<option value="US">🇺🇸 آمریکا</option>
+<option value="FI">🇫🇮 فنلاند</option>
+<option value="TR">🇹🇷 ترکیه</option>
+<option value="IR">🇮🇷 ایران</option>
+<option value="RU">🇷🇺 روسیه</option>
+<option value="AE">🇦🇪 امارات</option>
+<option value="OTHER" selected>🌍 سایر</option>
+</select>
+</div>
+
+<div class="field">
+<label>IP / Host دستی</label>
+<input id="manualHost" placeholder="مثلاً example.com یا 1.2.3.4" autocomplete="off" />
+</div>
+
+<div class="field">
+<label>Clean IP</label>
+<input id="manualCleanIp" placeholder="مثلاً 1.2.3.4 یا IPv6" autocomplete="off" />
+</div>
+
+<div class="field">
+
+<label>
+حجم
+</label>
+
+<input
+id="manualVolume"
+type="number"
+min="0"
+placeholder="0 = نامحدود"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+واحد حجم
+</label>
+
+<select id="manualVolumeUnit">
+
+<option value="GB">
+GB
+</option>
+
+<option value="MB">
+MB
+</option>
+
+<option value="TB">
+TB
+</option>
+
+</select>
+
+</div>
+
+
+<div class="field">
+
+<label>
+تعداد روز
+</label>
+
+<input
+id="manualDays"
+type="number"
+min="0"
+placeholder="0 = نامحدود"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+محدودیت IP
+</label>
+
+<input
+id="manualIpLimit"
+type="number"
+min="0"
+placeholder="0 = نامحدود"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+محدودیت اتصال
+</label>
+
+<input
+id="manualConnections"
+type="number"
+min="0"
+placeholder="0 = نامحدود"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+سرعت
+</label>
+
+<input
+id="manualSpeed"
+type="number"
+min="0"
+placeholder="0 = نامحدود"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+Fingerprint
+</label>
+
+<select id="manualFingerprint">
+
+<option value="chrome">
+Chrome
+</option>
+
+<option value="firefox">
+Firefox
+</option>
+
+<option value="safari">
+Safari
+</option>
+
+<option value="ios">
+iOS
+</option>
+
+<option value="android">
+Android
+</option>
+
+<option value="edge">
+Edge
+</option>
+
+<option value="360">
+360
+</option>
+
+<option value="qq">
+QQ
+</option>
+
+<option value="random">
+Random
+</option>
+
+<option value="randomized">
+Randomized
+</option>
+
+</select>
+
+</div>
+
+
+<div class="field">
+
+<label>
+Fragment
+</label>
+
+<select id="manualFragment">
+
+<option value="off">
+خاموش
+</option>
+
+<option value="safe">
+Safe
+</option>
+
+<option value="balanced">
+Balanced
+</option>
+
+<option value="aggressive">
+Aggressive
+</option>
+
+</select>
+
+</div>
+
+
+<div class="field">
+
+<label>
+Port
+</label>
+
+<input
+id="manualPort"
+type="number"
+min="1"
+max="65535"
+value="443"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
+ALPN
+</label>
+
+<input
+id="manualAlpn"
+value="http/1.1"
+/>
+
+</div>
+
+
+<div class="field full">
+
+<label>
+یادداشت
+</label>
+
+<textarea
+id="manualNote"
+placeholder="یادداشت اختیاری"
+></textarea>
+
+</div>
+
+</div>
+
+<div class="modal-actions">
+
+<button
+class="modal-btn secondary"
+onclick="closeManualModal()"
+>
+انصراف
+</button>
+
+<button
+class="modal-btn primary"
+onclick="createManual()"
+>
+ساخت کانفیگ
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ===================================================== -->
+<!-- AUTO MODAL -->
+<!-- ===================================================== -->
+
+<div
+id="autoModal"
+class="modal-backdrop"
+>
+
+<div class="modal">
+
+<div class="modal-head">
+
+<div class="modal-title">
+ساخت خودکار
+</div>
+
+<button
+class="close"
+onclick="closeAutoModal()"
+>
+×
+</button>
+
+</div>
+
+<div class="form-grid" style="margin-top:14px">
+<div class="field">
+<label>پروتکل</label>
+<select id="autoProtocol">
+<option value="vless-ws">VLESS WebSocket</option>
+<option value="xhttp-packet-up">XHTTP Packet Up</option>
+<option value="xhttp-stream-up">XHTTP Stream Up</option>
+<option value="xhttp-stream-one">XHTTP Stream One</option>
+<option value="vmess-ws">VMess WebSocket</option>
+<option value="trojan-ws">Trojan WebSocket</option>
+<option value="shadowsocks">Shadowsocks</option>
+<option value="socks5">SOCKS5</option>
+<option value="http">HTTP Proxy</option>
+<option value="hysteria2">Hysteria 2</option>
+<option value="tuic">TUIC</option>
+<option value="wireguard">WireGuard</option>
+</select>
+</div>
+<div class="field">
+<label>پروفایل امنیتی</label>
+<select id="autoProfile">
+<option value="balanced">Balanced</option>
+<option value="gaming">Gaming</option>
+<option value="maximum">Maximum</option>
+<option value="normal">Normal</option>
+</select>
+</div>
+</div>
+
+<div
+style="
+color:rgba(255,255,255,.55);
+font-size:11px;
+line-height:2;
+">
+
+کانفیگ خودکار با نام تصادفی
+<code>pxpanel_********</code>
+ساخته می‌شود.
+
+<br>
+
+حجم: <b>نامحدود</b>
+
+<br>
+
+زمان: <b>نامحدود</b>
+
+<br>
+
+IP: <b>نامحدود</b>
+
+<br>
+
+سرعت: <b>نامحدود</b>
+
+<br>
+
+اتصال: <b>نامحدود</b>
+
+<br>
+
+پروتکل:
+<b>VLESS WebSocket</b>
+
+<br>
+
+Port:
+<b>443</b>
+
+</div>
+
+<div class="modal-actions">
+
+<button
+class="modal-btn secondary"
+onclick="closeAutoModal()"
+>
+انصراف
+</button>
+
+<button
+class="modal-btn primary"
+onclick="createAuto()"
+>
+ساخت خودکار
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ===================================================== -->
+<!-- PASSWORD MODAL -->
+<!-- ===================================================== -->
+
+<div
+id="passwordModal"
+class="modal-backdrop"
+>
+
+<div class="modal">
+
+<div class="modal-head">
+
+<div class="modal-title">
+تغییر رمز پنل
+</div>
+
+<button
+class="close"
+onclick="closePasswordModal()"
+>
+×
+</button>
+
+</div>
+
+<div class="form-grid">
+
+<div class="field full">
+
+<label>
+رمز فعلی
+</label>
+
+<input
+id="currentPassword"
+type="password"
+/>
+
+</div>
+
+<div class="field">
+
+<label>
+رمز جدید
+</label>
+
+<input
+id="newPassword"
+type="password"
+/>
+
+</div>
+
+<div class="field">
+
+<label>
+تکرار رمز جدید
+</label>
+
+<input
+id="repeatPassword"
+type="password"
+/>
+
+</div>
+
+</div>
+
+<div class="modal-actions">
+
+<button
+class="modal-btn secondary"
+onclick="closePasswordModal()"
+>
+انصراف
+</button>
+
+<button
+class="modal-btn primary"
+onclick="changePassword()"
+>
+ذخیره رمز
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+
+    <!-- LOGIN NOTICE START -->
+<div id="loginNoticeModal" class="login-notice-backdrop" role="dialog" aria-modal="true" aria-labelledby="regionNoticeTitle">
+<div class="login-notice">
+<div class="login-notice-head">
+<div class="login-notice-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/><path d="M16.5 3.5h4v4"/><path d="m20.5 3.5-5 5"/></svg>
+</div>
+<div>
+<h3 id="regionNoticeTitle">راهنمای اتصال سرویس</h3>
+<p>اطلاعیه مهم منطقه‌ای قبل از اتصال کانفیگ‌ها</p>
+</div>
+</div>
+<div class="login-notice-body">
+<b>نکته:</b> لینک SUB را داخل برنامه Import / Subscription اضافه کنید. برای اتصال مستقیم نیز می‌توانید لینک VLESS را وارد کنید.
+<div class="region-warning">
+<div class="warning-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>هشدار منطقه‌ای اتصال</div>
+⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️
+</div>
+</div>
+<div class="notice-downloads">
+<a class="notice-download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><strong>v2rayNG</strong><span>Android</span></a>
+<a class="notice-download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><strong>v2rayN</strong><span>Windows / macOS / Linux</span></a>
+<a class="notice-download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></a>
+</div>
+<div class="login-notice-actions"><button type="button" onclick="closeLoginNotice()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>متوجه شدم</button></div>
+</div></div>
+    <!-- LOGIN NOTICE END -->
+
+<div
+id="toast"
+class="toast"
+></div>
+
+
+<script>
+
+let editingLink = null;
+
+
+/* LOGIN NOTICE START — DELETE THIS WHOLE BLOCK TO DISABLE THE LOGIN NOTICE */
+function closeLoginNotice(){const modal=document.getElementById("loginNoticeModal");if(modal)modal.remove();try{history.replaceState({},document.title,location.pathname)}catch(e){}}
+(function(){
+    const modal=document.getElementById("loginNoticeModal");
+    if(modal && new URLSearchParams(location.search).get("login") !== "1") modal.remove();
+})();
+window.addEventListener("keydown",event=>{if(event.key==="Escape")closeLoginNotice()});
+/* LOGIN NOTICE END */
+
+function escapeHtml(value){
+
+    return String(
+        value ?? ""
+    )
+
+    .replaceAll(
+        "&",
+        "&amp;"
+    )
+
+    .replaceAll(
+        "<",
+        "&lt;"
+    )
+
+    .replaceAll(
+        ">",
+        "&gt;"
+    )
+
+    .replaceAll(
+        '"',
+        "&quot;"
+    )
+
+    .replaceAll(
+        "'",
+        "&#039;"
+    );
+
+}
+
+
+function formatBytes(value){
+
+    value =
+        Number(
+            value || 0
+        );
+
+    if(
+        value < 1024
+    ){
+        return (
+            value +
+            " B"
+        );
+    }
+
+    if(
+        value < 1024 ** 2
+    ){
+        return (
+            (
+                value /
+                1024
+            ).toFixed(1)
+            +
+            " KB"
+        );
+    }
+
+    if(
+        value < 1024 ** 3
+    ){
+        return (
+            (
+                value /
+                1024 ** 2
+            ).toFixed(2)
+            +
+            " MB"
+        );
+    }
+
+    return (
+        (
+            value /
+            1024 ** 3
+        ).toFixed(2)
+        +
+        " GB"
+    );
+
+}
+
+
+function showToast(message){
+
+    const toast =
+        document.getElementById(
+            "toast"
+        );
+
+    toast.textContent =
+        message;
+
+    toast.classList.add(
+        "show"
+    );
+
+    clearTimeout(
+        window.__toastTimer
+    );
+
+    window.__toastTimer =
+        setTimeout(
+            () => {
+                toast.classList.remove(
+                    "show"
+                );
+            },
+            2200
+        );
+
+}
+
+
+async function api(
+    url,
+    options = {}
+){
+
+    try{
+
+        const response =
+            await fetch(
+                url,
+                {
+                    cache:"no-store",
+                    credentials:"same-origin",
+                    ...options
                 }
-            } catch (e) {
-                alert('خطا در ساخت کانفیگ: ' + e.message);
+            );
+
+        if(
+            response.status === 401
+        ){
+
+            location.href =
+                "/login";
+
+            return null;
+
+        }
+
+        let data = null;
+
+        try{
+
+            data =
+                await response.json();
+
+        }catch{
+
+            data = {
+                ok:false,
+                error:
+                    "پاسخ سرور قابل خواندن نیست"
+            };
+
+        }
+
+        if(
+            !response.ok
+        ){
+
+            const message =
+                data.detail ||
+                data.error ||
+                "خطای سرور";
+
+            showToast(
+                message
+            );
+
+            console.error(
+                "API error:",
+                url,
+                data
+            );
+
+            return null;
+        }
+
+        return data;
+
+    }catch(error){
+
+        console.error(
+            "Request failed:",
+            url,
+            error
+        );
+
+        showToast(
+            "ارتباط با سرور برقرار نشد"
+        );
+
+        return null;
+
+    }
+
+}
+
+
+async function refresh(){
+
+    const results =
+        await Promise.all([
+            api("/stats"),
+            api("/api/links"),
+            api("/api/activity")
+        ]);
+
+    const statsData =
+        results[0];
+
+    const linksData =
+        results[1];
+
+    const activity =
+        results[2];
+
+    if(statsData){
+
+        document.getElementById(
+            "totalLinks"
+        ).textContent =
+            statsData.links_count;
+
+        document.getElementById(
+            "activeLinks"
+        ).textContent =
+            statsData.active_links;
+
+        document.getElementById(
+            "connections"
+        ).textContent =
+            statsData.active_connections;
+
+        document.getElementById(
+            "traffic"
+        ).textContent =
+            formatBytes(
+                statsData.total_traffic_bytes
+            );
+
+        document.getElementById(
+            "requests"
+        ).textContent =
+            statsData.total_requests;
+
+        document.getElementById(
+            "uptime"
+        ).textContent =
+            statsData.uptime;
+    }
+
+
+    if(linksData){
+
+        const table =
+            document.getElementById(
+                "linksTable"
+            );
+
+        table.innerHTML = "";
+
+
+        if(
+            !linksData.links ||
+            !linksData.links.length
+        ){
+
+            table.innerHTML = `
+                <tr>
+                    <td
+                    colspan="10"
+                    class="empty"
+                    >
+                    هنوز کانفیگی ساخته نشده است.
+                    </td>
+                </tr>
+            `;
+
+        }else{
+
+            const countryFilter = document.getElementById("countryFilter")?.value || "ALL";
+            const visibleLinks = linksData.links.filter(link => countryFilter === "ALL" || String(link.country || "OTHER") === countryFilter);
+
+            for(
+                const link
+                of visibleLinks
+            ){
+
+                const row =
+                    document.createElement(
+                        "tr"
+                    );
+
+                const limit =
+                    Number(
+                        link.limit_bytes ||
+                        0
+                    );
+
+                const used =
+                    Number(
+                        link.used_bytes ||
+                        0
+                    );
+
+                let usageText =
+                    formatBytes(
+                        used
+                    );
+
+                if(limit > 0){
+
+                    usageText +=
+                        " / " +
+                        formatBytes(
+                            limit
+                        );
+
+                }else{
+
+                    usageText +=
+                        " / ∞";
+                }
+
+
+                row.innerHTML = `
+
+<td>
+
+<div style="font-weight:700">
+${escapeHtml(
+    link.label
+)}
+</div>
+
+<div
+style="
+margin-top:3px;
+color:rgba(255,255,255,.25);
+font-size:8px;
+"
+>
+${escapeHtml(
+    link.uuid
+)}
+</div>
+
+</td>
+
+
+<td>
+${escapeHtml(link.country_name || "🌍 سایر")}
+</td>
+
+<td>
+<div>${escapeHtml(link.clean_ip || link.manual_host || "پیش‌فرض سرور")}</div>
+${link.manual_host && link.clean_ip ? `<div style="margin-top:3px;color:rgba(255,255,255,.35);font-size:8px">SNI: ${escapeHtml(link.manual_host)}</div>` : ""}
+</td>
+
+<td>
+${escapeHtml(
+    link.protocol
+)}
+</td>
+
+
+<td>
+
+<span class="
+    badge
+    ${
+        link.active
+        ? "active"
+        : "off"
+    }
+">
+
+${
+    link.active
+    ? "فعال"
+    : "غیرفعال"
+}
+
+</span>
+
+</td>
+
+
+<td>
+${usageText}
+</td>
+
+
+<td>
+${
+    link.expires_at
+    ? escapeHtml(
+        link.expires_at
+      )
+    : "∞"
+}
+</td>
+
+
+<td>
+${link.connected_ips || 0}
+</td>
+
+
+<td>
+
+<div
+class="url-box"
+title="${escapeHtml(link.vless)}"
+>
+${escapeHtml(link.vless)}
+</div>
+
+</td>
+
+
+<td>
+
+<div class="actions">
+
+<button
+class="action primary"
+type="button"
+data-action="copy-vless"
+>
+VLESS
+</button>
+
+<button
+class="action"
+type="button"
+data-action="copy-sub"
+>
+SUB
+</button>
+
+<button
+class="action"
+type="button"
+data-action="open-info"
+>
+INFO
+</button>
+
+<button
+class="action"
+type="button"
+data-action="toggle"
+>
+${
+    link.active
+    ? "خاموش"
+    : "فعال"
+}
+</button>
+
+<button
+class="action"
+type="button"
+data-action="reset"
+>
+ریست
+</button>
+
+<button
+class="action danger"
+type="button"
+data-action="delete"
+>
+حذف
+</button>
+
+</div>
+
+</td>
+
+`;
+
+                const actionButtons =
+                    row.querySelectorAll(
+                        "button[data-action]"
+                    );
+
+                actionButtons.forEach(
+                    (button) => {
+                        button.addEventListener(
+                            "click",
+                            async () => {
+                                const action =
+                                    button.dataset.action;
+
+                                if (action === "copy-vless") {
+                                    await copyText(link.vless);
+                                    return;
+                                }
+
+                                if (action === "copy-sub") {
+                                    await copyText(link.sub);
+                                    return;
+                                }
+
+                                if (action === "open-info") {
+                                    if (!link.info) {
+                                        showToast("لینک INFO موجود نیست");
+                                        return;
+                                    }
+                                    window.open(
+                                        String(link.info),
+                                        "_blank",
+                                        "noopener,noreferrer"
+                                    );
+                                    return;
+                                }
+
+                                button.disabled = true;
+                                try {
+                                    if (action === "toggle") {
+                                        await toggleLink(
+                                            link.uuid,
+                                            !Boolean(link.active)
+                                        );
+                                    } else if (action === "reset") {
+                                        await resetUsage(link.uuid);
+                                    } else if (action === "delete") {
+                                        await deleteLink(link.uuid);
+                                    }
+                                } finally {
+                                    button.disabled = false;
+                                }
+                            }
+                        );
+                    }
+                );
+
+                table.appendChild(
+                    row
+                );
+
             }
-        }
 
-        async function deleteLink(uuid) {
-            if (!confirm('آیا از حذف این کانفیگ مطمئنید؟')) return;
-            try {
-                const res = await fetch(`/api/links/${uuid}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete');
-                await fetchLinks();
-            } catch (e) {
-                alert('خطا در حذف: ' + e.message);
+        }
+    }
+
+
+    if(
+        activity
+        &&
+        activity.logs
+    ){
+
+        document.getElementById(
+            "logs"
+        ).textContent =
+            activity.logs
+                .slice()
+                .reverse()
+                .map(
+                    item =>
+                        `[${item.level}] ${item.message}`
+                )
+                .join(
+                    "\n"
+                )
+                ||
+                "فعالیتی ثبت نشده است";
+
+    }
+
+}
+
+
+async function copyText(text){
+
+    const value =
+        String(text ?? "").trim();
+
+    if (!value) {
+        showToast("متنی برای کپی وجود ندارد");
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(value);
+            showToast("کپی شد");
+            return true;
+        }
+    } catch (error) {
+        console.warn("Clipboard API failed:", error);
+    }
+
+    try {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        const copied = document.execCommand("copy");
+        textarea.remove();
+
+        if (copied) {
+            showToast("کپی شد");
+            return true;
+        }
+    } catch (error) {
+        console.warn("Legacy clipboard fallback failed:", error);
+    }
+
+    try {
+        window.prompt("لینک را کپی کنید:", value);
+    } catch (error) {
+        console.warn("Prompt fallback failed:", error);
+    }
+
+    return false;
+
+}
+
+function openManualModal(){
+
+    document
+        .getElementById(
+            "manualModal"
+        )
+        .classList.add(
+            "open"
+        );
+
+}
+
+
+function closeManualModal(){
+
+    document
+        .getElementById(
+            "manualModal"
+        )
+        .classList.remove(
+            "open"
+        );
+
+}
+
+
+function openAutoModal(){
+
+    document
+        .getElementById(
+            "autoModal"
+        )
+        .classList.add(
+            "open"
+        );
+
+}
+
+
+function closeAutoModal(){
+
+    document
+        .getElementById(
+            "autoModal"
+        )
+        .classList.remove(
+            "open"
+        );
+
+}
+
+
+function openPasswordModal(){
+
+    document
+        .getElementById(
+            "passwordModal"
+        )
+        .classList.add(
+            "open"
+        );
+
+}
+
+
+function closePasswordModal(){
+
+    document
+        .getElementById(
+            "passwordModal"
+        )
+        .classList.remove(
+            "open"
+        );
+
+}
+
+
+async function createAuto(){
+    const protocol = document.getElementById("autoProtocol")?.value || "vless-ws";
+    const profile = document.getElementById("autoProfile")?.value || "balanced";
+    closeAutoModal();
+    showToast("در حال ساخت کانفیگ حرفه‌ای...");
+    const result = await api("/api/links/auto", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({protocol,profile})
+    });
+    if(!result || !result.ok) return;
+    const config = result.config || result.vless || result.link || "";
+    await copyText(config);
+    showToast("کانفیگ ساخته شد و در کلیپ‌بورد قرار گرفت");
+    await refresh();
+}
+
+
+async function createManual(){
+
+    const body = {
+
+        label:
+            document
+                .getElementById(
+                    "manualName"
+                )
+                .value
+                .trim()
+            ||
+            "کانفیگ جدید",
+
+        limit_value:
+            Number(
+                document
+                    .getElementById(
+                        "manualVolume"
+                    )
+                    .value
+                || 0
+            ),
+
+        limit_unit:
+            document
+                .getElementById(
+                    "manualVolumeUnit"
+                )
+                .value,
+
+        expires_days:
+            Number(
+                document
+                    .getElementById(
+                        "manualDays"
+                    )
+                    .value
+                || 0
+            ),
+
+        ip_limit:
+            Number(
+                document
+                    .getElementById(
+                        "manualIpLimit"
+                    )
+                    .value
+                || 0
+            ),
+
+        connection_limit:
+            Number(
+                document
+                    .getElementById(
+                        "manualConnections"
+                    )
+                    .value
+                || 0
+            ),
+
+        speed_limit_value:
+            Number(
+                document
+                    .getElementById(
+                        "manualSpeed"
+                    )
+                    .value
+                || 0
+            ),
+
+        speed_limit_unit:
+            "MBIT",
+
+        protocol:
+            document
+                .getElementById(
+                    "manualProtocol"
+                )
+                .value,
+
+        country:
+            document.getElementById("manualCountry").value,
+
+        manual_host:
+            document.getElementById("manualHost").value.trim(),
+
+        clean_ip:
+            document.getElementById("manualCleanIp").value.trim(),
+
+        fingerprint:
+            document
+                .getElementById(
+                    "manualFingerprint"
+                )
+                .value,
+
+        fragment:
+            document
+                .getElementById(
+                    "manualFragment"
+                )
+                .value,
+
+        port:
+            Number(
+                document
+                    .getElementById(
+                        "manualPort"
+                    )
+                    .value
+                || 443
+            ),
+
+        alpn:
+            document
+                .getElementById(
+                    "manualAlpn"
+                )
+                .value,
+
+        note:
+            document
+                .getElementById(
+                    "manualNote"
+                )
+                .value
+
+    };
+
+
+    const result =
+        await api(
+            "/api/links",
+            {
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify(
+                        body
+                    )
             }
-        }
+        );
 
-        function copyLink(text) {
-            if (!text) {
-                alert('لینکی برای کپی وجود ندارد');
-                return;
+
+    if(
+        !result
+    ){
+        return;
+    }
+
+
+    closeManualModal();
+
+    if(result.vless){
+
+        await copyText(
+            result.vless
+        );
+
+        showToast(
+            "کانفیگ ساخته شد"
+        );
+
+    }
+
+    await refresh();
+
+}
+
+
+async function toggleLink(
+    uuid,
+    active
+){
+
+    const result =
+        await api(
+            "/api/links/" +
+            encodeURIComponent(uuid),
+            {
+                method:"PATCH",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    active:Boolean(active)
+                })
             }
-            navigator.clipboard.writeText(text).then(() => {
-                alert('✅ لینک کپی شد!');
-            }).catch(() => {
-                // Fallback
-                const input = document.createElement('input');
-                input.value = text;
-                document.body.appendChild(input);
-                input.select();
-                document.execCommand('copy');
-                document.body.removeChild(input);
-                alert('✅ لینک کپی شد!');
-            });
+        );
+
+    if (!result || result.ok !== true) {
+        return false;
+    }
+
+    showToast(
+        active
+        ? "کانفیگ فعال شد"
+        : "کانفیگ غیرفعال شد"
+    );
+
+    await refresh();
+    return true;
+
+}
+
+
+async function resetUsage(
+    uuid
+){
+
+    const result =
+        await api(
+            "/api/links/" +
+            encodeURIComponent(uuid) +
+            "/reset-usage",
+            {
+                method:"POST"
+            }
+        );
+
+    if (!result || result.ok !== true) {
+        return false;
+    }
+
+    showToast("مصرف ریست شد");
+    await refresh();
+    return true;
+
+}
+
+
+async function deleteLink(
+    uuid
+){
+
+    if (!confirm("این کانفیگ حذف شود؟")) {
+        return false;
+    }
+
+    const result =
+        await api(
+            "/api/links/" +
+            encodeURIComponent(uuid),
+            {
+                method:"DELETE"
+            }
+        );
+
+    if (!result || result.ok !== true) {
+        return false;
+    }
+
+    showToast("کانفیگ حذف شد");
+    await refresh();
+    return true;
+
+}
+
+
+async function changePassword(){
+
+    const current =
+        document
+            .getElementById(
+                "currentPassword"
+            )
+            .value;
+
+    const newPassword =
+        document
+            .getElementById(
+                "newPassword"
+            )
+            .value;
+
+    const repeat =
+        document
+            .getElementById(
+                "repeatPassword"
+            )
+            .value;
+
+
+    const result =
+        await api(
+            "/api/change-password",
+            {
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify({
+
+                        current_password:
+                            current,
+
+                        new_password:
+                            newPassword,
+
+                        repeat_password:
+                            repeat
+
+                    })
+            }
+        );
+
+
+    if(
+        result
+        &&
+        result.ok
+    ){
+
+        closePasswordModal();
+
+        document
+            .getElementById(
+                "currentPassword"
+            )
+            .value = "";
+
+        document
+            .getElementById(
+                "newPassword"
+            )
+            .value = "";
+
+        document
+            .getElementById(
+                "repeatPassword"
+            )
+            .value = "";
+
+        showToast(
+            "رمز عبور تغییر کرد"
+        );
+
+    }
+
+}
+
+
+refresh();
+
+setInterval(
+    refresh,
+    1000
+);
+
+</script>
+
+<!-- ===================================================== -->
+<!-- POST LOGIN REGION / DOMAIN NOTICE -->
+<!-- ===================================================== -->
+
+<div
+    id="regionNotice"
+    style="
+        display:none;
+        position:fixed;
+        inset:0;
+        z-index:99999;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background:rgba(2,6,23,.78);
+        backdrop-filter:blur(18px);
+        -webkit-backdrop-filter:blur(18px);
+    "
+>
+    <div
+        style="
+            width:min(560px,100%);
+            position:relative;
+            overflow:hidden;
+            border:1px solid rgba(245,158,11,.28);
+            border-radius:26px;
+            padding:26px;
+            background:linear-gradient(145deg,rgba(30,25,8,.98),rgba(10,12,20,.98));
+            box-shadow:0 30px 100px rgba(0,0,0,.55),0 0 60px rgba(245,158,11,.10);
+            font-family:"Vazirmatn",sans-serif;
+        "
+    >
+        <div
+            style="
+                position:absolute;
+                width:180px;
+                height:180px;
+                left:-70px;
+                top:-90px;
+                border-radius:999px;
+                background:rgba(245,158,11,.12);
+                filter:blur(35px);
+                pointer-events:none;
+            "
+        ></div>
+
+        <div style="display:flex;align-items:flex-start;gap:14px;position:relative;">
+            <div
+                style="
+                    flex:0 0 auto;
+                    width:54px;
+                    height:54px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    border-radius:17px;
+                    color:#fbbf24;
+                    border:1px solid rgba(251,191,36,.25);
+                    background:rgba(245,158,11,.10);
+                "
+            >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3 2.8 19a1.4 1.4 0 0 0 1.22 2h15.96a1.4 1.4 0 0 0 1.22-2L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                    <path d="M12 9v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <circle cx="12" cy="16.8" r="1" fill="currentColor"/>
+                </svg>
+            </div>
+
+            <div style="min-width:0;flex:1;">
+                <div style="font-size:18px;font-weight:900;color:#fff;line-height:1.5;">هشدار مهم قبل ساخت کانفیگ</div>
+                <div style="margin-top:5px;font-size:11px;color:rgba(255,255,255,.45);">بررسی دامنه و محدودیت‌های منطقه‌ای</div>
+            </div>
+
+            <button
+                type="button"
+                onclick="closeRegionNotice()"
+                aria-label="بستن"
+                style="
+                    width:38px;
+                    height:38px;
+                    flex:0 0 auto;
+                    border:1px solid rgba(255,255,255,.08);
+                    border-radius:12px;
+                    color:rgba(255,255,255,.65);
+                    background:rgba(255,255,255,.04);
+                    cursor:pointer;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                "
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+
+        <div
+            style="
+                position:relative;
+                margin-top:20px;
+                padding:17px;
+                border:1px solid rgba(251,191,36,.16);
+                border-radius:18px;
+                background:rgba(245,158,11,.055);
+                color:rgba(255,255,255,.82);
+                font-size:13px;
+                line-height:2.05;
+                text-align:right;
+            "
+        >
+            <strong style="color:#fbbf24;">⚠️⚠️</strong> اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید <strong style="color:#fbbf24;">⚠️⚠️</strong>
+            <div style="margin-top:10px;color:rgba(255,255,255,.48);font-size:11px;line-height:1.9;">
+                ممکنه دسترسی دامنه به‌دلیل محدودیت‌های منطقه‌ای، اپراتور یا ISP متفاوت باشه. در این شرایط یک دامنه جدید امتحان کنید.
+            </div>
+        </div>
+
+        <button
+            type="button"
+            onclick="closeRegionNotice()"
+            style="
+                position:relative;
+                width:100%;
+                margin-top:15px;
+                min-height:46px;
+                border:1px solid rgba(251,191,36,.20);
+                border-radius:15px;
+                color:#17120a;
+                background:linear-gradient(135deg,#fbbf24,#f59e0b);
+                font-family:inherit;
+                font-weight:900;
+                cursor:pointer;
+            "
+        >
+            متوجه شدم
+        </button>
+    </div>
+</div>
+
+<script>
+(function(){
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("login") === "1") {
+        const modal = document.getElementById("regionNotice");
+        if (modal) {
+            modal.style.display = "flex";
+            document.body.style.overflow = "hidden";
         }
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+})();
 
-        function refreshLinks() {
-            fetchLinks();
-        }
+function closeRegionNotice(){
+    const modal = document.getElementById("regionNotice");
+    if (modal) modal.style.display = "none";
+    document.body.style.overflow = "";
+}
 
-        // Auto refresh every 30 seconds
-        setInterval(fetchLinks, 30000);
-
-        // Initial load
-        fetchLinks();
-    </script>
+document.addEventListener("keydown", function(event){
+    if (event.key === "Escape") closeRegionNotice();
+});
+</script>
 
 </body>
 </html>
 """
 
-@app.get("/dashboard")
+
+@app.get(
+    "/dashboard",
+    response_class=HTMLResponse,
+)
 async def dashboard(
     request: Request,
-    _=Depends(require_auth),
 ):
-    return HTMLResponse(DASHBOARD_HTML)
+
+    if not await is_valid_session(
+        request.cookies.get(
+            SESSION_COOKIE
+        )
+    ):
+        return RedirectResponse(
+            "/login"
+        )
+
+    await ensure_default_link()
+
+    return HTMLResponse(
+        DASHBOARD_HTML
+    )
+
 
 # ============================================================
-# SUBSCRIPTION (SUB) ENDPOINT
+# TEST
 # ============================================================
 
-@app.get("/sub/{uuid}")
-async def get_subscription(
-    uuid: str,
+@app.get(
+    "/test-ws",
+    response_class=HTMLResponse,
+)
+async def test_ws():
+
+    return HTMLResponse(
+        """
+        <script>
+        location.href='/dashboard'
+        </script>
+        """
+    )
+
+
+# ============================================================
+# GLOBAL ERROR HANDLER
+# ============================================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(
     request: Request,
+    exc: Exception,
 ):
-    async with LINKS_LOCK:
-        link = LINKS.get(uuid)
-        if not link:
-            raise HTTPException(
-                status_code=404,
-                detail="لینک یافت نشد"
-            )
 
-        if not is_link_allowed(link):
-            raise HTTPException(
-                status_code=403,
-                detail="لینک غیرفعال یا منقضی شده است"
-            )
+    stats[
+        "total_errors"
+    ] += 1
 
-        host = get_host(request)
-        vless_link = vless_link_for_link(link, uuid, host)
+    error_logs.append(
+        {
+            "error":
+                str(exc),
 
-    return Response(
-        content=vless_link,
-        media_type="text/plain",
-        headers={
-            "Content-Disposition": f"attachment; filename=config_{uuid}.txt",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "path":
+                str(request.url),
+
+            "method":
+                request.method,
+
+            "time":
+                datetime.now().isoformat(),
         }
     )
 
+    logger.exception(
+        "Unhandled exception: %s %s",
+        request.method,
+        request.url,
+    )
+
+    # API requests
+    if (
+        request.url.path.startswith(
+            "/api/"
+        )
+        or request.url.path == "/stats"
+    ):
+
+        return JSONResponse(
+            {
+                "ok": False,
+                "error":
+                    str(exc)
+                or "internal server error",
+            },
+            status_code=500,
+        )
+
+    return HTMLResponse(
+        """
+        <html lang="fa" dir="rtl">
+        <body style="
+            background:#07070a;
+            color:#fff;
+            font-family:sans-serif;
+            padding:40px;
+        ">
+            <h2>
+            خطای داخلی PixonPanel
+            </h2>
+
+            <p>
+            لطفاً لاگ Railway را بررسی کنید.
+            </p>
+        </body>
+        </html>
+        """,
+        status_code=500,
+    )
+
+
 # ============================================================
-# INFO ENDPOINT
-# ============================================================
-
-@app.get("/info/{uuid}")
-async def get_link_info_public(
-    uuid: str,
-    request: Request,
-):
-    async with LINKS_LOCK:
-        link = LINKS.get(uuid)
-        if not link:
-            raise HTTPException(
-                status_code=404,
-                detail="لینک یافت نشد"
-            )
-
-        host = get_host(request)
-        info = get_link_info(link, uuid, host)
-
-        # Remove sensitive info for public view
-        public_info = {
-            "name": info["name"],
-            "protocol": info["protocol"],
-            "active": info["active"],
-            "used_bytes": info["used_bytes"],
-            "limit_bytes": info["limit_bytes"],
-            "expires_at": info["expires_at"],
-            "ip_limit": info["ip_limit"],
-            "connection_limit": info["connection_limit"],
-            "created_at": link.get("created_at"),
-            "support": info["support"],
-        }
-
-        return JSONResponse(public_info)
-
-# ============================================================
-# RUN
+# MAIN
 # ============================================================
 
 if __name__ == "__main__":
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=PORT,
         log_level="info",
+        workers=1,
     )
