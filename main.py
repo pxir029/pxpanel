@@ -1,5 +1,5 @@
 # ============================================================
-# PXpanel 12.1.0 Beta
+# PXpanel 13.2.0 Beta
 # Railway Ready
 # ============================================================
 
@@ -41,7 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ============================================================
 
 APP_NAME = "PXpanel"
-APP_VERSION = "12.1.0 Beta"
+APP_VERSION = "13.2.0 Beta"
 
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
@@ -2193,7 +2193,7 @@ PXpanel
 </div>
 
 <div class="version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 </div>
 
@@ -2250,7 +2250,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PXpanel · 12.1.0 Beta
+PXpanel · 13.2.0 Beta
 </span>
 
 <a
@@ -2537,7 +2537,7 @@ P
 </h1>
 
 <div class="version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 
 <div class="desc">
@@ -4094,7 +4094,10 @@ async def info_page(
     async with LINKS_LOCK:
         link = LINKS.get(uid)
         if not link:
-            return HTMLResponse("<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>", status_code=404)
+            return HTMLResponse(
+                "<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>",
+                status_code=404,
+            )
         snapshot = dict(link)
 
     host = get_host(request)
@@ -4104,11 +4107,9 @@ async def info_page(
     limit = int(snapshot.get("limit_bytes", 0) or 0)
     if limit > 0:
         usage_percent = max(0, min(100, round((used / limit) * 100, 1)))
-        usage_value = f"{fmt_bytes(used)} / {fmt_bytes(limit)}"
         remaining_value = fmt_bytes(max(0, limit - used))
     else:
         usage_percent = 0
-        usage_value = f"{fmt_bytes(used)} / نامحدود"
         remaining_value = "نامحدود"
 
     expires_at = snapshot.get("expires_at")
@@ -4123,7 +4124,15 @@ async def info_page(
                 days, rem = divmod(seconds, 86400)
                 hours, rem = divmod(rem, 3600)
                 minutes, _ = divmod(rem, 60)
-                expiry_remaining = f"{days} روز و {hours} ساعت" if days else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
+                expiry_remaining = (
+                    f"{days} روز و {hours} ساعت"
+                    if days
+                    else (
+                        f"{hours} ساعت و {minutes} دقیقه"
+                        if hours
+                        else f"{minutes} دقیقه"
+                    )
+                )
         except Exception:
             expiry_remaining = "نامشخص"
         expiry_display = str(expires_at)
@@ -4133,121 +4142,324 @@ async def info_page(
 
     status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
     status_class = "good" if status_text == "فعال" else "bad"
-    ip_limit = "نامحدود" if not snapshot.get("ip_limit",0) else str(snapshot.get("ip_limit"))
-    connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
-    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
+    connection_limit = (
+        "نامحدود"
+        if not snapshot.get("connection_limit", 0)
+        else str(snapshot.get("connection_limit"))
+    )
+    speed_limit = (
+        "نامحدود"
+        if not snapshot.get("speed_limit_bytes", 0)
+        else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
+    )
+
+    now = now_ir()
+    fa_days = [
+        "دوشنبه",
+        "سه‌شنبه",
+        "چهارشنبه",
+        "پنجشنبه",
+        "جمعه",
+        "شنبه",
+        "یکشنبه",
+    ]
+    today_name = fa_days[now.weekday()]
+    today_date = now.strftime("%Y/%m/%d")
+    today_time = now.strftime("%H:%M")
+
+    r_ring = 54
+    c_ring = 2 * 3.1415926535 * r_ring
+    if limit > 0:
+        ring_offset = c_ring * (1 - usage_percent / 100.0)
+    else:
+        ring_offset = c_ring * (1 - min(0.12, 0.04 + (used % 50) / 400.0))
+
+    week_labels = []
+    for i in range(6, -1, -1):
+        d = now - timedelta(days=i)
+        week_labels.append(fa_days[d.weekday()])
+
+    points_vals = [0, 0, 0, 0, 0, 0, max(8, int(usage_percent) if limit > 0 else min(40, 8 + (used % 40)))]
+    chart_w, chart_h = 320, 120
+    pad_x, pad_y = 16, 16
+    usable_w = chart_w - pad_x * 2
+    usable_h = chart_h - pad_y * 2
+    n = len(points_vals)
+    pts = []
+    for i, v in enumerate(points_vals):
+        x = pad_x + (usable_w * i / max(1, n - 1))
+        y = pad_y + usable_h * (1 - v / 100.0)
+        pts.append(f"{x:.1f},{y:.1f}")
+    polyline = " ".join(pts)
+    area_pts = f"{pad_x},{pad_y + usable_h} " + polyline + f" {pad_x + usable_w},{pad_y + usable_h}"
+    last_x = pad_x + usable_w
+    last_y = pad_y + usable_h * (1 - points_vals[-1] / 100.0)
+
+    socks_host = (snapshot.get("socks5_host") or "").strip()
+    socks_port = int(snapshot.get("socks5_port") or 0)
+    socks_user = (snapshot.get("socks5_user") or "").strip()
+    socks_pass = (snapshot.get("socks5_pass") or "").strip()
+    if socks_host and socks_port > 0:
+        auth = f"{socks_user}:{socks_pass}@" if socks_user else ""
+        socks_uri = f"socks5://{auth}{socks_host}:{socks_port}"
+        socks_html = (
+            '<section class="card">'
+            '<div class="card-head"><div><div class="kicker">Proxy</div><div class="title">SOCKS5</div></div></div>'
+            '<div class="link-row"><div class="link-label">URI</div>'
+            f'<div class="link-val" id="socksUri">{escape_html(socks_uri)}</div>'
+            '<button type="button" class="btn-copy" onclick="copyEl(\'socksUri\')">کپی</button></div>'
+            "</section>"
+        )
+    else:
+        socks_html = ""
+
+    labels_html = "".join(
+        f'<span class="{"today" if i == 6 else ""}">{escape_html(lab)}</span>'
+        for i, lab in enumerate(week_labels)
+    )
+
+    pct_label = f"{usage_percent}%" if limit > 0 else "∞"
+    limit_label = fmt_bytes(limit) if limit > 0 else "∞"
 
     info_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>{escape_html(snapshot.get("label","PXpanel"))} | INFO</title>
+<title>{escape_html(snapshot.get("label", "PXpanel"))} · INFO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{{--bg:#07080d;--panel:rgba(17,19,28,.72);--line:rgba(255,255,255,.08);--muted:rgba(255,255,255,.42);--text:#f6f7fb;--green:#34d399;--blue:#60a5fa;--orange:#f59e0b;--red:#fb7185;--purple:#a78bfa}}
+:root{{
+  --bg:#07080d;--card:rgba(255,255,255,.03);--line:rgba(255,255,255,.08);
+  --text:#f4f4f8;--muted:rgba(255,255,255,.42);--purple:#a78bfa;
+  --green:#34d399;--blue:#818cf8;--orange:#fbbf24;--radius:18px;
+}}
 *{{box-sizing:border-box}}
 html,body{{margin:0;min-height:100%;background:var(--bg)}}
-body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;background:radial-gradient(circle at 15% 0%,rgba(96,165,250,.16),transparent 30%),radial-gradient(circle at 95% 30%,rgba(167,139,250,.13),transparent 28%),radial-gradient(circle at 80% 100%,rgba(52,211,153,.08),transparent 30%),#07080d}}
-.page{{width:min(920px,100%);margin:auto}}
-.shell{{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));backdrop-filter:blur(28px);border-radius:30px;box-shadow:0 35px 100px rgba(0,0,0,.38)}}
-.shell:before{{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.04),transparent 35%,rgba(255,255,255,.02))}}
-.hero{{position:relative;padding:25px 25px 20px;border-bottom:1px solid rgba(255,255,255,.06)}}
-.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:16px}}
-.brand{{display:flex;align-items:center;gap:13px}}
-.brand-icon{{width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(96,165,250,.2);background:linear-gradient(145deg,rgba(96,165,250,.14),rgba(167,139,250,.08));border-radius:15px;color:#93c5fd;font-weight:900;font-size:16px}}
-.hero h1{{margin:0;font-size:21px;font-weight:900;letter-spacing:-.35px}}
-.hero-meta{{margin-top:4px;color:var(--muted);font-size:9px;word-break:break-all}}
-.status{{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:12px;font-size:9px;font-weight:800;white-space:nowrap}}
-.status i{{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}}
-.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.18);background:rgba(52,211,153,.08)}}
-.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.18);background:rgba(251,113,133,.08)}}
-.notice{{margin-top:18px;display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid rgba(167,139,250,.17);background:linear-gradient(120deg,rgba(167,139,250,.10),rgba(96,165,250,.04));border-radius:16px;color:rgba(255,255,255,.62);font-size:9px;line-height:2}}
-.notice-icon{{width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;border-radius:9px;background:rgba(167,139,250,.13);border:1px solid rgba(167,139,250,.18);color:#c4b5fd;font-size:12px}}
-.notice strong{{color:#ddd6fe}}
-.dashboard{{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;padding:16px}}
-.usage-card,.side-card{{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:20px}}
-.usage-card{{padding:18px}}
-.section-kicker{{font-size:8px;color:rgba(255,255,255,.30);font-weight:800;letter-spacing:.7px;text-transform:uppercase}}
-.section-title{{margin-top:4px;font-size:13px;font-weight:900}}
-.usage-line{{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:16px}}
-.usage-number{{font-size:22px;font-weight:900;letter-spacing:-.5px}}
-.usage-number span{{font-size:10px;color:var(--muted);font-weight:600}}
-.usage-percent{{font-size:12px;font-weight:900;color:#86efac}}
-.track{{height:12px;margin-top:12px;border-radius:999px;background:rgba(255,255,255,.055);overflow:hidden;border:1px solid rgba(255,255,255,.035)}}
-.track span{{display:block;height:100%;width:{usage_percent}%;border-radius:inherit;background:linear-gradient(90deg,#34d399,#f59e0b);box-shadow:0 0 20px rgba(52,211,153,.18)}}
-.usage-bottom{{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:8px}}
-.side-card{{padding:14px}}
-.side-row{{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}}
-.side-row:last-child{{border-bottom:0;padding-bottom:0}}
-.side-label{{font-size:8px;color:var(--muted)}}
-.side-value{{font-size:9px;font-weight:800}}
-.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px 16px}}
-.metric{{position:relative;overflow:hidden;padding:14px 14px 13px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}}
-.metric:before{{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.025),transparent 55%)}}
-.metric .dot{{width:8px;height:8px;border-radius:50%;margin-bottom:9px;background:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}}
-.metric-label{{color:var(--muted);font-size:8px}}
-.metric-value{{margin-top:5px;font-size:12px;font-weight:900;color:var(--c);word-break:break-word}}
-.metric.green{{--c:#34d399}} .metric.orange{{--c:#f59e0b}} .metric.blue{{--c:#60a5fa}} .metric.purple{{--c:#a78bfa}}
-.content{{padding:0 16px 18px}}
-.section{{margin-top:10px;padding:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.022);border-radius:20px}}
-.section-head{{display:flex;align-items:end;justify-content:space-between;gap:10px}}
-.section-head .section-title{{margin:0}}
-.section-sub{{color:var(--muted);font-size:8px}}
-.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}}
-.info-item{{padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13)}}
-.info-label{{font-size:8px;color:var(--muted)}}
-.info-value{{margin-top:5px;font-size:9px;font-weight:700;color:rgba(255,255,255,.86);word-break:break-word}}
-.code{{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8.5px;color:#c4b5fd;font-weight:500}}
-.link-card{{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13);margin-top:9px}}
-.link-card:first-child{{margin-top:12px}}
-.link-main{{min-width:0}}
-.link-name{{font-size:8px;color:var(--muted);font-weight:800}}
-.link-url{{margin-top:4px;direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8px;color:#c4b5fd;word-break:break-all}}
-.copy-hint{{flex:0 0 auto;font-size:8px;color:rgba(255,255,255,.28)}}
-.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}}
-.download{{display:flex;align-items:center;gap:10px;min-height:68px;padding:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.07);background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border-radius:16px;transition:transform .2s ease,border-color .2s ease,background .2s ease}}
-.download:hover{{transform:translateY(-2px);border-color:rgba(96,165,250,.28);background:linear-gradient(145deg,rgba(96,165,250,.07),rgba(255,255,255,.02))}}
-.app-icon{{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:10px;background:rgba(96,165,250,.11);border:1px solid rgba(96,165,250,.14);color:#93c5fd;font-size:11px;font-weight:900}}
-.download strong{{display:block;font-size:9px}}
-.download span{{display:block;margin-top:2px;color:var(--muted);font-size:7.5px}}
-.channel{{margin-top:15px;padding:12px 14px;text-align:center;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.045);border-radius:14px;color:var(--muted);font-size:8px}}
-.channel b{{color:#6ee7b7}}
-@media(max-width:760px){{body{{padding:12px}}.dashboard{{grid-template-columns:1fr}}.stats{{grid-template-columns:repeat(2,1fr)}}.downloads{{grid-template-columns:1fr}}.hero-row{{align-items:flex-start;flex-direction:column}}}}
+body{{
+  font-family:"Vazirmatn",sans-serif;color:var(--text);padding:28px 20px 40px;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%,rgba(129,140,248,.14),transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 0%,rgba(167,139,250,.10),transparent 45%),
+    #07080d;
+}}
+*::-webkit-scrollbar{{width:7px;height:7px}}
+*::-webkit-scrollbar-track{{background:transparent}}
+*::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
+.wrap{{width:min(880px,100%);margin:0 auto}}
+.shell{{border:1px solid var(--line);border-radius:28px;background:rgba(12,14,20,.72);backdrop-filter:blur(24px);overflow:hidden}}
+.hero{{padding:28px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}}
+.brand{{display:flex;align-items:center;gap:14px;min-width:0}}
+.logo{{width:48px;height:48px;border-radius:14px;flex:none;display:grid;place-items:center;font-weight:900;font-size:15px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff}}
+.hero h1{{margin:0;font-size:20px;font-weight:800}}
+.meta{{margin-top:6px;font-size:11px;color:var(--muted);word-break:break-all;line-height:1.7}}
+.badge{{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700}}
+.badge i{{width:7px;height:7px;border-radius:50%;background:currentColor}}
+.badge.good{{color:#6ee7b7;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2)}}
+.badge.bad{{color:#fda4af;background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.2)}}
+.body{{padding:22px}}
+.grid{{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}}
+.card{{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}}
+.stack{{display:flex;flex-direction:column;gap:16px}}
+.kicker{{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}}
+.title{{margin-top:4px;font-size:15px;font-weight:800}}
+.usage-row{{display:flex;align-items:center;gap:22px;margin-top:18px}}
+.ring-wrap{{position:relative;width:140px;height:140px;flex:none}}
+.ring-wrap svg{{width:100%;height:100%;transform:rotate(-90deg)}}
+.ring-bg{{fill:none;stroke:rgba(255,255,255,.06);stroke-width:10}}
+.ring-fg{{fill:none;stroke:url(#ringGrad);stroke-width:10;stroke-linecap:round;stroke-dasharray:{c_ring:.2f};stroke-dashoffset:{ring_offset:.2f}}}
+.ring-center{{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}}
+.ring-pct{{font-size:22px;font-weight:900}}
+.ring-day{{margin-top:2px;font-size:11px;color:var(--purple);font-weight:700}}
+.ring-date{{font-size:10px;color:var(--muted);margin-top:2px}}
+.usage-info{{flex:1;min-width:0}}
+.usage-big{{font-size:22px;font-weight:900}}
+.usage-big span{{font-size:12px;color:var(--muted);font-weight:600}}
+.usage-meta{{margin-top:12px;display:grid;gap:8px}}
+.usage-meta div{{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05)}}
+.usage-meta span{{color:var(--muted)}}
+.usage-meta b{{font-weight:700}}
+.chart-box{{margin-top:8px}}
+.chart-svg{{width:100%;height:auto;display:block}}
+.chart-labels{{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px;font-size:9px;color:var(--muted);text-align:center}}
+.chart-labels .today{{color:var(--purple);font-weight:800}}
+.metrics{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}}
+.metric{{padding:16px;border-radius:var(--radius);border:1px solid var(--line);background:var(--card)}}
+.metric .dot{{width:8px;height:8px;border-radius:50%;background:var(--c);margin-bottom:10px;box-shadow:0 0 12px color-mix(in srgb, var(--c) 50%, transparent)}}
+.metric .lbl{{font-size:10px;color:var(--muted)}}
+.metric .val{{margin-top:6px;font-size:13px;font-weight:800;color:var(--c);word-break:break-word}}
+.metric.g{{--c:var(--green)}} .metric.o{{--c:var(--orange)}} .metric.b{{--c:var(--blue)}} .metric.p{{--c:var(--purple)}}
+.card-head{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}}
+.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}}
+.info-item{{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.16)}}
+.info-item .lbl{{font-size:10px;color:var(--muted)}}
+.info-item .val{{margin-top:6px;font-size:12px;font-weight:700;word-break:break-word}}
+.code{{direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#c4b5fd}}
+.link-row{{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:10px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.16)}}
+.link-row:first-of-type{{margin-top:0}}
+.link-label{{font-size:10px;color:var(--muted);font-weight:700;flex:none;min-width:52px}}
+.link-val{{flex:1;min-width:0;direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:10px;color:#c4b5fd;word-break:break-all;line-height:1.6}}
+.btn-copy{{flex:none;border:0;border-radius:10px;padding:8px 12px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6)}}
+.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}}
+.download{{display:flex;align-items:center;gap:10px;padding:14px;text-decoration:none;color:#fff;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.14);transition:border-color .15s ease,transform .15s ease}}
+.download:hover{{border-color:rgba(129,140,248,.35);transform:translateY(-1px)}}
+.app-ic{{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.18);color:#a5b4fc;font-weight:900;font-size:11px}}
+.download strong{{display:block;font-size:12px}}
+.download span{{display:block;margin-top:2px;font-size:10px;color:var(--muted)}}
+.foot{{margin-top:16px;padding:14px 16px;text-align:center;border-radius:14px;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.04);font-size:11px;color:var(--muted)}}
+.foot b{{color:#6ee7b7}}
+.toast{{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);padding:10px 16px;border-radius:12px;background:rgba(20,20,28,.95);border:1px solid var(--line);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}}
+.toast.show{{opacity:1;transform:translateX(-50%) translateY(0)}}
+@media(max-width:720px){{
+  body{{padding:14px 12px 28px}}
+  .grid,.downloads,.info-grid{{grid-template-columns:1fr}}
+  .metrics{{grid-template-columns:repeat(2,1fr)}}
+  .hero,.body{{padding:18px}}
+  .usage-row{{flex-direction:column;align-items:center;text-align:center}}
+}}
 </style>
 </head>
 <body>
-<div class="page"><div class="shell">
-<section class="hero">
-<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
-<div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
-</section>
+<div class="wrap"><div class="shell">
+<header class="hero">
+  <div class="brand">
+    <div class="logo">PX</div>
+    <div>
+      <h1>{escape_html(snapshot.get("label", "PXpanel"))}</h1>
+      <div class="meta">UUID · {escape_html(uid)} · {APP_VERSION}</div>
+    </div>
+  </div>
+  <div class="badge {status_class}"><i></i>{status_text}</div>
+</header>
+<div class="body">
+  <div class="grid">
+    <section class="card">
+      <div class="kicker">مصرف امروز</div>
+      <div class="title">{escape_html(today_name)} · {escape_html(today_date)}</div>
+      <div class="usage-row">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 128 128" aria-hidden="true">
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#34d399"/>
+                <stop offset="100%" stop-color="#818cf8"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-bg" cx="64" cy="64" r="54"/>
+            <circle class="ring-fg" cx="64" cy="64" r="54"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-pct">{pct_label}</div>
+            <div class="ring-day">{escape_html(today_name)}</div>
+            <div class="ring-date">{escape_html(today_time)}</div>
+          </div>
+        </div>
+        <div class="usage-info">
+          <div class="usage-big">{escape_html(fmt_bytes(used))} <span>/ {escape_html(limit_label)}</span></div>
+          <div class="usage-meta">
+            <div><span>باقی‌مانده</span><b>{escape_html(remaining_value)}</b></div>
+            <div><span>زمان سرویس</span><b>{escape_html(expiry_remaining)}</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="kicker">آمار خطی</div>
+      <div class="title">روند ۷ روز</div>
+      <div class="chart-box">
+        <svg class="chart-svg" viewBox="0 0 {chart_w} {chart_h}" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(129,140,248,.35)"/>
+              <stop offset="100%" stop-color="rgba(129,140,248,0)"/>
+            </linearGradient>
+          </defs>
+          <line x1="{pad_x}" y1="{pad_y}" x2="{pad_x}" y2="{pad_y + usable_h}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+          <line x1="{pad_x}" y1="{pad_y + usable_h}" x2="{pad_x + usable_w}" y2="{pad_y + usable_h}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+          <polygon points="{area_pts}" fill="url(#areaGrad)"/>
+          <polyline points="{polyline}" fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="4.5" fill="#a78bfa" stroke="#0b0c10" stroke-width="2"/>
+        </svg>
+        <div class="chart-labels">{labels_html}</div>
+      </div>
+    </section>
+  </div>
 
-<section class="dashboard">
-<div class="usage-card"><div class="section-kicker">Traffic Overview</div><div class="section-title">مصرف سرویس</div><div class="usage-line"><div class="usage-number">{escape_html(fmt_bytes(used))} <span>/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div><div class="usage-percent">{usage_percent}%</div></div><div class="track"><span></span></div><div class="usage-bottom"><span>باقی‌مانده: {escape_html(remaining_value)}</span><span>زمان: {escape_html(expiry_remaining)}</span></div></div>
-<div class="side-card"><div class="section-kicker">Service</div><div class="side-row"><span class="side-label">انقضا</span><span class="side-value">{escape_html(expiry_display)}</span></div><div class="side-row"><span class="side-label">IP Limit</span><span class="side-value">{escape_html(ip_limit)}</span></div><div class="side-row"><span class="side-label">Connection</span><span class="side-value">{escape_html(connection_limit)}</span></div><div class="side-row"><span class="side-label">Speed</span><span class="side-value">{escape_html(speed_limit)}</span></div></div>
-</section>
+  <div class="metrics">
+    <div class="metric g"><div class="dot"></div><div class="lbl">مصرف فعلی</div><div class="val">{escape_html(fmt_bytes(used))}</div></div>
+    <div class="metric o"><div class="dot"></div><div class="lbl">باقی‌مانده</div><div class="val">{escape_html(remaining_value)}</div></div>
+    <div class="metric b"><div class="dot"></div><div class="lbl">IP فعال</div><div class="val">{len(unique_ips_for_uuid(uid))}</div></div>
+    <div class="metric p"><div class="dot"></div><div class="lbl">زمان باقی</div><div class="val">{escape_html(expiry_remaining)}</div></div>
+  </div>
 
-<section class="stats">
-<div class="metric green"><div class="dot"></div><div class="metric-label">مصرف فعلی</div><div class="metric-value">{escape_html(fmt_bytes(used))}</div></div>
-<div class="metric orange"><div class="dot"></div><div class="metric-label">باقی‌مانده</div><div class="metric-value">{escape_html(remaining_value)}</div></div>
-<div class="metric blue"><div class="dot"></div><div class="metric-label">اتصالات فعال</div><div class="metric-value">{len(unique_ips_for_uuid(uid))}</div></div>
-<div class="metric purple"><div class="dot"></div><div class="metric-label">زمان باقی‌مانده</div><div class="metric-value">{escape_html(expiry_remaining)}</div></div>
-</section>
+  <div class="stack" style="margin-top:16px">
+    <section class="card">
+      <div class="card-head"><div><div class="kicker">Details</div><div class="title">جزئیات فنی</div></div></div>
+      <div class="info-grid">
+        <div class="info-item"><div class="lbl">Protocol</div><div class="val code">{escape_html(snapshot.get("protocol", "vless-ws"))}</div></div>
+        <div class="info-item"><div class="lbl">Fingerprint</div><div class="val code">{escape_html(snapshot.get("fingerprint", "chrome"))}</div></div>
+        <div class="info-item"><div class="lbl">IP Limit</div><div class="val">{escape_html(ip_limit)}</div></div>
+        <div class="info-item"><div class="lbl">Connection</div><div class="val">{escape_html(connection_limit)}</div></div>
+        <div class="info-item"><div class="lbl">Speed</div><div class="val">{escape_html(speed_limit)}</div></div>
+        <div class="info-item"><div class="lbl">انقضا</div><div class="val">{escape_html(expiry_display)}</div></div>
+      </div>
+    </section>
 
-<div class="content">
-<section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
+    <section class="card">
+      <div class="card-head"><div><div class="kicker">Links</div><div class="title">لینک‌های سرویس</div></div></div>
+      <div class="link-row"><div class="link-label">VLESS</div><div class="link-val" id="vlessUrl">{escape_html(vless_url)}</div>
+        <button type="button" class="btn-copy" onclick="copyEl('vlessUrl')">کپی</button></div>
+      <div class="link-row"><div class="link-label">SUB</div><div class="link-val" id="subUrl">{escape_html(sub_url)}</div>
+        <button type="button" class="btn-copy" onclick="copyEl('subUrl')">کپی</button></div>
+    </section>
 
-<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
+    {socks_html}
 
-<section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
-
-<div class="channel">پشتیبانی و اطلاعیه‌ها · <b>کانال تلگرام: logic_sec</b></div>
-</div></div></div>
-</body></html>"""
+    <section class="card">
+      <div class="card-head"><div><div class="kicker">Apps</div><div class="title">دانلود برنامه</div></div></div>
+      <div class="downloads">
+        <a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener"><div class="app-ic">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a>
+        <a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener"><div class="app-ic">N</div><div><strong>v2rayN</strong><span>Windows / macOS</span></div></a>
+        <a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener"><div class="app-ic">H</div><div><strong>Hiddify</strong><span>همه پلتفرم‌ها</span></div></a>
+      </div>
+    </section>
+    <div class="foot">پشتیبانی · <b>کانال تلگرام logic_sec</b></div>
+  </div>
+</div>
+</div></div>
+<div class="toast" id="toast">کپی شد</div>
+<script>
+function copyEl(id){{
+  const el = document.getElementById(id);
+  const t = el ? el.textContent.trim() : "";
+  if (!t) return;
+  const done = () => {{
+    const toast = document.getElementById("toast");
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1400);
+  }};
+  if (navigator.clipboard && navigator.clipboard.writeText) {{
+    navigator.clipboard.writeText(t).then(done).catch(() => {{
+      const ta = document.createElement("textarea");
+      ta.value = t; document.body.appendChild(ta); ta.select();
+      try {{ document.execCommand("copy"); }} catch (e) {{}}
+      ta.remove(); done();
+    }});
+  }} else {{
+    const ta = document.createElement("textarea");
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    try {{ document.execCommand("copy"); }} catch (e) {{}}
+    ta.remove(); done();
+  }}
+}}
+</script>
+</body>
+</html>"""
     return HTMLResponse(info_html)
+
 
 
 # ============================================================
@@ -4810,7 +5022,7 @@ PXpanel
 </h1>
 
 <div class="version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 
 <div class="text">
@@ -5851,7 +6063,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PXpanel 12.1.0 Beta
+PXpanel 13.2.0 Beta
 </title>
 
 <link
@@ -6728,7 +6940,7 @@ PXpanel
 </div>
 
 <div class="brand-version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 
 </div>
