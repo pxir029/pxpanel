@@ -1,5 +1,5 @@
 # ============================================================
-# PXpanel 13.2.0 Beta
+# PXpanel 12.1.0 Beta
 # Railway Ready
 # ============================================================
 
@@ -41,7 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ============================================================
 
 APP_NAME = "PXpanel"
-APP_VERSION = "13.2.0 Beta"
+APP_VERSION = "12.1.0 Beta"
 
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
@@ -869,7 +869,6 @@ def generate_vless_link(
     fingerprint: str | None = None,
     alpn: str | None = None,
     port: int | None = None,
-    address: str | None = None,
 ):
 
     fp = (
@@ -956,13 +955,10 @@ def generate_vless_link(
         for key, value in params.items()
     )
 
-    # address = IP تمیز برای اتصال؛ host/sni روی دامنه واقعی پنل می‌ماند
-    connect_host = (address or host or "").strip() or host
-
     return (
         f"vless://"
         f"{uuid}@"
-        f"{connect_host}:"
+        f"{host}:"
         f"{port_value}?"
         f"{query}#"
         f"{quote(remark)}"
@@ -974,11 +970,6 @@ def vless_link_for_link(
     uid: str,
     host: str,
 ):
-    clean_ip = (
-        link.get("clean_ip")
-        or ""
-    ).strip()
-
     return generate_vless_link(
         uid,
         host,
@@ -1001,7 +992,6 @@ def vless_link_for_link(
             "port",
             DEFAULT_PORT,
         ),
-        address=clean_ip or None,
     )
 
 
@@ -1082,23 +1072,6 @@ def get_link_info(
         "note": link.get(
             "note",
             "",
-        ),
-        "clean_ip": link.get(
-            "clean_ip",
-            "",
-        ),
-        "socks5_host": link.get("socks5_host", ""),
-        "socks5_port": int(link.get("socks5_port") or 0),
-        "socks5_user": link.get("socks5_user", ""),
-        "socks5_pass": link.get("socks5_pass", ""),
-        "socks5_uri": (
-            (
-                "socks5://"
-                + (f"{link.get('socks5_user','')}:{link.get('socks5_pass','')}@" if link.get("socks5_user") else "")
-                + f"{link.get('socks5_host')}:{int(link.get('socks5_port') or 0)}"
-            )
-            if link.get("socks5_host") and int(link.get("socks5_port") or 0) > 0
-            else ""
         ),
         "vless": vless_link_for_link(
             link,
@@ -1215,11 +1188,6 @@ async def load_state():
             link.setdefault(
                 "fragment",
                 "off",
-            )
-
-            link.setdefault(
-                "clean_ip",
-                "",
             )
 
             link.setdefault(
@@ -1404,29 +1372,6 @@ async def ensure_default_link():
 # LINK MANAGEMENT
 # ============================================================
 
-
-MAX_CLEAN_IPS = 20
-
-def parse_clean_ips(value) -> list[str]:
-    """چند ایپی تمیز؛ هر خط یا جدا با کاما — حداکثر ۲۰"""
-    if value is None:
-        return []
-    raw = str(value).replace(",", chr(10))
-    seen = set()
-    result = []
-    for line in raw.splitlines():
-        ip = line.strip()[:120]
-        if not ip:
-            continue
-        if ip in seen:
-            continue
-        seen.add(ip)
-        result.append(ip)
-        if len(result) >= MAX_CLEAN_IPS:
-            break
-    return result
-
-
 async def make_link(
     label: str = "لینک جدید",
     limit_bytes: int = 0,
@@ -1441,11 +1386,6 @@ async def make_link(
     speed_limit_bytes: int = 0,
     connection_limit: int = 0,
     fragment: str = "off",
-    clean_ip: str = "",
-    socks5_host: str = "",
-    socks5_port: int = 0,
-    socks5_user: str = "",
-    socks5_pass: str = "",
 ):
 
     if protocol not in PROTOCOLS:
@@ -1543,16 +1483,6 @@ async def make_link(
                 fragment
                 or "off"
             ).strip().lower(),
-
-        "clean_ip":
-            (
-                clean_ip
-                or ""
-            ).strip()[:120],
-        "socks5_host": (socks5_host or "").strip()[:200],
-        "socks5_port": int(socks5_port or 0),
-        "socks5_user": (socks5_user or "").strip()[:100],
-        "socks5_pass": (socks5_pass or "").strip()[:100],
     }
 
     async with LINKS_LOCK:
@@ -2159,23 +2089,6 @@ h1{
         flex-direction:column;
     }
 }
-
-.alert-red{
-    margin-top:16px;
-    padding:13px 14px;
-    border-radius:14px;
-    background:rgba(239,68,68,.12);
-    border:1px solid rgba(239,68,68,.35);
-    color:#fecaca;
-    font-size:11.5px;
-    line-height:1.9;
-}
-.alert-red strong{
-    display:block;
-    margin-bottom:4px;
-    color:#fca5a5;
-    font-size:12.5px;
-}
 </style>
 </head>
 
@@ -2193,7 +2106,7 @@ PXpanel
 </div>
 
 <div class="version">
-13.2.0 Beta
+12.1.0 Beta
 </div>
 </div>
 
@@ -2212,15 +2125,6 @@ PXpanel
 <div class="desc">
 این صفحه، درگاه عمومی PXpanel است.
 برای دسترسی به داشبورد مدیریت از مسیر ورود استفاده کنید.
-</div>
-
-<div class="alert-red">
-<strong>اطلاعیه مهم</strong>
-اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
-<span style="opacity:.85">(پینگ بالاتر)</span>.
-<br>
-اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
-<span style="opacity:.85">(پینگ بهتر)</span>.
 </div>
 
 <div class="path">
@@ -2250,7 +2154,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PXpanel · 13.2.0 Beta
+PXpanel · 12.1.0 Beta
 </span>
 
 <a
@@ -2503,23 +2407,6 @@ button{
     font-size:11px;
 }
 
-.alert-red{
-    margin-top:16px;
-    padding:13px 14px;
-    border-radius:14px;
-    background:rgba(239,68,68,.12);
-    border:1px solid rgba(239,68,68,.35);
-    color:#fecaca;
-    font-size:11.5px;
-    line-height:1.9;
-}
-.alert-red strong{
-    display:block;
-    margin-bottom:4px;
-    color:#fca5a5;
-    font-size:12.5px;
-}
-
 </style>
 
 </head>
@@ -2537,20 +2424,11 @@ P
 </h1>
 
 <div class="version">
-13.2.0 Beta
+12.1.0 Beta
 </div>
 
 <div class="desc">
 برای ادامه رمز عبور پنل مدیریت را وارد کنید.
-</div>
-
-<div class="alert-red">
-<strong>اطلاعیه مهم</strong>
-اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
-<span style="opacity:.85">(پینگ بالاتر)</span>.
-<br>
-اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
-<span style="opacity:.85">(پینگ بهتر)</span>.
 </div>
 
 <form
@@ -3176,83 +3054,45 @@ async def create_link_api(
     if fragment not in allowed_fragments:
         fragment = "off"
 
-    clean_ips = parse_clean_ips(
-        body.get(
-            "clean_ip",
+    uid, link = await make_link(
+        label=body.get(
+            "label",
+            auto_config_name(),
+        ),
+        limit_bytes=limit_bytes,
+        expires_at=expires_at,
+        note=body.get(
+            "note",
             "",
-        )
+        ),
+        sub_id=body.get(
+            "sub_id"
+        ),
+        protocol=protocol,
+        fingerprint=fingerprint,
+        alpn=body.get(
+            "alpn",
+            DEFAULT_ALPN_BY_PROTOCOL.get(
+                protocol,
+                "http/1.1",
+            ),
+        ),
+        port=port,
+        ip_limit=ip_limit,
+        speed_limit_bytes=speed_bytes,
+        connection_limit=connection_limit,
+        fragment=fragment,
     )
 
-    if not clean_ips:
-        clean_ips = [""]
-
     host = get_host(request)
-    base_label = (
-        body.get(
-            "label",
-            "",
-        )
-        or ""
-    ).strip()
-
-    created = []
-
-    for index, clean_ip in enumerate(clean_ips):
-        if len(clean_ips) == 1:
-            label = base_label or auto_config_name()
-        else:
-            suffix = clean_ip or str(index + 1)
-            if base_label:
-                label = f"{base_label}-{suffix}"[:60]
-            else:
-                label = f"{auto_config_name()}-{suffix}"[:60]
-
-        uid, link = await make_link(
-            label=label,
-            limit_bytes=limit_bytes,
-            expires_at=expires_at,
-            note=body.get(
-                "note",
-                "",
-            ),
-            sub_id=body.get(
-                "sub_id"
-            ),
-            protocol=protocol,
-            fingerprint=fingerprint,
-            alpn=body.get(
-                "alpn",
-                DEFAULT_ALPN_BY_PROTOCOL.get(
-                    protocol,
-                    "http/1.1",
-                ),
-            ),
-            port=port,
-            ip_limit=ip_limit,
-            speed_limit_bytes=speed_bytes,
-            connection_limit=connection_limit,
-            fragment=fragment,
-            clean_ip=clean_ip,
-            socks5_host=str(body.get("socks5_host") or "").strip()[:200],
-            socks5_port=safe_int(body.get("socks5_port"), 0, 0, 65535),
-            socks5_user=str(body.get("socks5_user") or "").strip()[:100],
-            socks5_pass=str(body.get("socks5_pass") or "").strip()[:100],
-
-        )
-
-        created.append(
-            get_link_info(
-                link,
-                uid,
-                host,
-            )
-        )
 
     result = {
-        **created[0],
+        **get_link_info(
+            link,
+            uid,
+            host,
+        ),
         "ok": True,
-        "created_count": len(created),
-        "items": created,
     }
 
     return result
@@ -3272,76 +3112,48 @@ async def create_auto_link(
 
         host = get_host(request)
 
-        try:
-            body = await request.json()
-            if not isinstance(body, dict):
-                body = {}
-        except Exception:
-            body = {}
+        uid, link = await make_link(
+            label=auto_config_name(),
 
-        clean_ips = parse_clean_ips(
-            body.get("clean_ip")
+            # Unlimited
+            limit_bytes=0,
+            expires_at=None,
+            ip_limit=0,
+            speed_limit_bytes=0,
+            connection_limit=0,
+
+            note=(
+                "Auto generated by "
+                "PXpanel"
+            ),
+
+            # IMPORTANT:
+            # Keep working protocol.
+            protocol="vless-ws",
+
+            fingerprint="chrome",
+
+            alpn="http/1.1",
+
+            port=443,
+
+            fragment="off",
         )
 
-        if not clean_ips:
-            clean_ips = [""]
-
-        created = []
-
-        for index, clean_ip in enumerate(clean_ips):
-            label = auto_config_name()
-            if clean_ip:
-                label = f"{label}-{clean_ip}"[:60]
-
-            uid, link = await make_link(
-                label=label,
-
-                # Unlimited
-                limit_bytes=0,
-                expires_at=None,
-                ip_limit=0,
-                speed_limit_bytes=0,
-                connection_limit=0,
-
-                note=(
-                    "Auto generated by "
-                    "PXpanel"
-                ),
-
-                # IMPORTANT:
-                # Keep working protocol.
-                protocol="vless-ws",
-
-                fingerprint="chrome",
-
-                alpn="http/1.1",
-
-                port=443,
-
-                fragment="off",
-
-                clean_ip=clean_ip,
-            )
-
-            created.append(
-                get_link_info(
-                    link,
-                    uid,
-                    host,
-                )
-            )
-
         result = {
-            **created[0],
+            **get_link_info(
+                link,
+                uid,
+                host,
+            ),
             "ok": True,
-            "created_count": len(created),
-            "items": created,
         }
 
         log_activity(
             "link",
             (
-                f"{len(created)} کانفیگ خودکار ساخته شد"
+                f"کانفیگ خودکار "
+                f"«{link['label']}» ساخته شد"
             ),
             "ok",
         )
@@ -4094,10 +3906,7 @@ async def info_page(
     async with LINKS_LOCK:
         link = LINKS.get(uid)
         if not link:
-            return HTMLResponse(
-                "<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>",
-                status_code=404,
-            )
+            return HTMLResponse("<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>", status_code=404)
         snapshot = dict(link)
 
     host = get_host(request)
@@ -4107,9 +3916,11 @@ async def info_page(
     limit = int(snapshot.get("limit_bytes", 0) or 0)
     if limit > 0:
         usage_percent = max(0, min(100, round((used / limit) * 100, 1)))
+        usage_value = f"{fmt_bytes(used)} / {fmt_bytes(limit)}"
         remaining_value = fmt_bytes(max(0, limit - used))
     else:
         usage_percent = 0
+        usage_value = f"{fmt_bytes(used)} / نامحدود"
         remaining_value = "نامحدود"
 
     expires_at = snapshot.get("expires_at")
@@ -4124,15 +3935,7 @@ async def info_page(
                 days, rem = divmod(seconds, 86400)
                 hours, rem = divmod(rem, 3600)
                 minutes, _ = divmod(rem, 60)
-                expiry_remaining = (
-                    f"{days} روز و {hours} ساعت"
-                    if days
-                    else (
-                        f"{hours} ساعت و {minutes} دقیقه"
-                        if hours
-                        else f"{minutes} دقیقه"
-                    )
-                )
+                expiry_remaining = f"{days} روز و {hours} ساعت" if days else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
         except Exception:
             expiry_remaining = "نامشخص"
         expiry_display = str(expires_at)
@@ -4142,85 +3945,9 @@ async def info_page(
 
     status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
     status_class = "good" if status_text == "فعال" else "bad"
-    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
-    connection_limit = (
-        "نامحدود"
-        if not snapshot.get("connection_limit", 0)
-        else str(snapshot.get("connection_limit"))
-    )
-    speed_limit = (
-        "نامحدود"
-        if not snapshot.get("speed_limit_bytes", 0)
-        else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
-    )
-
-    now = now_ir()
-    fa_days = [
-        "دوشنبه",
-        "سه‌شنبه",
-        "چهارشنبه",
-        "پنجشنبه",
-        "جمعه",
-        "شنبه",
-        "یکشنبه",
-    ]
-    today_name = fa_days[now.weekday()]
-    today_date = now.strftime("%Y/%m/%d")
-    today_time = now.strftime("%H:%M")
-
-    r_ring = 54
-    c_ring = 2 * 3.1415926535 * r_ring
-    if limit > 0:
-        ring_offset = c_ring * (1 - usage_percent / 100.0)
-    else:
-        ring_offset = c_ring * (1 - min(0.12, 0.04 + (used % 50) / 400.0))
-
-    week_labels = []
-    for i in range(6, -1, -1):
-        d = now - timedelta(days=i)
-        week_labels.append(fa_days[d.weekday()])
-
-    points_vals = [0, 0, 0, 0, 0, 0, max(8, int(usage_percent) if limit > 0 else min(40, 8 + (used % 40)))]
-    chart_w, chart_h = 320, 120
-    pad_x, pad_y = 16, 16
-    usable_w = chart_w - pad_x * 2
-    usable_h = chart_h - pad_y * 2
-    n = len(points_vals)
-    pts = []
-    for i, v in enumerate(points_vals):
-        x = pad_x + (usable_w * i / max(1, n - 1))
-        y = pad_y + usable_h * (1 - v / 100.0)
-        pts.append(f"{x:.1f},{y:.1f}")
-    polyline = " ".join(pts)
-    area_pts = f"{pad_x},{pad_y + usable_h} " + polyline + f" {pad_x + usable_w},{pad_y + usable_h}"
-    last_x = pad_x + usable_w
-    last_y = pad_y + usable_h * (1 - points_vals[-1] / 100.0)
-
-    socks_host = (snapshot.get("socks5_host") or "").strip()
-    socks_port = int(snapshot.get("socks5_port") or 0)
-    socks_user = (snapshot.get("socks5_user") or "").strip()
-    socks_pass = (snapshot.get("socks5_pass") or "").strip()
-    if socks_host and socks_port > 0:
-        auth = f"{socks_user}:{socks_pass}@" if socks_user else ""
-        socks_uri = f"socks5://{auth}{socks_host}:{socks_port}"
-        socks_html = (
-            '<section class="card">'
-            '<div class="card-head"><div><div class="kicker">Proxy</div><div class="title">SOCKS5</div></div></div>'
-            '<div class="link-row"><div class="link-label">URI</div>'
-            f'<div class="link-val" id="socksUri">{escape_html(socks_uri)}</div>'
-            '<button type="button" class="btn-copy" onclick="copyEl(\'socksUri\')">کپی</button></div>'
-            "</section>"
-        )
-    else:
-        socks_html = ""
-
-    labels_html = "".join(
-        f'<span class="{"today" if i == 6 else ""}">{escape_html(lab)}</span>'
-        for i, lab in enumerate(week_labels)
-    )
-
-    pct_label = f"{usage_percent}%" if limit > 0 else "∞"
-    limit_label = fmt_bytes(limit) if limit > 0 else "∞"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit",0) else str(snapshot.get("ip_limit"))
+    connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
+    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
 
     info_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -4459,7 +4186,6 @@ function copyEl(id){{
 </body>
 </html>"""
     return HTMLResponse(info_html)
-
 
 
 # ============================================================
@@ -5022,7 +4748,7 @@ PXpanel
 </h1>
 
 <div class="version">
-13.2.0 Beta
+12.1.0 Beta
 </div>
 
 <div class="text">
@@ -6063,7 +5789,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PXpanel 13.2.0 Beta
+PXpanel 12.1.0 Beta
 </title>
 
 <link
@@ -6224,7 +5950,152 @@ body{
     filter:brightness(1.08);
 }
 
-
+.tg-panel{
+    margin-top:14px;
+    border-radius:22px;
+    border:1px solid rgba(255,255,255,.10);
+    background:
+        linear-gradient(145deg, rgba(14,165,233,.08), rgba(37,99,235,.04)),
+        rgba(255,255,255,.035);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:
+        0 10px 40px rgba(0,0,0,.22),
+        inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;
+}
+.tg-panel-head{
+    padding:16px 18px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    background:linear-gradient(90deg, rgba(14,165,233,.10), transparent);
+}
+.tg-panel-title{
+    font-size:13px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.tg-panel-title span.dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#38bdf8;
+    box-shadow:0 0 12px #38bdf8;
+}
+.tg-panel-sub{
+    margin-top:3px;
+    color:rgba(255,255,255,.38);
+    font-size:9.5px;
+}
+.tg-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:12px;
+    padding:14px;
+}
+.tg-card{
+    position:relative;
+    border-radius:18px;
+    padding:14px;
+    border:1px solid rgba(255,255,255,.09);
+    background:
+        linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    transition:.2s ease;
+}
+.tg-card:hover{
+    border-color:rgba(56,189,248,.28);
+    transform:translateY(-2px);
+    box-shadow:0 12px 28px rgba(14,165,233,.12);
+}
+.tg-card.off{
+    opacity:.55;
+    filter:grayscale(.35);
+}
+.tg-card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:10px;
+}
+.tg-card-name{
+    font-size:12px;
+    font-weight:800;
+}
+.tg-card-meta{
+    margin-top:4px;
+    font-size:9px;
+    color:rgba(255,255,255,.38);
+    direction:ltr;
+    text-align:right;
+}
+.tg-badge{
+    display:inline-flex;
+    padding:4px 9px;
+    border-radius:999px;
+    font-size:8px;
+    font-weight:700;
+}
+.tg-badge.on{
+    color:#7dd3fc;
+    background:rgba(14,165,233,.14);
+    border:1px solid rgba(14,165,233,.22);
+}
+.tg-badge.off{
+    color:#fca5a5;
+    background:rgba(239,68,68,.10);
+    border:1px solid rgba(239,68,68,.18);
+}
+.tg-link-box{
+    margin-top:10px;
+    padding:10px 11px;
+    border-radius:12px;
+    background:rgba(0,0,0,.22);
+    border:1px solid rgba(255,255,255,.06);
+    font-family:Consolas,monospace;
+    font-size:9px;
+    direction:ltr;
+    text-align:left;
+    color:#bae6fd;
+    word-break:break-all;
+    line-height:1.6;
+    max-height:52px;
+    overflow:hidden;
+}
+.tg-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:12px;
+}
+.tg-actions .action{
+    flex:1;
+    min-width:70px;
+    justify-content:center;
+}
+.tg-empty{
+    grid-column:1/-1;
+    text-align:center;
+    padding:28px 16px;
+    color:rgba(255,255,255,.40);
+    font-size:11px;
+    line-height:1.9;
+}
+.tg-hint{
+    margin:0 14px 14px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:rgba(14,165,233,.07);
+    border:1px solid rgba(14,165,233,.15);
+    color:rgba(255,255,255,.58);
+    font-size:10px;
+    line-height:1.85;
+}
 
 
 .stats-grid{
@@ -6857,62 +6728,6 @@ th{
     }
 }
 
-
-/* Professional scrollbar */
-*::-webkit-scrollbar{width:8px;height:8px}
-*::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:999px}
-*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
-*::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,.45);border:2px solid transparent;background-clip:padding-box}
-*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) rgba(255,255,255,.03)}
-
-.modal{
-    max-height:min(88vh,820px);
-    overflow:auto;
-}
-.modal .form-grid{
-    gap:12px;
-}
-.modal .field label{
-    font-size:10px;
-    letter-spacing:.02em;
-    color:rgba(255,255,255,.42);
-    margin-bottom:6px;
-}
-.modal input,
-.modal select,
-.modal textarea{
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,.08);
-    background:rgba(0,0,0,.22);
-    transition:border-color .15s ease, background .15s ease;
-}
-.modal input:focus,
-.modal select:focus,
-.modal textarea:focus{
-    border-color:rgba(167,139,250,.45);
-    background:rgba(0,0,0,.28);
-    outline:none;
-}
-.modal-hint{
-    margin-top:6px;
-    font-size:10px;
-    color:rgba(255,255,255,.35);
-    line-height:1.7;
-}
-.modal-section{
-    grid-column:1/-1;
-    margin-top:4px;
-    padding-top:12px;
-    border-top:1px solid rgba(255,255,255,.06);
-    font-size:11px;
-    font-weight:700;
-    color:rgba(255,255,255,.55);
-}
-.modal-btn.ghost{
-    background:rgba(255,255,255,.04);
-    border:1px solid rgba(255,255,255,.08);
-    color:rgba(255,255,255,.85);
-}
 </style>
 
 </head>
@@ -6940,7 +6755,7 @@ PXpanel
 </div>
 
 <div class="brand-version">
-13.2.0 Beta
+12.1.0 Beta
 </div>
 
 </div>
@@ -6954,6 +6769,13 @@ class="top-btn primary"
 onclick="openAutoModal()"
 ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
 ساخت خودکار
+</button>
+
+<button
+class="top-btn tg-proxy"
+onclick="createTelegramProxy()"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 5L2 12.5l7 1.5L18 8l-7 7.5 1.5 6.5L21 5Z"/></svg>
+ساخت پروکسی تلگرام
 </button>
 
 <button
@@ -7059,6 +6881,37 @@ class="stat-value"
 </div>
 
 
+
+<div class="tg-panel">
+  <div class="tg-panel-head">
+    <div>
+      <div class="tg-panel-title">
+        <span class="dot"></span>
+        مدیریت پروکسی تلگرام
+      </div>
+      <div class="tg-panel-sub">
+        لینک‌ها روی دامنه واقعی همین سرور ساخته می‌شوند · FakeTLS / Secure
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="top-btn tg-proxy" onclick="openTgCreateModal()">
+        + ساخت پروکسی
+      </button>
+      <button class="top-btn" onclick="refreshTgProxies()">↻ بروزرسانی</button>
+    </div>
+  </div>
+
+  <div id="tgProxyGrid" class="tg-grid">
+    <div class="tg-empty">در حال بارگذاری پروکسی‌ها...</div>
+  </div>
+
+  <div class="tg-hint">
+    <strong style="color:#7dd3fc">راهنما:</strong>
+    هر پروکسی با secret اختصاصی روی <b>هاست همین پنل</b> ساخته می‌شود.
+    برای اتصال واقعی کاربران، سرویس MTProto (مثل <code style="direction:ltr">mtg</code> یا <code style="direction:ltr">teleproxy</code>) باید روی همین سرور با همان secret و پورت اجرا شود.
+    تا آن زمان لینک‌ها آماده اشتراک‌گذاری و مدیریت داخل پنل هستند.
+  </div>
+</div>
 
 <div class="panel">
 
@@ -7571,53 +7424,67 @@ Aggressive
 
 
 <div class="field">
-<label>Port</label>
-<input id="manualPort" type="number" min="1" max="65535" value="443" />
+
+<label>
+Port
+</label>
+
+<input
+id="manualPort"
+type="number"
+min="1"
+max="65535"
+value="443"
+/>
+
 </div>
+
 
 <div class="field">
-<label>ALPN</label>
-<input id="manualAlpn" value="http/1.1" />
+
+<label>
+ALPN
+</label>
+
+<input
+id="manualAlpn"
+value="http/1.1"
+/>
+
 </div>
 
-<div class="modal-section">ایپی تمیز</div>
 
 <div class="field full">
-<label>ایپی تمیز — هر خط یک IP (حداکثر ۲۰)</label>
-<textarea id="manualCleanIp" rows="3" placeholder="خالی = دامنه پنل&#10;1.2.3.4&#10;5.6.7.8" style="direction:ltr;text-align:left;min-height:84px;resize:vertical"></textarea>
-<div class="modal-hint">بیش از یک IP → یک ردیف در پنل + ساب چندکانفیگه</div>
-</div>
 
-<div class="modal-section">پروکسی SOCKS5 (اختیاری)</div>
+<label>
+یادداشت
+</label>
 
-<div class="field">
-<label>SOCKS5 Host</label>
-<input id="manualSocksHost" placeholder="127.0.0.1" style="direction:ltr;text-align:left" />
-</div>
-<div class="field">
-<label>SOCKS5 Port</label>
-<input id="manualSocksPort" type="number" min="0" max="65535" placeholder="1080" />
-</div>
-<div class="field">
-<label>SOCKS5 User</label>
-<input id="manualSocksUser" placeholder="اختیاری" style="direction:ltr;text-align:left" />
-</div>
-<div class="field">
-<label>SOCKS5 Password</label>
-<input id="manualSocksPass" type="password" placeholder="اختیاری" style="direction:ltr;text-align:left" />
-</div>
+<textarea
+id="manualNote"
+placeholder="یادداشت اختیاری"
+></textarea>
 
-<div class="field full">
-<label>یادداشت</label>
-<textarea id="manualNote" placeholder="اختیاری"></textarea>
 </div>
 
 </div>
 
 <div class="modal-actions">
-<button class="modal-btn secondary" onclick="closeManualModal()">انصراف</button>
-<button class="modal-btn ghost" type="button" onclick="applyBestManualSettings()">بهترین تنظیمات</button>
-<button class="modal-btn primary" onclick="createManual()">ساخت کانفیگ</button>
+
+<button
+class="modal-btn secondary"
+onclick="closeManualModal()"
+>
+انصراف
+</button>
+
+<button
+class="modal-btn primary"
+onclick="createManual()"
+>
+ساخت کانفیگ
+</button>
+
 </div>
 
 </div>
@@ -7745,19 +7612,65 @@ onclick="closeAutoModal()"
 
 </div>
 
-<div style="color:rgba(255,255,255,.48);font-size:11px;line-height:1.9;margin-bottom:4px">
-نام تصادفی · حجم/زمان/IP نامحدود · پروتکل VLESS-WS · پورت ۴۴۳
-</div>
+<div
+style="
+color:rgba(255,255,255,.55);
+font-size:11px;
+line-height:2;
+"
+>
 
-<div class="field" style="margin-top:12px">
-<label>ایپی تمیز — هر خط یک IP (حداکثر ۲۰، اختیاری)</label>
-<textarea id="autoCleanIp" rows="3" placeholder="خالی بگذارید یا چند IP&#10;1.2.3.4" style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.22);color:#fff;font-family:Vazirmatn,sans-serif;font-size:12px;outline:none;box-sizing:border-box;min-height:84px;resize:vertical"></textarea>
-<div class="modal-hint">SNI روی دامنه پنل می‌ماند</div>
+کانفیگ خودکار با نام تصادفی
+<code>pxpanel_********</code>
+ساخته می‌شود.
+
+<br>
+
+حجم: <b>نامحدود</b>
+
+<br>
+
+زمان: <b>نامحدود</b>
+
+<br>
+
+IP: <b>نامحدود</b>
+
+<br>
+
+سرعت: <b>نامحدود</b>
+
+<br>
+
+اتصال: <b>نامحدود</b>
+
+<br>
+
+پروتکل:
+<b>VLESS WebSocket</b>
+
+<br>
+
+Port:
+<b>443</b>
+
 </div>
 
 <div class="modal-actions">
-<button class="modal-btn secondary" onclick="closeAutoModal()">انصراف</button>
-<button class="modal-btn primary" onclick="createAuto()">ساخت خودکار</button>
+
+<button
+class="modal-btn secondary"
+onclick="closeAutoModal()"
+>
+انصراف
+</button>
+
+<button
+class="modal-btn primary"
+onclick="createAuto()"
+>
+ساخت خودکار
+</button>
 
 </div>
 
@@ -7874,9 +7787,7 @@ onclick="changePassword()"
 <b>نکته:</b> لینک SUB را داخل برنامه Import / Subscription اضافه کنید. برای اتصال مستقیم نیز می‌توانید لینک VLESS را وارد کنید.
 <div class="region-warning">
 <div class="warning-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>هشدار منطقه‌ای اتصال</div>
-⚠️ اگر برای هوش مصنوعی استفاده می‌کنید، کشور ریلوی را روی <b>آمریکا (USA)</b> بگذارید (پینگ بالاتر).<br>
-اگر نیاز ندارید، روی <b>هلند (Netherlands)</b> قرار دهید (پینگ بهتر).<br>
-اگر کانفیگ پینگ نداد، دامنه ممکن است فیلتر شده باشد — با ایپی تمیز دوباره بسازید.
+⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️
 </div>
 </div>
 <div class="notice-downloads">
@@ -8478,6 +8389,10 @@ data-action="delete"
 
     }
 
+    try {
+        await refreshTgProxies();
+    } catch (e) {}
+
 }
 
 async function copyText(text){
@@ -8669,6 +8584,7 @@ async function submitTgCreate(){
 
     showTgResult(result);
     showToast("پروکسی ساخته شد");
+    await refreshTgProxies();
 }
 
 async function createTelegramProxy(){
@@ -8685,6 +8601,7 @@ async function createTelegramProxy(){
     }
     showTgResult(result);
     showToast("پروکسی تلگرام آماده شد");
+    await refreshTgProxies();
 }
 
 async function copyTgLink(id){
@@ -8694,10 +8611,76 @@ async function copyTgLink(id){
     }
 }
 
-async function createAuto(){
+async function refreshTgProxies(){
+    const data = await api("/api/telegram-proxies");
+    const grid = document.getElementById("tgProxyGrid");
+    if (!grid) return;
 
-    const cleanIpEl = document.getElementById("autoCleanIp");
-    const cleanIp = cleanIpEl ? cleanIpEl.value.trim() : "";
+    if (!data || !data.ok) {
+        grid.innerHTML = '<div class="tg-empty">خطا در دریافت لیست پروکسی‌ها</div>';
+        return;
+    }
+
+    const list = data.proxies || [];
+    if (!list.length) {
+        grid.innerHTML = `
+          <div class="tg-empty">
+            هنوز پروکسی تلگرامی ساخته نشده است.<br>
+            از دکمه <b>ساخت پروکسی</b> استفاده کنید.
+          </div>`;
+        return;
+    }
+
+    grid.innerHTML = "";
+    for (const p of list) {
+        const card = document.createElement("div");
+        card.className = "tg-card" + (p.active ? "" : " off");
+        const status = p.active
+            ? '<span class="tg-badge on">فعال</span>'
+            : '<span class="tg-badge off">خاموش</span>';
+        card.innerHTML = `
+          <div class="tg-card-top">
+            <div>
+              <div class="tg-card-name">${escapeHtml(p.label || "بدون نام")}</div>
+              <div class="tg-card-meta">${escapeHtml(p.server)}:${p.port} · ${escapeHtml(p.mode || "ee")}</div>
+            </div>
+            ${status}
+          </div>
+          <div class="tg-link-box" title="${escapeHtml(p.tg_link)}">${escapeHtml(p.tg_link)}</div>
+          <div class="tg-actions">
+            <button class="action primary" data-act="copy">کپی لینک</button>
+            <button class="action" data-act="toggle">${p.active ? "خاموش" : "فعال"}</button>
+            <button class="action danger" data-act="del">حذف</button>
+          </div>
+        `;
+        card.querySelectorAll("button[data-act]").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const act = btn.dataset.act;
+                if (act === "copy") {
+                    await copyText(p.tg_link);
+                    return;
+                }
+                btn.disabled = true;
+                try {
+                    if (act === "toggle") {
+                        await api("/api/telegram-proxies/" + p.id + "/toggle", { method: "POST" });
+                        await refreshTgProxies();
+                    } else if (act === "del") {
+                        if (!confirm("این پروکسی حذف شود؟")) return;
+                        await api("/api/telegram-proxies/" + p.id, { method: "DELETE" });
+                        showToast("حذف شد");
+                        await refreshTgProxies();
+                    }
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+        grid.appendChild(card);
+    }
+}
+
+async function createAuto(){
 
     closeAutoModal();
 
@@ -8709,13 +8692,7 @@ async function createAuto(){
         await api(
             "/api/links/auto",
             {
-                method:"POST",
-                headers:{
-                    "Content-Type":"application/json"
-                },
-                body: JSON.stringify({
-                    clean_ip: cleanIp
-                })
+                method:"POST"
             }
         );
 
@@ -8731,11 +8708,8 @@ async function createAuto(){
         result.vless
     );
 
-    const count = result.created_count || 1;
     showToast(
-        count > 1
-            ? (count + " کانفیگ ساخته شد — اولی کپی شد")
-            : "کانفیگ ساخته شد و VLESS کپی شد"
+        "کانفیگ ساخته شد و VLESS کپی شد"
     );
 
     await refresh();
@@ -8743,32 +8717,7 @@ async function createAuto(){
 }
 
 
-function applyBestManualSettings(){
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    set("manualName", "premium");
-    set("manualProtocol", "vless-ws");
-    set("manualVolume", "0");
-    set("manualVolumeUnit", "GB");
-    set("manualDays", "0");
-    set("manualIpLimit", "0");
-    set("manualConnections", "0");
-    set("manualSpeed", "0");
-    set("manualFingerprint", "chrome");
-    set("manualFragment", "off");
-    set("manualPort", "443");
-    set("manualAlpn", "http/1.1");
-    set("manualNote", "بهترین تنظیمات — نامحدود");
-    showToast("بهترین تنظیمات اعمال شد — هنوز ساخته نشده");
-}
-
 async function createManual(){
-
-    const cleanRaw = ((document.getElementById("manualCleanIp") || {}).value || "");
-    const uniq = [...new Set(cleanRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean))];
-    if (uniq.length > 20) {
-        showToast("حداکثر ۲۰ ایپی تمیز مجاز است");
-        return;
-    }
 
     const body = {
 
@@ -8873,19 +8822,6 @@ async function createManual(){
                 || 443
             ),
 
-        clean_ip:
-            document
-                .getElementById(
-                    "manualCleanIp"
-                )
-                .value
-                .trim(),
-
-        socks5_host: (document.getElementById("manualSocksHost")||{}).value ? document.getElementById("manualSocksHost").value.trim() : "",
-        socks5_port: Number((document.getElementById("manualSocksPort")||{}).value || 0),
-        socks5_user: (document.getElementById("manualSocksUser")||{}).value ? document.getElementById("manualSocksUser").value.trim() : "",
-        socks5_pass: (document.getElementById("manualSocksPass")||{}).value ? document.getElementById("manualSocksPass").value.trim() : "",
-
         alpn:
             document
                 .getElementById(
@@ -8937,11 +8873,8 @@ async function createManual(){
             result.vless
         );
 
-        const count = result.created_count || 1;
         showToast(
-            count > 1
-                ? (count + " کانفیگ ساخته شد")
-                : "کانفیگ ساخته شد"
+            "کانفیگ ساخته شد"
         );
 
     }
