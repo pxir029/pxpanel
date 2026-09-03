@@ -1391,6 +1391,25 @@ async def ensure_default_link():
 # LINK MANAGEMENT
 # ============================================================
 
+
+def parse_clean_ips(value) -> list[str]:
+    """چند ایپی تمیز؛ هر خط یا جدا با کاما"""
+    if value is None:
+        return []
+    raw = str(value).replace(",", "\n")
+    seen = set()
+    result = []
+    for line in raw.splitlines():
+        ip = line.strip()[:120]
+        if not ip:
+            continue
+        if ip in seen:
+            continue
+        seen.add(ip)
+        result.append(ip)
+    return result
+
+
 async def make_link(
     label: str = "لینک جدید",
     limit_bytes: int = 0,
@@ -2115,6 +2134,23 @@ h1{
         flex-direction:column;
     }
 }
+
+.alert-red{
+    margin-top:16px;
+    padding:13px 14px;
+    border-radius:14px;
+    background:rgba(239,68,68,.12);
+    border:1px solid rgba(239,68,68,.35);
+    color:#fecaca;
+    font-size:11.5px;
+    line-height:1.9;
+}
+.alert-red strong{
+    display:block;
+    margin-bottom:4px;
+    color:#fca5a5;
+    font-size:12.5px;
+}
 </style>
 </head>
 
@@ -2151,6 +2187,15 @@ PXpanel
 <div class="desc">
 این صفحه، درگاه عمومی PXpanel است.
 برای دسترسی به داشبورد مدیریت از مسیر ورود استفاده کنید.
+</div>
+
+<div class="alert-red">
+<strong>اطلاعیه مهم</strong>
+اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
+<span style="opacity:.85">(پینگ بالاتر)</span>.
+<br>
+اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
+<span style="opacity:.85">(پینگ بهتر)</span>.
 </div>
 
 <div class="path">
@@ -2433,6 +2478,23 @@ button{
     font-size:11px;
 }
 
+.alert-red{
+    margin-top:16px;
+    padding:13px 14px;
+    border-radius:14px;
+    background:rgba(239,68,68,.12);
+    border:1px solid rgba(239,68,68,.35);
+    color:#fecaca;
+    font-size:11.5px;
+    line-height:1.9;
+}
+.alert-red strong{
+    display:block;
+    margin-bottom:4px;
+    color:#fca5a5;
+    font-size:12.5px;
+}
+
 </style>
 
 </head>
@@ -2455,6 +2517,15 @@ P
 
 <div class="desc">
 برای ادامه رمز عبور پنل مدیریت را وارد کنید.
+</div>
+
+<div class="alert-red">
+<strong>اطلاعیه مهم</strong>
+اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
+<span style="opacity:.85">(پینگ بالاتر)</span>.
+<br>
+اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
+<span style="opacity:.85">(پینگ بهتر)</span>.
 </div>
 
 <form
@@ -3080,55 +3151,95 @@ async def create_link_api(
     if fragment not in allowed_fragments:
         fragment = "off"
 
-    clean_ip = str(
+    clean_ips = parse_clean_ips(
         body.get(
             "clean_ip",
             "",
         )
-        or ""
-    ).strip()[:120]
-
-    uid, link = await make_link(
-        label=body.get(
-            "label",
-            auto_config_name(),
-        ),
-        limit_bytes=limit_bytes,
-        expires_at=expires_at,
-        note=body.get(
-            "note",
-            "",
-        ),
-        sub_id=body.get(
-            "sub_id"
-        ),
-        protocol=protocol,
-        fingerprint=fingerprint,
-        alpn=body.get(
-            "alpn",
-            DEFAULT_ALPN_BY_PROTOCOL.get(
-                protocol,
-                "http/1.1",
-            ),
-        ),
-        port=port,
-        ip_limit=ip_limit,
-        speed_limit_bytes=speed_bytes,
-        connection_limit=connection_limit,
-        fragment=fragment,
-        clean_ip=clean_ip,
     )
 
-    host = get_host(request)
+    if not clean_ips:
+        clean_ips = [""]
 
-    result = {
-        **get_link_info(
+    host = get_host(request)
+    base_label = (
+        body.get(
+            "label",
+            "",
+        )
+        or ""
+    ).strip()
+
+    # اگر چند ایپی باشد، همه داخل یک ساب‌گروه می‌روند
+    group_sub_id = body.get("sub_id")
+    group_sub_url = None
+
+    if len(clean_ips) > 1 and not group_sub_id:
+        group_name = base_label or f"multi-ip-{secrets.token_hex(3)}"
+        group_sub_id, group_rec = await create_sub_group(
+            name=group_name[:60],
+            desc=f"{len(clean_ips)} کانفیگ با ایپی تمیز",
+        )
+        group_sub_url = (
+            f"https://{host}/sub-group/{group_rec['uuid_key']}"
+        )
+
+    created = []
+
+    for index, clean_ip in enumerate(clean_ips):
+        if len(clean_ips) == 1:
+            label = base_label or auto_config_name()
+        else:
+            suffix = clean_ip or str(index + 1)
+            if base_label:
+                label = f"{base_label}-{suffix}"[:60]
+            else:
+                label = f"{auto_config_name()}-{suffix}"[:60]
+
+        uid, link = await make_link(
+            label=label,
+            limit_bytes=limit_bytes,
+            expires_at=expires_at,
+            note=body.get(
+                "note",
+                "",
+            ),
+            sub_id=group_sub_id,
+            protocol=protocol,
+            fingerprint=fingerprint,
+            alpn=body.get(
+                "alpn",
+                DEFAULT_ALPN_BY_PROTOCOL.get(
+                    protocol,
+                    "http/1.1",
+                ),
+            ),
+            port=port,
+            ip_limit=ip_limit,
+            speed_limit_bytes=speed_bytes,
+            connection_limit=connection_limit,
+            fragment=fragment,
+            clean_ip=clean_ip,
+        )
+
+        info = get_link_info(
             link,
             uid,
             host,
-        ),
+        )
+        created.append(info)
+
+    result = {
+        **created[0],
         "ok": True,
+        "created_count": len(created),
+        "items": created,
     }
+
+    if group_sub_url:
+        result["sub"] = group_sub_url
+        result["group_sub"] = group_sub_url
+        result["sub_group"] = True
 
     return result
 
@@ -3147,48 +3258,101 @@ async def create_auto_link(
 
         host = get_host(request)
 
-        uid, link = await make_link(
-            label=auto_config_name(),
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                body = {}
+        except Exception:
+            body = {}
 
-            # Unlimited
-            limit_bytes=0,
-            expires_at=None,
-            ip_limit=0,
-            speed_limit_bytes=0,
-            connection_limit=0,
-
-            note=(
-                "Auto generated by "
-                "PXpanel"
-            ),
-
-            # IMPORTANT:
-            # Keep working protocol.
-            protocol="vless-ws",
-
-            fingerprint="chrome",
-
-            alpn="http/1.1",
-
-            port=443,
-
-            fragment="off",
+        clean_ips = parse_clean_ips(
+            body.get("clean_ip")
         )
 
+        if not clean_ips:
+            clean_ips = [""]
+
+        group_sub_id = None
+        group_sub_url = None
+
+        if len(clean_ips) > 1:
+            group_name = f"auto-multi-{secrets.token_hex(3)}"
+            group_sub_id, group_rec = await create_sub_group(
+                name=group_name,
+                desc=f"{len(clean_ips)} کانفیگ خودکار با ایپی تمیز",
+            )
+            group_sub_url = (
+                f"https://{host}/sub-group/{group_rec['uuid_key']}"
+            )
+
+        created = []
+
+        for index, clean_ip in enumerate(clean_ips):
+            label = auto_config_name()
+            if clean_ip:
+                label = f"{label}-{clean_ip}"[:60]
+
+            uid, link = await make_link(
+                label=label,
+
+                # Unlimited
+                limit_bytes=0,
+                expires_at=None,
+                ip_limit=0,
+                speed_limit_bytes=0,
+                connection_limit=0,
+
+                note=(
+                    "Auto generated by "
+                    "PXpanel"
+                ),
+
+                # IMPORTANT:
+                # Keep working protocol.
+                protocol="vless-ws",
+
+                fingerprint="chrome",
+
+                alpn="http/1.1",
+
+                port=443,
+
+                fragment="off",
+
+                clean_ip=clean_ip,
+
+                sub_id=group_sub_id,
+            )
+
+            created.append(
+                get_link_info(
+                    link,
+                    uid,
+                    host,
+                )
+            )
+
         result = {
-            **get_link_info(
-                link,
-                uid,
-                host,
-            ),
+            **created[0],
             "ok": True,
+            "created_count": len(created),
+            "items": created,
         }
+
+        if group_sub_url:
+            result["sub"] = group_sub_url
+            result["group_sub"] = group_sub_url
+            result["sub_group"] = True
 
         log_activity(
             "link",
             (
-                f"کانفیگ خودکار "
-                f"«{link['label']}» ساخته شد"
+                f"{len(created)} کانفیگ خودکار ساخته شد"
+                + (
+                    " (ساب گروهی)"
+                    if group_sub_url
+                    else ""
+                )
             ),
             "ok",
         )
@@ -7173,17 +7337,19 @@ value="443"
 </div>
 
 
-<div class="field">
+<div class="field full">
 
 <label>
 ایپی تمیز
+<span style="opacity:.55;font-weight:500">— هر خط یک IP (Ctrl+Enter خط جدید)</span>
 </label>
 
-<input
+<textarea
 id="manualCleanIp"
-placeholder="مثلاً 1.2.3.4 — خالی = دامنه پنل"
-style="direction:ltr;text-align:left"
-/>
+rows="4"
+placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8&#10;خالی = دامنه پنل"
+style="direction:ltr;text-align:left;min-height:96px;resize:vertical"
+></textarea>
 
 </div>
 
@@ -7404,6 +7570,19 @@ Port:
 
 </div>
 
+<div class="field" style="margin-top:14px">
+<label>ایپی تمیز (اختیاری) — هر خط یک IP</label>
+<textarea
+id="autoCleanIp"
+rows="4"
+placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8"
+style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18);color:#fff;font-family:Vazirmatn,sans-serif;font-size:12px;outline:none;box-sizing:border-box;min-height:96px;resize:vertical"
+></textarea>
+<div style="margin-top:7px;color:rgba(255,255,255,.38);font-size:10px;line-height:1.7">
+هر خط = یک کانفیگ جدا با همان ایپی تمیز. SNI روی دامنه پنل می‌ماند تا پینگ درست باشد.
+</div>
+</div>
+
 <div class="modal-actions">
 
 <button
@@ -7535,7 +7714,9 @@ onclick="changePassword()"
 <b>نکته:</b> لینک SUB را داخل برنامه Import / Subscription اضافه کنید. برای اتصال مستقیم نیز می‌توانید لینک VLESS را وارد کنید.
 <div class="region-warning">
 <div class="warning-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>هشدار منطقه‌ای اتصال</div>
-⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️
+⚠️ اگر برای هوش مصنوعی استفاده می‌کنید، کشور ریلوی را روی <b>آمریکا (USA)</b> بگذارید (پینگ بالاتر).<br>
+اگر نیاز ندارید، روی <b>هلند (Netherlands)</b> قرار دهید (پینگ بهتر).<br>
+اگر کانفیگ پینگ نداد، دامنه ممکن است فیلتر شده باشد — با ایپی تمیز دوباره بسازید.
 </div>
 </div>
 <div class="notice-downloads">
@@ -8355,6 +8536,9 @@ async function copyTgLink(id){
 
 async function createAuto(){
 
+    const cleanIpEl = document.getElementById("autoCleanIp");
+    const cleanIp = cleanIpEl ? cleanIpEl.value.trim() : "";
+
     closeAutoModal();
 
     showToast(
@@ -8365,7 +8549,13 @@ async function createAuto(){
         await api(
             "/api/links/auto",
             {
-                method:"POST"
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body: JSON.stringify({
+                    clean_ip: cleanIp
+                })
             }
         );
 
@@ -8377,13 +8567,15 @@ async function createAuto(){
         return;
     }
 
-    await copyText(
-        result.vless
-    );
+    const count = result.created_count || 1;
 
-    showToast(
-        "کانفیگ ساخته شد و VLESS کپی شد"
-    );
+    if (count > 1 && result.group_sub) {
+        await copyText(result.group_sub);
+        showToast(count + " کانفیگ ساخته شد — لینک ساب گروهی کپی شد");
+    } else if (result.vless) {
+        await copyText(result.vless);
+        showToast("کانفیگ ساخته شد و VLESS کپی شد");
+    }
 
     await refresh();
 
@@ -8548,16 +8740,14 @@ async function createManual(){
 
     closeManualModal();
 
-    if(result.vless){
+    const count = result.created_count || 1;
 
-        await copyText(
-            result.vless
-        );
-
-        showToast(
-            "کانفیگ ساخته شد"
-        );
-
+    if (count > 1 && result.group_sub) {
+        await copyText(result.group_sub);
+        showToast(count + " کانفیگ ساخته شد — لینک ساب گروهی کپی شد");
+    } else if (result.vless) {
+        await copyText(result.vless);
+        showToast("کانفیگ ساخته شد");
     }
 
     await refresh();
