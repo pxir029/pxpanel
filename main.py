@@ -191,8 +191,10 @@ CONFIG = {
 
 LINKS: dict = {}
 SUBS: dict = {}
+TG_PROXIES: dict = {}
 SESSIONS: dict = {}
 connections: dict = {}
+TG_PROXIES_LOCK = asyncio.Lock()
 
 stats = {
     "total_bytes": 0,
@@ -1129,6 +1131,13 @@ async def load_state():
             )
         )
 
+        TG_PROXIES.update(
+            data.get(
+                "tg_proxies",
+                {},
+            )
+        )
+
         stored_password = data.get(
             "password_hash"
         )
@@ -1187,9 +1196,10 @@ async def load_state():
             )
 
         logger.info(
-            "State loaded: %d links / %d subscriptions",
+            "State loaded: %d links / %d subscriptions / %d tg-proxies",
             len(LINKS),
             len(SUBS),
+            len(TG_PROXIES),
         )
 
     except Exception as exc:
@@ -1217,6 +1227,9 @@ async def save_state():
 
                 "subs":
                     dict(SUBS),
+
+                "tg_proxies":
+                    dict(TG_PROXIES),
 
                 "password_hash":
                     AUTH[
@@ -3946,75 +3959,253 @@ async def info_page(
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{{--bg:#07080d;--panel:rgba(17,19,28,.72);--line:rgba(255,255,255,.08);--muted:rgba(255,255,255,.42);--text:#f6f7fb;--green:#34d399;--blue:#60a5fa;--orange:#f59e0b;--red:#fb7185;--purple:#a78bfa}}
-*{{box-sizing:border-box}}
-html,body{{margin:0;min-height:100%;background:var(--bg)}}
-body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;background:radial-gradient(circle at 15% 0%,rgba(96,165,250,.16),transparent 30%),radial-gradient(circle at 95% 30%,rgba(167,139,250,.13),transparent 28%),radial-gradient(circle at 80% 100%,rgba(52,211,153,.08),transparent 30%),#07080d}}
-.page{{width:min(920px,100%);margin:auto}}
-.shell{{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));backdrop-filter:blur(28px);border-radius:30px;box-shadow:0 35px 100px rgba(0,0,0,.38)}}
-.shell:before{{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.04),transparent 35%,rgba(255,255,255,.02))}}
-.hero{{position:relative;padding:25px 25px 20px;border-bottom:1px solid rgba(255,255,255,.06)}}
-.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:16px}}
-.brand{{display:flex;align-items:center;gap:13px}}
-.brand-icon{{width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(96,165,250,.2);background:linear-gradient(145deg,rgba(96,165,250,.14),rgba(167,139,250,.08));border-radius:15px;color:#93c5fd;font-weight:900;font-size:16px}}
-.hero h1{{margin:0;font-size:21px;font-weight:900;letter-spacing:-.35px}}
-.hero-meta{{margin-top:4px;color:var(--muted);font-size:9px;word-break:break-all}}
-.status{{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:12px;font-size:9px;font-weight:800;white-space:nowrap}}
-.status i{{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}}
-.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.18);background:rgba(52,211,153,.08)}}
-.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.18);background:rgba(251,113,133,.08)}}
-.notice{{margin-top:18px;display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid rgba(167,139,250,.17);background:linear-gradient(120deg,rgba(167,139,250,.10),rgba(96,165,250,.04));border-radius:16px;color:rgba(255,255,255,.62);font-size:9px;line-height:2}}
-.notice-icon{{width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;border-radius:9px;background:rgba(167,139,250,.13);border:1px solid rgba(167,139,250,.18);color:#c4b5fd;font-size:12px}}
+:root{{
+  --bg:#05060a;
+  --card:rgba(255,255,255,.035);
+  --card-hover:rgba(255,255,255,.055);
+  --border:rgba(255,255,255,.08);
+  --border-soft:rgba(255,255,255,.05);
+  --text:#f1f3f9;
+  --muted:rgba(255,255,255,.45);
+  --muted2:rgba(255,255,255,.28);
+  --green:#34d399;
+  --green-soft:rgba(52,211,153,.12);
+  --blue:#60a5fa;
+  --blue-soft:rgba(96,165,250,.12);
+  --orange:#f59e0b;
+  --orange-soft:rgba(245,158,11,.12);
+  --red:#fb7185;
+  --purple:#a78bfa;
+  --purple-soft:rgba(167,139,250,.12);
+  --radius:22px;
+  --radius-sm:14px;
+}}
+*{{box-sizing:border-box;margin:0;padding:0}}
+html,body{{min-height:100%;background:var(--bg)}}
+body{{
+  font-family:"Vazirmatn",system-ui,sans-serif;
+  color:var(--text);
+  padding:28px 16px;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%,rgba(96,165,250,.18),transparent 50%),
+    radial-gradient(ellipse 60% 40% at 95% 20%,rgba(167,139,250,.14),transparent 45%),
+    radial-gradient(ellipse 50% 30% at 70% 100%,rgba(52,211,153,.08),transparent 40%),
+    var(--bg);
+  line-height:1.6;
+}}
+.page{{width:min(880px,100%);margin:0 auto}}
+.shell{{
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 100%);
+  backdrop-filter:blur(32px);
+  -webkit-backdrop-filter:blur(32px);
+  border-radius:28px;
+  box-shadow:0 40px 80px -20px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03) inset;
+}}
+.shell::before{{
+  content:"";
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.05) 0%,transparent 40%,rgba(255,255,255,.02) 100%);
+  border-radius:inherit;
+}}
+
+/* Hero */
+.hero{{padding:28px 28px 22px;border-bottom:1px solid var(--border-soft)}}
+.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:18px}}
+.brand{{display:flex;align-items:center;gap:14px}}
+.brand-icon{{
+  width:48px;height:48px;
+  display:grid;place-items:center;
+  border-radius:16px;
+  background:linear-gradient(145deg,rgba(96,165,250,.18),rgba(167,139,250,.1));
+  border:1px solid rgba(96,165,250,.22);
+  color:#93c5fd;font-weight:900;font-size:15px;
+  box-shadow:0 8px 24px -6px rgba(96,165,250,.25);
+}}
+.hero h1{{margin:0;font-size:22px;font-weight:900;letter-spacing:-.4px}}
+.hero-meta{{margin-top:5px;color:var(--muted);font-size:11px;word-break:break-all;opacity:.85}}
+.status{{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 14px;border-radius:999px;
+  font-size:12px;font-weight:800;white-space:nowrap;
+}}
+.status i{{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor}}
+.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.1)}}
+.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.25);background:rgba(251,113,133,.1)}}
+
+/* Notice */
+.notice{{
+  margin-top:20px;display:flex;gap:12px;align-items:flex-start;
+  padding:14px 16px;
+  border:1px solid rgba(167,139,250,.2);
+  background:linear-gradient(120deg,rgba(167,139,250,.12),rgba(96,165,250,.05));
+  border-radius:16px;
+  color:rgba(255,255,255,.65);font-size:12px;line-height:1.85;
+}}
+.notice-icon{{
+  width:28px;height:28px;flex:0 0 28px;
+  display:grid;place-items:center;border-radius:10px;
+  background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.2);
+  color:#c4b5fd;font-size:13px;font-weight:800;
+}}
 .notice strong{{color:#ddd6fe}}
-.dashboard{{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;padding:16px}}
-.usage-card,.side-card{{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:20px}}
-.usage-card{{padding:18px}}
-.section-kicker{{font-size:8px;color:rgba(255,255,255,.30);font-weight:800;letter-spacing:.7px;text-transform:uppercase}}
-.section-title{{margin-top:4px;font-size:13px;font-weight:900}}
-.usage-line{{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:16px}}
-.usage-number{{font-size:22px;font-weight:900;letter-spacing:-.5px}}
-.usage-number span{{font-size:10px;color:var(--muted);font-weight:600}}
-.usage-percent{{font-size:12px;font-weight:900;color:#86efac}}
-.track{{height:12px;margin-top:12px;border-radius:999px;background:rgba(255,255,255,.055);overflow:hidden;border:1px solid rgba(255,255,255,.035)}}
-.track span{{display:block;height:100%;width:{usage_percent}%;border-radius:inherit;background:linear-gradient(90deg,#34d399,#f59e0b);box-shadow:0 0 20px rgba(52,211,153,.18)}}
-.usage-bottom{{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:8px}}
-.side-card{{padding:14px}}
-.side-row{{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}}
+
+/* Dashboard */
+.dashboard{{display:grid;grid-template-columns:1.4fr .6fr;gap:14px;padding:20px 20px 8px}}
+.usage-card,.side-card{{
+  border:1px solid var(--border);
+  background:var(--card);
+  border-radius:var(--radius);
+}}
+.usage-card{{padding:22px}}
+.section-kicker{{
+  font-size:10px;color:var(--muted2);font-weight:800;
+  letter-spacing:1px;text-transform:uppercase;
+}}
+.section-title{{margin-top:5px;font-size:15px;font-weight:900}}
+.usage-line{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:18px}}
+.usage-number{{font-size:26px;font-weight:900;letter-spacing:-.6px}}
+.usage-number span{{font-size:13px;color:var(--muted);font-weight:600}}
+.usage-percent{{font-size:15px;font-weight:900;color:#86efac}}
+.track{{
+  height:10px;margin-top:14px;border-radius:999px;
+  background:rgba(255,255,255,.06);overflow:hidden;
+  border:1px solid rgba(255,255,255,.04);
+}}
+.track span{{
+  display:block;height:100%;width:{usage_percent}%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#34d399 0%,#f59e0b 100%);
+  box-shadow:0 0 18px rgba(52,211,153,.3);
+  transition:width .4s ease;
+}}
+.usage-bottom{{
+  display:flex;justify-content:space-between;gap:10px;
+  margin-top:12px;color:var(--muted);font-size:11px;
+}}
+.side-card{{padding:18px}}
+.side-row{{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 0;border-bottom:1px solid var(--border-soft);
+}}
 .side-row:last-child{{border-bottom:0;padding-bottom:0}}
-.side-label{{font-size:8px;color:var(--muted)}}
-.side-value{{font-size:9px;font-weight:800}}
-.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px 16px}}
-.metric{{position:relative;overflow:hidden;padding:14px 14px 13px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}}
-.metric:before{{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.025),transparent 55%)}}
-.metric .dot{{width:8px;height:8px;border-radius:50%;margin-bottom:9px;background:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}}
-.metric-label{{color:var(--muted);font-size:8px}}
-.metric-value{{margin-top:5px;font-size:12px;font-weight:900;color:var(--c);word-break:break-word}}
-.metric.green{{--c:#34d399}} .metric.orange{{--c:#f59e0b}} .metric.blue{{--c:#60a5fa}} .metric.purple{{--c:#a78bfa}}
-.content{{padding:0 16px 18px}}
-.section{{margin-top:10px;padding:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.022);border-radius:20px}}
-.section-head{{display:flex;align-items:end;justify-content:space-between;gap:10px}}
-.section-head .section-title{{margin:0}}
-.section-sub{{color:var(--muted);font-size:8px}}
-.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}}
-.info-item{{padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13)}}
-.info-label{{font-size:8px;color:var(--muted)}}
-.info-value{{margin-top:5px;font-size:9px;font-weight:700;color:rgba(255,255,255,.86);word-break:break-word}}
-.code{{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8.5px;color:#c4b5fd;font-weight:500}}
-.link-card{{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13);margin-top:9px}}
-.link-card:first-child{{margin-top:12px}}
-.link-main{{min-width:0}}
-.link-name{{font-size:8px;color:var(--muted);font-weight:800}}
-.link-url{{margin-top:4px;direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8px;color:#c4b5fd;word-break:break-all}}
-.copy-hint{{flex:0 0 auto;font-size:8px;color:rgba(255,255,255,.28)}}
-.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}}
-.download{{display:flex;align-items:center;gap:10px;min-height:68px;padding:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.07);background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border-radius:16px;transition:transform .2s ease,border-color .2s ease,background .2s ease}}
-.download:hover{{transform:translateY(-2px);border-color:rgba(96,165,250,.28);background:linear-gradient(145deg,rgba(96,165,250,.07),rgba(255,255,255,.02))}}
-.app-icon{{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:10px;background:rgba(96,165,250,.11);border:1px solid rgba(96,165,250,.14);color:#93c5fd;font-size:11px;font-weight:900}}
-.download strong{{display:block;font-size:9px}}
-.download span{{display:block;margin-top:2px;color:var(--muted);font-size:7.5px}}
-.channel{{margin-top:15px;padding:12px 14px;text-align:center;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.045);border-radius:14px;color:var(--muted);font-size:8px}}
+.side-label{{font-size:11px;color:var(--muted)}}
+.side-value{{font-size:12px;font-weight:800}}
+
+/* Stats */
+.stats{{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+  padding:12px 20px 8px;
+}}
+.metric{{
+  position:relative;overflow:hidden;
+  padding:16px;border-radius:18px;
+  border:1px solid var(--border);background:var(--card);
+  transition:background .2s,border-color .2s;
+}}
+.metric:hover{{background:var(--card-hover);border-color:rgba(255,255,255,.12)}}
+.metric::before{{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(145deg,rgba(255,255,255,.03),transparent 60%);
+  pointer-events:none;
+}}
+.metric .dot{{
+  width:9px;height:9px;border-radius:50%;margin-bottom:10px;
+  background:var(--c);box-shadow:0 0 16px color-mix(in srgb,var(--c) 50%,transparent);
+}}
+.metric-label{{color:var(--muted);font-size:11px}}
+.metric-value{{margin-top:6px;font-size:14px;font-weight:900;color:var(--c);word-break:break-word}}
+.metric.green{{--c:#34d399}}
+.metric.orange{{--c:#f59e0b}}
+.metric.blue{{--c:#60a5fa}}
+.metric.purple{{--c:#a78bfa}}
+
+/* Content sections */
+.content{{padding:8px 20px 24px}}
+.section{{
+  margin-top:14px;padding:20px;
+  border:1px solid var(--border);background:var(--card);
+  border-radius:var(--radius);
+}}
+.section-head{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:4px}}
+.section-head .section-title{{margin:0;font-size:15px}}
+.section-sub{{color:var(--muted);font-size:11px}}
+.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}}
+.info-item{{
+  padding:14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border-soft);background:rgba(0,0,0,.18);
+}}
+.info-label{{font-size:11px;color:var(--muted)}}
+.info-value{{margin-top:6px;font-size:12px;font-weight:700;color:rgba(255,255,255,.88);word-break:break-word}}
+.code{{direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#c4b5fd;font-weight:500}}
+
+/* Links */
+.link-card{{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border-soft);background:rgba(0,0,0,.18);
+  margin-top:10px;transition:border-color .2s,background .2s;
+}}
+.link-card:first-of-type{{margin-top:14px}}
+.link-card:hover{{border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}}
+.link-main{{min-width:0;flex:1}}
+.link-name{{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:.3px}}
+.link-url{{
+  margin-top:5px;direction:ltr;text-align:left;
+  font-family:ui-monospace,Consolas,monospace;font-size:11px;
+  color:#c4b5fd;word-break:break-all;line-height:1.5;
+}}
+.copy-hint{{
+  flex:0 0 auto;font-size:10px;font-weight:700;
+  color:var(--muted2);padding:6px 10px;border-radius:8px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border-soft);
+}}
+
+/* Downloads */
+.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}}
+.download{{
+  display:flex;align-items:center;gap:12px;min-height:72px;
+  padding:14px;text-decoration:none;color:#fff;
+  border:1px solid var(--border);background:var(--card);
+  border-radius:16px;
+  transition:transform .2s ease,border-color .2s,background .2s,box-shadow .2s;
+}}
+.download:hover{{
+  transform:translateY(-3px);
+  border-color:rgba(96,165,250,.3);
+  background:linear-gradient(145deg,rgba(96,165,250,.1),rgba(255,255,255,.03));
+  box-shadow:0 12px 28px -8px rgba(96,165,250,.2);
+}}
+.app-icon{{
+  width:34px;height:34px;flex:0 0 34px;
+  display:grid;place-items:center;border-radius:11px;
+  background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.18);
+  color:#93c5fd;font-size:12px;font-weight:900;
+}}
+.download strong{{display:block;font-size:12px;font-weight:800}}
+.download span{{display:block;margin-top:3px;color:var(--muted);font-size:10px}}
+
+/* Channel */
+.channel{{
+  margin-top:18px;padding:14px 16px;text-align:center;
+  border:1px solid rgba(52,211,153,.15);background:rgba(52,211,153,.06);
+  border-radius:14px;color:var(--muted);font-size:12px;
+}}
 .channel b{{color:#6ee7b7}}
-@media(max-width:760px){{body{{padding:12px}}.dashboard{{grid-template-columns:1fr}}.stats{{grid-template-columns:repeat(2,1fr)}}.downloads{{grid-template-columns:1fr}}.hero-row{{align-items:flex-start;flex-direction:column}}}}
+
+/* Responsive */
+@media(max-width:760px){{
+  body{{padding:12px}}
+  .hero{{padding:20px 18px 16px}}
+  .dashboard{{grid-template-columns:1fr;padding:14px}}
+  .stats{{grid-template-columns:repeat(2,1fr);padding:8px 14px}}
+  .content{{padding:6px 14px 18px}}
+  .downloads{{grid-template-columns:1fr}}
+  .hero-row{{align-items:flex-start;flex-direction:column}}
+  .info-grid{{grid-template-columns:1fr}}
+}}
 </style>
 </head>
 <body>
@@ -5431,7 +5622,11 @@ async def http_proxy(
 
 
 # ============================================================
-# TELEGRAM PROXY GENERATOR
+# TELEGRAM PROXY GENERATOR + MANAGEMENT
+# ============================================================
+# لینک‌ها روی دامنه/هاست واقعی همین پنل ساخته می‌شوند.
+# برای کارکرد واقعی باید سرویس MTProto (مثل mtg) روی همین سرور
+# با همان secretها روی پورت مشخص اجرا شود.
 # ============================================================
 
 FAKE_TLS_DOMAINS = (
@@ -5443,7 +5638,46 @@ FAKE_TLS_DOMAINS = (
     "cdnjs.cloudflare.com",
     "www.amazon.com",
     "www.github.com",
+    "www.divar.ir",
+    "www.aparat.com",
 )
+
+
+def build_tg_links(host: str, port: int, secret: str) -> dict:
+    tg_link = (
+        f"tg://proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+    web_link = (
+        f"https://t.me/proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+    return {
+        "tg_link": tg_link,
+        "web_link": web_link,
+    }
+
+
+def tg_proxy_info(proxy_id: str, proxy: dict, host: str) -> dict:
+    port = int(proxy.get("port") or 443)
+    secret = proxy.get("secret") or ""
+    links = build_tg_links(host, port, secret)
+    return {
+        "id": proxy_id,
+        "label": proxy.get("label") or "",
+        "server": host,
+        "port": port,
+        "secret": secret,
+        "domain": proxy.get("domain") or "",
+        "mode": proxy.get("mode") or "ee",
+        "active": bool(proxy.get("active", True)),
+        "note": proxy.get("note") or "",
+        "created_at": proxy.get("created_at"),
+        "tg_link": links["tg_link"],
+        "web_link": links["web_link"],
+    }
 
 
 @app.post("/api/telegram-proxy")
@@ -5451,41 +5685,141 @@ async def create_telegram_proxy(
     request: Request,
     _=Depends(require_auth),
 ):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
     host = get_host(request)
-    port = 443
+    port = safe_int(body.get("port"), 443, 1, 65535)
+    label = (body.get("label") or "").strip()[:60]
+    note = (body.get("note") or "").strip()[:200]
+    mode = (body.get("mode") or "ee").strip().lower()
+    domain = (body.get("domain") or "").strip().lower()
+
+    if mode not in ("ee", "dd", "plain"):
+        mode = "ee"
+
+    if not domain:
+        domain = secrets.choice(FAKE_TLS_DOMAINS)
 
     raw_secret = secrets.token_hex(16)
-    domain = secrets.choice(FAKE_TLS_DOMAINS)
-    domain_hex = domain.encode("utf-8").hex()
-    secret = f"ee{raw_secret}{domain_hex}"
 
-    tg_link = (
-        f"tg://proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
+    if mode == "ee":
+        domain_hex = domain.encode("utf-8").hex()
+        secret = f"ee{raw_secret}{domain_hex}"
+    elif mode == "dd":
+        secret = f"dd{raw_secret}"
+    else:
+        secret = raw_secret
 
-    web_link = (
-        f"https://t.me/proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
+    if not label:
+        label = f"tg_{secrets.token_hex(3)}"
+
+    proxy_id = secrets.token_hex(8)
+
+    record = {
+        "label": label,
+        "port": port,
+        "secret": secret,
+        "raw_secret": raw_secret,
+        "domain": domain if mode == "ee" else "",
+        "mode": mode,
+        "note": note,
+        "active": True,
+        "created_at": datetime.now().isoformat(),
+    }
+
+    async with TG_PROXIES_LOCK:
+        TG_PROXIES[proxy_id] = record
+
+    await save_state()
+
+    info = tg_proxy_info(proxy_id, record, host)
 
     log_activity(
         "telegram",
-        f"پروکسی تلگرام ساخته شد → {host}:{port} ({domain})",
+        f"پروکسی تلگرام ساخته شد: {label} → {host}:{port}",
         "info",
     )
 
     return {
         "ok": True,
-        "server": host,
-        "port": port,
-        "secret": secret,
-        "domain": domain,
-        "tg_link": tg_link,
-        "web_link": web_link,
+        **info,
     }
+
+
+@app.get("/api/telegram-proxies")
+async def list_telegram_proxies(
+    request: Request,
+    _=Depends(require_auth),
+):
+    host = get_host(request)
+    result = []
+
+    async with TG_PROXIES_LOCK:
+        items = list(TG_PROXIES.items())
+
+    for proxy_id, proxy in items:
+        result.append(tg_proxy_info(proxy_id, proxy, host))
+
+    result.sort(
+        key=lambda item: item.get("created_at") or "",
+        reverse=True,
+    )
+
+    return {
+        "ok": True,
+        "proxies": result,
+        "count": len(result),
+        "server": host,
+    }
+
+
+@app.delete("/api/telegram-proxies/{proxy_id}")
+async def delete_telegram_proxy(
+    proxy_id: str,
+    _=Depends(require_auth),
+):
+    async with TG_PROXIES_LOCK:
+        if proxy_id not in TG_PROXIES:
+            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
+        label = TG_PROXIES[proxy_id].get("label", proxy_id)
+        TG_PROXIES.pop(proxy_id, None)
+
+    await save_state()
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام حذف شد: {label}",
+        "info",
+    )
+
+    return {"ok": True}
+
+
+@app.post("/api/telegram-proxies/{proxy_id}/toggle")
+async def toggle_telegram_proxy(
+    proxy_id: str,
+    _=Depends(require_auth),
+):
+    async with TG_PROXIES_LOCK:
+        if proxy_id not in TG_PROXIES:
+            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
+        current = bool(TG_PROXIES[proxy_id].get("active", True))
+        TG_PROXIES[proxy_id]["active"] = not current
+        active = TG_PROXIES[proxy_id]["active"]
+        label = TG_PROXIES[proxy_id].get("label", proxy_id)
+
+    await save_state()
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام {'فعال' if active else 'غیرفعال'} شد: {label}",
+        "info",
+    )
+
+    return {"ok": True, "active": active}
 
 
 # ============================================================
@@ -5657,6 +5991,7 @@ body{
     color:#fca5a5;
 }
 
+
 .top-btn.tg-proxy{
     background:linear-gradient(135deg,#0ea5e9,#2563eb);
     border-color:transparent;
@@ -5665,6 +6000,153 @@ body{
 }
 .top-btn.tg-proxy:hover{
     filter:brightness(1.08);
+}
+
+.tg-panel{
+    margin-top:14px;
+    border-radius:22px;
+    border:1px solid rgba(255,255,255,.10);
+    background:
+        linear-gradient(145deg, rgba(14,165,233,.08), rgba(37,99,235,.04)),
+        rgba(255,255,255,.035);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:
+        0 10px 40px rgba(0,0,0,.22),
+        inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;
+}
+.tg-panel-head{
+    padding:16px 18px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    background:linear-gradient(90deg, rgba(14,165,233,.10), transparent);
+}
+.tg-panel-title{
+    font-size:13px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.tg-panel-title span.dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#38bdf8;
+    box-shadow:0 0 12px #38bdf8;
+}
+.tg-panel-sub{
+    margin-top:3px;
+    color:rgba(255,255,255,.38);
+    font-size:9.5px;
+}
+.tg-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:12px;
+    padding:14px;
+}
+.tg-card{
+    position:relative;
+    border-radius:18px;
+    padding:14px;
+    border:1px solid rgba(255,255,255,.09);
+    background:
+        linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    transition:.2s ease;
+}
+.tg-card:hover{
+    border-color:rgba(56,189,248,.28);
+    transform:translateY(-2px);
+    box-shadow:0 12px 28px rgba(14,165,233,.12);
+}
+.tg-card.off{
+    opacity:.55;
+    filter:grayscale(.35);
+}
+.tg-card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:10px;
+}
+.tg-card-name{
+    font-size:12px;
+    font-weight:800;
+}
+.tg-card-meta{
+    margin-top:4px;
+    font-size:9px;
+    color:rgba(255,255,255,.38);
+    direction:ltr;
+    text-align:right;
+}
+.tg-badge{
+    display:inline-flex;
+    padding:4px 9px;
+    border-radius:999px;
+    font-size:8px;
+    font-weight:700;
+}
+.tg-badge.on{
+    color:#7dd3fc;
+    background:rgba(14,165,233,.14);
+    border:1px solid rgba(14,165,233,.22);
+}
+.tg-badge.off{
+    color:#fca5a5;
+    background:rgba(239,68,68,.10);
+    border:1px solid rgba(239,68,68,.18);
+}
+.tg-link-box{
+    margin-top:10px;
+    padding:10px 11px;
+    border-radius:12px;
+    background:rgba(0,0,0,.22);
+    border:1px solid rgba(255,255,255,.06);
+    font-family:Consolas,monospace;
+    font-size:9px;
+    direction:ltr;
+    text-align:left;
+    color:#bae6fd;
+    word-break:break-all;
+    line-height:1.6;
+    max-height:52px;
+    overflow:hidden;
+}
+.tg-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:12px;
+}
+.tg-actions .action{
+    flex:1;
+    min-width:70px;
+    justify-content:center;
+}
+.tg-empty{
+    grid-column:1/-1;
+    text-align:center;
+    padding:28px 16px;
+    color:rgba(255,255,255,.40);
+    font-size:11px;
+    line-height:1.9;
+}
+.tg-hint{
+    margin:0 14px 14px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:rgba(14,165,233,.07);
+    border:1px solid rgba(14,165,233,.15);
+    color:rgba(255,255,255,.58);
+    font-size:10px;
+    line-height:1.85;
 }
 
 
@@ -6451,6 +6933,38 @@ class="stat-value"
 </div>
 
 
+
+<div class="tg-panel">
+  <div class="tg-panel-head">
+    <div>
+      <div class="tg-panel-title">
+        <span class="dot"></span>
+        مدیریت پروکسی تلگرام
+      </div>
+      <div class="tg-panel-sub">
+        لینک‌ها روی دامنه واقعی همین سرور ساخته می‌شوند · FakeTLS / Secure
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="top-btn tg-proxy" onclick="openTgCreateModal()">
+        + ساخت پروکسی
+      </button>
+      <button class="top-btn" onclick="refreshTgProxies()">↻ بروزرسانی</button>
+    </div>
+  </div>
+
+  <div id="tgProxyGrid" class="tg-grid">
+    <div class="tg-empty">در حال بارگذاری پروکسی‌ها...</div>
+  </div>
+
+  <div class="tg-hint">
+    <strong style="color:#7dd3fc">راهنما:</strong>
+    هر پروکسی با secret اختصاصی روی <b>هاست همین پنل</b> ساخته می‌شود.
+    برای اتصال واقعی کاربران، سرویس MTProto (مثل <code style="direction:ltr">mtg</code> یا <code style="direction:ltr">teleproxy</code>) باید روی همین سرور با همان secret و پورت اجرا شود.
+    تا آن زمان لینک‌ها آماده اشتراک‌گذاری و مدیریت داخل پنل هستند.
+  </div>
+</div>
+
 <div class="panel">
 
 <div class="panel-head">
@@ -7031,45 +7545,77 @@ onclick="createManual()"
 
 
 
+
 <!-- ===================================================== -->
-<!-- TELEGRAM PROXY MODAL -->
+<!-- TELEGRAM CREATE MODAL -->
 <!-- ===================================================== -->
 
-<div
-id="tgProxyModal"
-class="modal-backdrop"
->
-
-<div class="modal" style="max-width:540px">
-
+<div id="tgCreateModal" class="modal-backdrop">
+<div class="modal" style="max-width:480px">
 <div class="modal-head">
-
-<div class="modal-title">
-پروکسی تلگرام ساخته شد
+<div class="modal-title">ساخت پروکسی تلگرام</div>
+<button class="close" onclick="closeTgCreateModal()">×</button>
 </div>
 
-<button
-class="close"
-onclick="closeTgProxyModal()"
->
-×
-</button>
+<div class="form-grid">
+<div class="field">
+<label>نام پروکسی</label>
+<input id="tgCreateName" placeholder="مثلاً Iran-TG-1" />
+</div>
+<div class="field">
+<label>پورت</label>
+<input id="tgCreatePort" type="number" min="1" max="65535" value="443" />
+</div>
+<div class="field">
+<label>حالت Secret</label>
+<select id="tgCreateMode">
+<option value="ee" selected>FakeTLS (ee) — پیشنهادی</option>
+<option value="dd">Secure (dd)</option>
+<option value="plain">Plain</option>
+</select>
+</div>
+<div class="field">
+<label>دامنه FakeTLS (اختیاری)</label>
+<input id="tgCreateDomain" placeholder="خودکار انتخاب می‌شود" style="direction:ltr;text-align:left" />
+</div>
+<div class="field full">
+<label>یادداشت</label>
+<textarea id="tgCreateNote" placeholder="اختیاری"></textarea>
+</div>
+</div>
 
+<div class="modal-actions">
+<button class="modal-btn secondary" onclick="closeTgCreateModal()">انصراف</button>
+<button class="modal-btn primary" onclick="submitTgCreate()">ساخت و نمایش لینک</button>
+</div>
+</div>
+</div>
+
+
+<!-- ===================================================== -->
+<!-- TELEGRAM RESULT MODAL -->
+<!-- ===================================================== -->
+
+<div id="tgProxyModal" class="modal-backdrop">
+<div class="modal" style="max-width:540px">
+<div class="modal-head">
+<div class="modal-title">پروکسی آماده شد</div>
+<button class="close" onclick="closeTgProxyModal()">×</button>
 </div>
 
 <div style="color:rgba(255,255,255,.55);font-size:11px;line-height:1.9;margin-bottom:14px">
-لینک آماده استفاده در تلگرام. روی لینک بزنید تا خودکار اضافه شود.
+لینک روی دامنه واقعی سرور شما ساخته شده است.
 </div>
 
-<div class="field full" style="margin-bottom:14px">
-<label>لینک مستقیم تلگرام (پیشنهادی)</label>
+<div class="field full" style="margin-bottom:12px">
+<label>لینک مستقیم تلگرام</label>
 <div style="display:flex;gap:8px;align-items:center">
 <input id="tgLinkDirect" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
 <button class="modal-btn primary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkDirect')">کپی</button>
 </div>
 </div>
 
-<div class="field full" style="margin-bottom:14px">
+<div class="field full" style="margin-bottom:12px">
 <label>لینک t.me</label>
 <div style="display:flex;gap:8px;align-items:center">
 <input id="tgLinkWeb" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
@@ -7077,41 +7623,18 @@ onclick="closeTgProxyModal()"
 </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-<div class="field">
-<label>سرور</label>
-<input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field">
-<label>پورت</label>
-<input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field full">
-<label>Secret (FakeTLS)</label>
-<input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field full">
-<label>دامنه FakeTLS</label>
-<input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+<div class="field"><label>سرور</label><input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field"><label>پورت</label><input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field full"><label>Secret</label><input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field full"><label>دامنه / حالت</label><input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
 </div>
 
-<div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.18);border-radius:12px;padding:12px 14px;font-size:10.5px;line-height:1.85;color:rgba(255,255,255,.65)">
-<strong style="color:#7dd3fc">نکته مهم:</strong>
-این لینک با استاندارد FakeTLS ساخته شده است. برای کارکرد واقعی باید روی همین سرور یک سرویس MTProto (مثل mtg یا teleproxy) روی پورت ۴۴۳ در حال اجرا باشد. در غیر این صورت لینک فقط برای اشتراک‌گذاری آماده است.
+<div class="modal-actions">
+<button class="modal-btn secondary" onclick="closeTgProxyModal()">بستن</button>
+<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">کپی لینک اصلی</button>
 </div>
-
-<div class="modal-actions" style="margin-top:18px">
-<button class="modal-btn secondary" onclick="closeTgProxyModal()">
-بستن
-</button>
-<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">
-کپی لینک اصلی
-</button>
 </div>
-
-</div>
-
 </div>
 
 
@@ -7921,6 +8444,9 @@ data-action="delete"
 }
 
 
+
+    try { await refreshTgProxies(); } catch (e) {}
+
 async function copyText(text){
 
     const value =
@@ -8053,6 +8579,20 @@ function closePasswordModal(){
 
 
 
+
+function openTgCreateModal(){
+    document.getElementById("tgCreateName").value = "";
+    document.getElementById("tgCreatePort").value = "443";
+    document.getElementById("tgCreateMode").value = "ee";
+    document.getElementById("tgCreateDomain").value = "";
+    document.getElementById("tgCreateNote").value = "";
+    document.getElementById("tgCreateModal").classList.add("open");
+}
+
+function closeTgCreateModal(){
+    document.getElementById("tgCreateModal").classList.remove("open");
+}
+
 function openTgProxyModal(){
     document.getElementById("tgProxyModal").classList.add("open");
 }
@@ -8061,29 +8601,59 @@ function closeTgProxyModal(){
     document.getElementById("tgProxyModal").classList.remove("open");
 }
 
-async function createTelegramProxy(){
-    showToast("در حال ساخت پروکسی تلگرام...");
+function showTgResult(data){
+    document.getElementById("tgServer").value = data.server || "";
+    document.getElementById("tgPort").value = data.port || "";
+    document.getElementById("tgSecret").value = data.secret || "";
+    document.getElementById("tgDomain").value = (data.domain || data.mode || "");
+    document.getElementById("tgLinkDirect").value = data.tg_link || "";
+    document.getElementById("tgLinkWeb").value = data.web_link || "";
+    openTgProxyModal();
+}
+
+async function submitTgCreate(){
+    const body = {
+        label: document.getElementById("tgCreateName").value.trim(),
+        port: Number(document.getElementById("tgCreatePort").value || 443),
+        mode: document.getElementById("tgCreateMode").value,
+        domain: document.getElementById("tgCreateDomain").value.trim(),
+        note: document.getElementById("tgCreateNote").value.trim(),
+    };
+
+    showToast("در حال ساخت پروکسی...");
+    closeTgCreateModal();
 
     const result = await api("/api/telegram-proxy", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: "{}"
+        body: JSON.stringify(body),
     });
 
+    if (!result || !result.ok) {
+        showToast("خطا در ساخت پروکسی");
+        return;
+    }
+
+    showTgResult(result);
+    showToast("پروکسی ساخته شد");
+    await refreshTgProxies();
+}
+
+async function createTelegramProxy(){
+    // one-click auto create (top button)
+    showToast("در حال ساخت پروکسی تلگرام...");
+    const result = await api("/api/telegram-proxy", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({}),
+    });
     if (!result || !result.ok) {
         showToast("خطا در ساخت پروکسی تلگرام");
         return;
     }
-
-    document.getElementById("tgServer").value = result.server || "";
-    document.getElementById("tgPort").value = result.port || "";
-    document.getElementById("tgSecret").value = result.secret || "";
-    document.getElementById("tgDomain").value = result.domain || "";
-    document.getElementById("tgLinkDirect").value = result.tg_link || "";
-    document.getElementById("tgLinkWeb").value = result.web_link || "";
-
-    openTgProxyModal();
+    showTgResult(result);
     showToast("پروکسی تلگرام آماده شد");
+    await refreshTgProxies();
 }
 
 async function copyTgLink(id){
@@ -8093,6 +8663,74 @@ async function copyTgLink(id){
     }
 }
 
+async function refreshTgProxies(){
+    const data = await api("/api/telegram-proxies");
+    const grid = document.getElementById("tgProxyGrid");
+    if (!grid) return;
+
+    if (!data || !data.ok) {
+        grid.innerHTML = '<div class="tg-empty">خطا در دریافت لیست پروکسی‌ها</div>';
+        return;
+    }
+
+    const list = data.proxies || [];
+    if (!list.length) {
+        grid.innerHTML = `
+          <div class="tg-empty">
+            هنوز پروکسی تلگرامی ساخته نشده است.<br>
+            از دکمه <b>ساخت پروکسی</b> استفاده کنید.
+          </div>`;
+        return;
+    }
+
+    grid.innerHTML = "";
+    for (const p of list) {
+        const card = document.createElement("div");
+        card.className = "tg-card" + (p.active ? "" : " off");
+        const status = p.active
+            ? '<span class="tg-badge on">فعال</span>'
+            : '<span class="tg-badge off">خاموش</span>';
+        card.innerHTML = `
+          <div class="tg-card-top">
+            <div>
+              <div class="tg-card-name">${escapeHtml(p.label || "بدون نام")}</div>
+              <div class="tg-card-meta">${escapeHtml(p.server)}:${p.port} · ${escapeHtml(p.mode || "ee")}</div>
+            </div>
+            ${status}
+          </div>
+          <div class="tg-link-box" title="${escapeHtml(p.tg_link)}">${escapeHtml(p.tg_link)}</div>
+          <div class="tg-actions">
+            <button class="action primary" data-act="copy">کپی لینک</button>
+            <button class="action" data-act="toggle">${p.active ? "خاموش" : "فعال"}</button>
+            <button class="action danger" data-act="del">حذف</button>
+          </div>
+        `;
+        card.querySelectorAll("button[data-act]").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const act = btn.dataset.act;
+                if (act === "copy") {
+                    await copyText(p.tg_link);
+                    return;
+                }
+                btn.disabled = true;
+                try {
+                    if (act === "toggle") {
+                        await api("/api/telegram-proxies/" + p.id + "/toggle", { method: "POST" });
+                        await refreshTgProxies();
+                    } else if (act === "del") {
+                        if (!confirm("این پروکسی حذف شود؟")) return;
+                        await api("/api/telegram-proxies/" + p.id, { method: "DELETE" });
+                        showToast("حذف شد");
+                        await refreshTgProxies();
+                    }
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+        grid.appendChild(card);
+    }
+}
 
 async function createAuto(){
 
