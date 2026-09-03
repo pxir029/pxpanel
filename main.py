@@ -2135,21 +2135,68 @@ h1{
     }
 }
 
+
 .alert-red{
-    margin-top:16px;
-    padding:13px 14px;
-    border-radius:14px;
-    background:rgba(239,68,68,.12);
-    border:1px solid rgba(239,68,68,.35);
+    position:relative;
+    margin-top:18px;
+    padding:16px 16px 16px 18px;
+    border-radius:18px;
+    background:
+        linear-gradient(145deg, rgba(239,68,68,.14), rgba(127,29,29,.08)),
+        rgba(255,255,255,.04);
+    border:1px solid rgba(248,113,113,.32);
     color:#fecaca;
     font-size:11.5px;
-    line-height:1.9;
+    line-height:1.95;
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:
+        0 0 0 1px rgba(248,113,113,.12),
+        0 0 28px rgba(239,68,68,.28),
+        0 0 56px rgba(239,68,68,.12),
+        inset 0 1px 0 rgba(255,255,255,.08);
+    overflow:hidden;
+}
+.alert-red::before{
+    content:"";
+    position:absolute;
+    inset:-40% auto auto -20%;
+    width:140px;
+    height:140px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(248,113,113,.35), transparent 68%);
+    filter:blur(8px);
+    pointer-events:none;
+}
+.alert-red::after{
+    content:"";
+    position:absolute;
+    top:0;
+    right:0;
+    left:0;
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(254,202,202,.45), transparent);
+    pointer-events:none;
 }
 .alert-red strong{
-    display:block;
-    margin-bottom:4px;
-    color:#fca5a5;
-    font-size:12.5px;
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+    color:#fda4af;
+    font-size:13px;
+    font-weight:800;
+    text-shadow:0 0 18px rgba(248,113,113,.45);
+}
+.alert-red strong::before{
+    content:"";
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#f87171;
+    box-shadow:0 0 10px #f87171, 0 0 20px rgba(248,113,113,.7);
+    flex:none;
 }
 </style>
 </head>
@@ -2191,11 +2238,13 @@ PXpanel
 
 <div class="alert-red">
 <strong>اطلاعیه مهم</strong>
+<div>
 اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
 <span style="opacity:.85">(پینگ بالاتر)</span>.
 <br>
 اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
 <span style="opacity:.85">(پینگ بهتر)</span>.
+</div>
 </div>
 
 <div class="path">
@@ -2478,21 +2527,68 @@ button{
     font-size:11px;
 }
 
+
 .alert-red{
-    margin-top:16px;
-    padding:13px 14px;
-    border-radius:14px;
-    background:rgba(239,68,68,.12);
-    border:1px solid rgba(239,68,68,.35);
+    position:relative;
+    margin-top:18px;
+    padding:16px 16px 16px 18px;
+    border-radius:18px;
+    background:
+        linear-gradient(145deg, rgba(239,68,68,.14), rgba(127,29,29,.08)),
+        rgba(255,255,255,.04);
+    border:1px solid rgba(248,113,113,.32);
     color:#fecaca;
     font-size:11.5px;
-    line-height:1.9;
+    line-height:1.95;
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:
+        0 0 0 1px rgba(248,113,113,.12),
+        0 0 28px rgba(239,68,68,.28),
+        0 0 56px rgba(239,68,68,.12),
+        inset 0 1px 0 rgba(255,255,255,.08);
+    overflow:hidden;
+}
+.alert-red::before{
+    content:"";
+    position:absolute;
+    inset:-40% auto auto -20%;
+    width:140px;
+    height:140px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(248,113,113,.35), transparent 68%);
+    filter:blur(8px);
+    pointer-events:none;
+}
+.alert-red::after{
+    content:"";
+    position:absolute;
+    top:0;
+    right:0;
+    left:0;
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(254,202,202,.45), transparent);
+    pointer-events:none;
 }
 .alert-red strong{
-    display:block;
-    margin-bottom:4px;
-    color:#fca5a5;
-    font-size:12.5px;
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+    color:#fda4af;
+    font-size:13px;
+    font-weight:800;
+    text-shadow:0 0 18px rgba(248,113,113,.45);
+}
+.alert-red strong::before{
+    content:"";
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#f87171;
+    box-shadow:0 0 10px #f87171, 0 0 20px rgba(248,113,113,.7);
+    flex:none;
 }
 
 </style>
@@ -2521,11 +2617,13 @@ P
 
 <div class="alert-red">
 <strong>اطلاعیه مهم</strong>
+<div>
 اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
 <span style="opacity:.85">(پینگ بالاتر)</span>.
 <br>
 اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
 <span style="opacity:.85">(پینگ بهتر)</span>.
+</div>
 </div>
 
 <form
@@ -5843,6 +5941,31 @@ async def toggle_telegram_proxy(
     return {"ok": True, "active": active}
 
 
+
+# ============================================================
+# CLEAN IP SCANNER DOWNLOAD
+# ============================================================
+
+_CLEAN_IP_SCANNER_B64 = "aW1wb3J0IGNvbmN1cnJlbnQuZnV0dXJlcwppbXBvcnQgc29ja2V0CmltcG9ydCBzc2wKCiMg27EuINiq2LnYsduM2YEg2KLbjOKAjNm+24zigIzZh9in24wg2YfYr9mBICjYsdmG2KzigIzZh9in24wg2qnYp9mF2YQpCklQX1RBUkdFVFMgPSBbCiAgICAqW2YiOTEuMTkzLjU5LntpfSIgZm9yIGkgaW4gcmFuZ2UoMSwgMjU1KV0sCl0KCgojINuyLiDZvtmI2LHYquKAjNmH2KfbjCDYp9mI2YTZiNuM2KrigIzYr9in2LEKUE9SVFMgPSBbNDQzLCAyMDk2LCAyMDg3LCAyMDgzXQpUSU1FT1VUID0gMS41CgoKZGVmIGNoZWNrX2lwKGlwLCBwb3J0KToKICAgIGNvbnRleHQgPSBzc2wuY3JlYXRlX2RlZmF1bHRfY29udGV4dCgpCiAgICBjb250ZXh0LmNoZWNrX2hvc3RuYW1lID0gRmFsc2UKICAgIGNvbnRleHQudmVyaWZ5X21vZGUgPSBzc2wuQ0VSVF9OT05FCgogICAgdHJ5OgogICAgICAgIHdpdGggc29ja2V0LmNyZWF0ZV9jb25uZWN0aW9uKChpcCwgcG9ydCksIHRpbWVvdXQ9VElNRU9VVCkgYXMgc29jazoKICAgICAgICAgICAgd2l0aCBjb250ZXh0LndyYXBfc29ja2V0KHNvY2ssIHNlcnZlcl9ob3N0bmFtZT0iY2xvdWRmbGFyZS5jb20iKToKICAgICAgICAgICAgICAgIHJldHVybiBmIlsrXSBDbGVhbiBJUCBGb3VuZDoge2lwfTp7cG9ydH0iCiAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgIHJldHVybiBOb25lCgoKZGVmIG1haW4oKToKICAgIHByaW50KGYiU2Nhbm5pbmcge2xlbihJUF9UQVJHRVRTKX0gSVBzIG9uIHBvcnRzIHtQT1JUU30uLi5cbiIpCiAgICB3b3JraW5nX2lwcyA9IFtdCgogICAgd2l0aCBjb25jdXJyZW50LmZ1dHVyZXMuVGhyZWFkUG9vbEV4ZWN1dG9yKG1heF93b3JrZXJzPTE1MCkgYXMgZXhlY3V0b3I6CiAgICAgICAgZnV0dXJlcyA9IFsKICAgICAgICAgICAgZXhlY3V0b3Iuc3VibWl0KGNoZWNrX2lwLCBpcCwgcG9ydCkKICAgICAgICAgICAgZm9yIGlwIGluIElQX1RBUkdFVFMKICAgICAgICAgICAgZm9yIHBvcnQgaW4gUE9SVFMKICAgICAgICBdCgogICAgICAgIGZvciBmdXR1cmUgaW4gY29uY3VycmVudC5mdXR1cmVzLmFzX2NvbXBsZXRlZChmdXR1cmVzKToKICAgICAgICAgICAgcmVzdWx0ID0gZnV0dXJlLnJlc3VsdCgpCiAgICAgICAgICAgIGlmIHJlc3VsdDoKICAgICAgICAgICAgICAgIHByaW50KHJlc3VsdCkKICAgICAgICAgICAgICAgIHdvcmtpbmdfaXBzLmFwcGVuZChyZXN1bHQpCgogICAgd2l0aCBvcGVuKCJ3b3JraW5nXzkxX2lwcy50eHQiLCAidyIsIGVuY29kaW5nPSJ1dGYtOCIpIGFzIGY6CiAgICAgICAgZi53cml0ZSgiXG4iLmpvaW4od29ya2luZ19pcHMpKQoKICAgIHByaW50KAogICAgICAgIGYiXG5Eb25lISBGb3VuZCB7bGVuKHdvcmtpbmdfaXBzKX0gd29ya2luZyBJUHMuIFNhdmVkIHRvIHdvcmtpbmdfOTFfaXBzLnR4dCIKICAgICkKCgppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOgogICAgbWFpbigpCg=="
+
+
+@app.get("/download/clean-ip-scanner.py")
+async def download_clean_ip_scanner():
+    import base64 as _b64
+
+    content = _b64.b64decode(_CLEAN_IP_SCANNER_B64).decode("utf-8")
+
+    return Response(
+        content=content,
+        media_type="text/x-python; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                'attachment; filename="clean_ip_scanner.py"'
+            ),
+        },
+    )
+
+
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -6562,13 +6685,17 @@ th{
 }
 .login-notice-body b{color:#fff}
 .region-warning{
-    margin-top:10px;
-    padding:13px 14px;
-    border-radius:15px;
-    border:1px solid rgba(251,191,36,.17);
-    background:rgba(251,191,36,.055);
-    color:rgba(255,255,255,.72);
-    line-height:2.1;
+    margin-top:12px;
+    padding:14px 15px;
+    border-radius:16px;
+    background:linear-gradient(145deg, rgba(239,68,68,.14), rgba(127,29,29,.06)), rgba(255,255,255,.03);
+    border:1px solid rgba(248,113,113,.30);
+    color:#fecaca;
+    font-size:11px;
+    line-height:1.9;
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    box-shadow:0 0 24px rgba(239,68,68,.22), inset 0 1px 0 rgba(255,255,255,.06);
 }
 .region-warning .warning-title{
     display:flex;align-items:center;gap:8px;
@@ -7351,6 +7478,20 @@ placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8&#10;خال
 style="direction:ltr;text-align:left;min-height:96px;resize:vertical"
 ></textarea>
 
+<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<a
+href="/download/clean-ip-scanner.py"
+download="clean_ip_scanner.py"
+class="top-btn"
+style="text-decoration:none;background:linear-gradient(135deg,#0ea5e9,#2563eb);border:0;color:#fff;font-weight:700"
+>
+دانلود برنامه اسکن ایپی تمیز (.py)
+</a>
+<span style="font-size:10px;color:rgba(255,255,255,.40);line-height:1.6">
+بعد از اسکن، IPهای سالم را هر خط یکی اینجا بچسبانید
+</span>
+</div>
+
 </div>
 
 
@@ -7580,6 +7721,16 @@ style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:
 ></textarea>
 <div style="margin-top:7px;color:rgba(255,255,255,.38);font-size:10px;line-height:1.7">
 هر خط = یک کانفیگ جدا با همان ایپی تمیز. SNI روی دامنه پنل می‌ماند تا پینگ درست باشد.
+</div>
+<div style="margin-top:10px">
+<a
+href="/download/clean-ip-scanner.py"
+download="clean_ip_scanner.py"
+class="top-btn"
+style="text-decoration:none;display:inline-flex;background:linear-gradient(135deg,#0ea5e9,#2563eb);border:0;color:#fff;font-weight:700"
+>
+دانلود برنامه اسکن ایپی تمیز (.py)
+</a>
 </div>
 </div>
 
