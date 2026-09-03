@@ -3958,292 +3958,107 @@ async def info_page(
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<script src="https://onlinegpt.ir/package/packages/tailwind/tailwind.js"></script>
-<script>
-tailwind.config = {{
-  theme: {{
-    extend: {{
-      fontFamily: {{
-        vazir: ['Vazirmatn', 'system-ui', 'sans-serif']
-      }},
-      colors: {{
-        dark: {{
-          950: '#06070c',
-          900: '#0c0e15',
-          800: '#13161f',
-          700: '#1c202c',
-          600: '#272c3a'
-        }}
-      }}
-    }}
-  }}
-}}
-</script>
 <style>
-  body {{ font-family: 'Vazirmatn', system-ui, sans-serif; }}
-  .font-mono {{ font-family: ui-monospace, Consolas, monospace; }}
+:root{{--bg:#07080d;--panel:rgba(17,19,28,.72);--line:rgba(255,255,255,.08);--muted:rgba(255,255,255,.42);--text:#f6f7fb;--green:#34d399;--blue:#60a5fa;--orange:#f59e0b;--red:#fb7185;--purple:#a78bfa}}
+*{{box-sizing:border-box}}
+html,body{{margin:0;min-height:100%;background:var(--bg)}}
+body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;background:radial-gradient(circle at 15% 0%,rgba(96,165,250,.16),transparent 30%),radial-gradient(circle at 95% 30%,rgba(167,139,250,.13),transparent 28%),radial-gradient(circle at 80% 100%,rgba(52,211,153,.08),transparent 30%),#07080d}}
+.page{{width:min(920px,100%);margin:auto}}
+.shell{{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));backdrop-filter:blur(28px);border-radius:30px;box-shadow:0 35px 100px rgba(0,0,0,.38)}}
+.shell:before{{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.04),transparent 35%,rgba(255,255,255,.02))}}
+.hero{{position:relative;padding:25px 25px 20px;border-bottom:1px solid rgba(255,255,255,.06)}}
+.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:16px}}
+.brand{{display:flex;align-items:center;gap:13px}}
+.brand-icon{{width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(96,165,250,.2);background:linear-gradient(145deg,rgba(96,165,250,.14),rgba(167,139,250,.08));border-radius:15px;color:#93c5fd;font-weight:900;font-size:16px}}
+.hero h1{{margin:0;font-size:21px;font-weight:900;letter-spacing:-.35px}}
+.hero-meta{{margin-top:4px;color:var(--muted);font-size:9px;word-break:break-all}}
+.status{{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:12px;font-size:9px;font-weight:800;white-space:nowrap}}
+.status i{{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}}
+.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.18);background:rgba(52,211,153,.08)}}
+.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.18);background:rgba(251,113,133,.08)}}
+.notice{{margin-top:18px;display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid rgba(167,139,250,.17);background:linear-gradient(120deg,rgba(167,139,250,.10),rgba(96,165,250,.04));border-radius:16px;color:rgba(255,255,255,.62);font-size:9px;line-height:2}}
+.notice-icon{{width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;border-radius:9px;background:rgba(167,139,250,.13);border:1px solid rgba(167,139,250,.18);color:#c4b5fd;font-size:12px}}
+.notice strong{{color:#ddd6fe}}
+.dashboard{{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;padding:16px}}
+.usage-card,.side-card{{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:20px}}
+.usage-card{{padding:18px}}
+.section-kicker{{font-size:8px;color:rgba(255,255,255,.30);font-weight:800;letter-spacing:.7px;text-transform:uppercase}}
+.section-title{{margin-top:4px;font-size:13px;font-weight:900}}
+.usage-line{{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:16px}}
+.usage-number{{font-size:22px;font-weight:900;letter-spacing:-.5px}}
+.usage-number span{{font-size:10px;color:var(--muted);font-weight:600}}
+.usage-percent{{font-size:12px;font-weight:900;color:#86efac}}
+.track{{height:12px;margin-top:12px;border-radius:999px;background:rgba(255,255,255,.055);overflow:hidden;border:1px solid rgba(255,255,255,.035)}}
+.track span{{display:block;height:100%;width:{usage_percent}%;border-radius:inherit;background:linear-gradient(90deg,#34d399,#f59e0b);box-shadow:0 0 20px rgba(52,211,153,.18)}}
+.usage-bottom{{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:8px}}
+.side-card{{padding:14px}}
+.side-row{{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}}
+.side-row:last-child{{border-bottom:0;padding-bottom:0}}
+.side-label{{font-size:8px;color:var(--muted)}}
+.side-value{{font-size:9px;font-weight:800}}
+.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px 16px}}
+.metric{{position:relative;overflow:hidden;padding:14px 14px 13px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}}
+.metric:before{{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.025),transparent 55%)}}
+.metric .dot{{width:8px;height:8px;border-radius:50%;margin-bottom:9px;background:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}}
+.metric-label{{color:var(--muted);font-size:8px}}
+.metric-value{{margin-top:5px;font-size:12px;font-weight:900;color:var(--c);word-break:break-word}}
+.metric.green{{--c:#34d399}} .metric.orange{{--c:#f59e0b}} .metric.blue{{--c:#60a5fa}} .metric.purple{{--c:#a78bfa}}
+.content{{padding:0 16px 18px}}
+.section{{margin-top:10px;padding:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.022);border-radius:20px}}
+.section-head{{display:flex;align-items:end;justify-content:space-between;gap:10px}}
+.section-head .section-title{{margin:0}}
+.section-sub{{color:var(--muted);font-size:8px}}
+.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}}
+.info-item{{padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13)}}
+.info-label{{font-size:8px;color:var(--muted)}}
+.info-value{{margin-top:5px;font-size:9px;font-weight:700;color:rgba(255,255,255,.86);word-break:break-word}}
+.code{{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8.5px;color:#c4b5fd;font-weight:500}}
+.link-card{{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13);margin-top:9px}}
+.link-card:first-child{{margin-top:12px}}
+.link-main{{min-width:0}}
+.link-name{{font-size:8px;color:var(--muted);font-weight:800}}
+.link-url{{margin-top:4px;direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8px;color:#c4b5fd;word-break:break-all}}
+.copy-hint{{flex:0 0 auto;font-size:8px;color:rgba(255,255,255,.28)}}
+.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}}
+.download{{display:flex;align-items:center;gap:10px;min-height:68px;padding:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.07);background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border-radius:16px;transition:transform .2s ease,border-color .2s ease,background .2s ease}}
+.download:hover{{transform:translateY(-2px);border-color:rgba(96,165,250,.28);background:linear-gradient(145deg,rgba(96,165,250,.07),rgba(255,255,255,.02))}}
+.app-icon{{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:10px;background:rgba(96,165,250,.11);border:1px solid rgba(96,165,250,.14);color:#93c5fd;font-size:11px;font-weight:900}}
+.download strong{{display:block;font-size:9px}}
+.download span{{display:block;margin-top:2px;color:var(--muted);font-size:7.5px}}
+.channel{{margin-top:15px;padding:12px 14px;text-align:center;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.045);border-radius:14px;color:var(--muted);font-size:8px}}
+.channel b{{color:#6ee7b7}}
+@media(max-width:760px){{body{{padding:12px}}.dashboard{{grid-template-columns:1fr}}.stats{{grid-template-columns:repeat(2,1fr)}}.downloads{{grid-template-columns:1fr}}.hero-row{{align-items:flex-start;flex-direction:column}}}}
 </style>
 </head>
-<body class="bg-dark-950 text-slate-100 min-h-screen p-4 md:p-7">
-  <div class="max-w-3xl mx-auto">
-    <div class="bg-dark-900/90 border border-slate-700/40 rounded-3xl overflow-hidden backdrop-blur-xl">
+<body>
+<div class="page"><div class="shell">
+<section class="hero">
+<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
+<div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
+</section>
 
-      <!-- Hero -->
-      <div class="px-6 pt-6 pb-5 border-b border-slate-700/30">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-300 font-black text-sm">
-              PX
-            </div>
-            <div>
-              <h1 class="text-xl font-black tracking-tight text-slate-50">{escape_html(snapshot.get("label","PXpanel"))}</h1>
-              <p class="text-[11px] text-slate-400 mt-1 break-all">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</p>
-            </div>
-          </div>
-          <div class="status {status_class} inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap">
-            <span class="w-2 h-2 rounded-full bg-current"></span>
-            {status_text}
-          </div>
-        </div>
+<section class="dashboard">
+<div class="usage-card"><div class="section-kicker">Traffic Overview</div><div class="section-title">مصرف سرویس</div><div class="usage-line"><div class="usage-number">{escape_html(fmt_bytes(used))} <span>/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div><div class="usage-percent">{usage_percent}%</div></div><div class="track"><span></span></div><div class="usage-bottom"><span>باقی‌مانده: {escape_html(remaining_value)}</span><span>زمان: {escape_html(expiry_remaining)}</span></div></div>
+<div class="side-card"><div class="section-kicker">Service</div><div class="side-row"><span class="side-label">انقضا</span><span class="side-value">{escape_html(expiry_display)}</span></div><div class="side-row"><span class="side-label">IP Limit</span><span class="side-value">{escape_html(ip_limit)}</span></div><div class="side-row"><span class="side-label">Connection</span><span class="side-value">{escape_html(connection_limit)}</span></div><div class="side-row"><span class="side-label">Speed</span><span class="side-value">{escape_html(speed_limit)}</span></div></div>
+</section>
 
-        <div class="mt-5 flex gap-3 items-start p-3.5 rounded-2xl border border-indigo-400/20 bg-gradient-to-l from-indigo-500/10 via-sky-500/5 to-transparent">
-          <div class="w-7 h-7 shrink-0 rounded-lg bg-indigo-500/20 border border-indigo-400/25 flex items-center justify-center text-indigo-300 text-xs font-bold">!</div>
-          <div class="text-xs text-slate-300/90 leading-7">
-            <strong class="text-indigo-200">اطلاعیه اتصال</strong><br>
-            لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید.
-            <strong class="text-indigo-200">کانال تلگرام: logic_sec</strong>
-          </div>
-        </div>
-      </div>
+<section class="stats">
+<div class="metric green"><div class="dot"></div><div class="metric-label">مصرف فعلی</div><div class="metric-value">{escape_html(fmt_bytes(used))}</div></div>
+<div class="metric orange"><div class="dot"></div><div class="metric-label">باقی‌مانده</div><div class="metric-value">{escape_html(remaining_value)}</div></div>
+<div class="metric blue"><div class="dot"></div><div class="metric-label">اتصالات فعال</div><div class="metric-value">{len(unique_ips_for_uuid(uid))}</div></div>
+<div class="metric purple"><div class="dot"></div><div class="metric-label">زمان باقی‌مانده</div><div class="metric-value">{escape_html(expiry_remaining)}</div></div>
+</section>
 
-      <!-- Dashboard -->
-      <div class="grid grid-cols-1 md:grid-cols-[1.4fr_0.6fr] gap-3.5 p-5 pb-2">
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
-          <div class="text-[10px] font-extrabold tracking-widest text-slate-500 uppercase">Traffic Overview</div>
-          <div class="text-[15px] font-black mt-1 text-slate-100">مصرف سرویس</div>
-          <div class="flex items-end justify-between gap-3 mt-4">
-            <div class="text-2xl font-black tracking-tight text-slate-50">
-              {escape_html(fmt_bytes(used))}
-              <span class="text-sm text-slate-400 font-semibold">/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
-            </div>
-            <div class="text-sm font-black text-teal-300">{usage_percent}%</div>
-          </div>
-          <div class="h-2.5 mt-3.5 rounded-full bg-slate-700/60 border border-slate-600/30 overflow-hidden">
-            <div class="h-full rounded-full bg-gradient-to-l from-amber-400 via-teal-400 to-emerald-400" style="width:{usage_percent}%"></div>
-          </div>
-          <div class="flex justify-between gap-2 mt-3 text-[11px] text-slate-400">
-            <span>باقی‌مانده: {escape_html(remaining_value)}</span>
-            <span>زمان: {escape_html(expiry_remaining)}</span>
-          </div>
-        </div>
+<div class="content">
+<section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
 
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
-          <div class="text-[10px] font-extrabold tracking-widest text-slate-500 uppercase mb-1">Service</div>
-          <div class="divide-y divide-slate-700/40">
-            <div class="flex items-center justify-between py-2.5">
-              <span class="text-[11px] text-slate-400">انقضا</span>
-              <span class="text-xs font-extrabold text-slate-200">{escape_html(expiry_display)}</span>
-            </div>
-            <div class="flex items-center justify-between py-2.5">
-              <span class="text-[11px] text-slate-400">IP Limit</span>
-              <span class="text-xs font-extrabold text-slate-200">{escape_html(ip_limit)}</span>
-            </div>
-            <div class="flex items-center justify-between py-2.5">
-              <span class="text-[11px] text-slate-400">Connection</span>
-              <span class="text-xs font-extrabold text-slate-200">{escape_html(connection_limit)}</span>
-            </div>
-            <div class="flex items-center justify-between py-2.5">
-              <span class="text-[11px] text-slate-400">Speed</span>
-              <span class="text-xs font-extrabold text-slate-200">{escape_html(speed_limit)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
 
-      <!-- Stats -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 px-5 pt-2 pb-2">
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
-          <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 mb-2.5"></div>
-          <div class="text-[11px] text-slate-400">مصرف فعلی</div>
-          <div class="mt-1.5 text-sm font-black text-emerald-400 break-words">{escape_html(fmt_bytes(used))}</div>
-        </div>
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
-          <div class="w-2.5 h-2.5 rounded-full bg-amber-400 mb-2.5"></div>
-          <div class="text-[11px] text-slate-400">باقی‌مانده</div>
-          <div class="mt-1.5 text-sm font-black text-amber-400 break-words">{escape_html(remaining_value)}</div>
-        </div>
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
-          <div class="w-2.5 h-2.5 rounded-full bg-sky-400 mb-2.5"></div>
-          <div class="text-[11px] text-slate-400">اتصالات فعال</div>
-          <div class="mt-1.5 text-sm font-black text-sky-400 break-words">{len(unique_ips_for_uuid(uid))}</div>
-        </div>
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
-          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 mb-2.5"></div>
-          <div class="text-[11px] text-slate-400">زمان باقی‌مانده</div>
-          <div class="mt-1.5 text-sm font-black text-indigo-400 break-words">{escape_html(expiry_remaining)}</div>
-        </div>
-      </div>
+<section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
 
-      <!-- Content -->
-      <div class="px-5 pb-6 space-y-3.5">
-
-        <!-- Technical Details -->
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
-          <div class="flex items-end justify-between gap-3 mb-1">
-            <div class="text-[15px] font-black text-slate-100">جزئیات فنی</div>
-            <div class="text-[11px] text-slate-400">Configuration Details</div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3.5">
-            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
-              <div class="text-[11px] text-slate-400">Protocol</div>
-              <div class="mt-1.5 text-xs font-bold text-indigo-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("protocol","vless-ws"))}</div>
-            </div>
-            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
-              <div class="text-[11px] text-slate-400">Fingerprint</div>
-              <div class="mt-1.5 text-xs font-bold text-indigo-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("fingerprint","chrome"))}</div>
-            </div>
-            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
-              <div class="text-[11px] text-slate-400">IP Limit</div>
-              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(ip_limit)}</div>
-            </div>
-            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
-              <div class="text-[11px] text-slate-400">Connection Limit</div>
-              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(connection_limit)}</div>
-            </div>
-            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
-              <div class="text-[11px] text-slate-400">Speed Limit</div>
-              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(speed_limit)}</div>
-            </div>
-            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
-              <div class="text-[11px] text-slate-400">تاریخ انقضا</div>
-              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(expiry_display)}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Service Links -->
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
-          <div class="flex items-end justify-between gap-3 mb-1">
-            <div class="text-[15px] font-black text-slate-100">لینک‌های سرویس</div>
-            <div class="text-[11px] text-slate-400">Copy / Import</div>
-          </div>
-
-          <div class="mt-4 space-y-3">
-            <!-- VLESS -->
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-slate-700/50 bg-dark-950/40 hover:bg-indigo-500/5 hover:border-indigo-400/30 transition-colors duration-200">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1.5">
-                  <span class="text-[10px] font-extrabold tracking-wide text-indigo-300 uppercase">VLESS</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 font-bold">Direct</span>
-                </div>
-                <div id="vless-url" class="font-mono text-[11px] text-indigo-200/90 break-all leading-relaxed dir-ltr text-left select-all">
-                  {escape_html(vless_url)}
-                </div>
-              </div>
-              <button type="button" onclick="copyText('vless-url', this)"
-                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-400/30 text-indigo-200 text-xs font-bold hover:bg-indigo-500/25 hover:border-indigo-400/50 active:scale-[0.98] transition-all duration-150">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                <span class="copy-label">کپی</span>
-              </button>
-            </div>
-
-            <!-- SUBSCRIPTION -->
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-slate-700/50 bg-dark-950/40 hover:bg-sky-500/5 hover:border-sky-400/30 transition-colors duration-200">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1.5">
-                  <span class="text-[10px] font-extrabold tracking-wide text-sky-300 uppercase">Subscription</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-300 font-bold">SUB</span>
-                </div>
-                <div id="sub-url" class="font-mono text-[11px] text-sky-200/90 break-all leading-relaxed dir-ltr text-left select-all">
-                  {escape_html(sub_url)}
-                </div>
-              </div>
-              <button type="button" onclick="copyText('sub-url', this)"
-                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500/15 border border-sky-400/30 text-sky-200 text-xs font-bold hover:bg-sky-500/25 hover:border-sky-400/50 active:scale-[0.98] transition-all duration-150">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                <span class="copy-label">کپی</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Downloads -->
-        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
-          <div class="flex items-end justify-between gap-3 mb-1">
-            <div class="text-[15px] font-black text-slate-100">دانلود برنامه‌ها</div>
-            <div class="text-[11px] text-slate-400">Official Releases</div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3.5">
-            <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
-              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-slate-700/40 bg-dark-950/30 hover:bg-sky-500/10 hover:border-sky-400/35 transition-colors duration-200 no-underline text-white">
-              <div class="w-9 h-9 shrink-0 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-300 text-xs font-black">NG</div>
-              <div>
-                <strong class="block text-xs font-extrabold text-slate-100">v2rayNG</strong>
-                <span class="block mt-0.5 text-[10px] text-slate-400">Android</span>
-              </div>
-            </a>
-            <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
-              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-slate-700/40 bg-dark-950/30 hover:bg-sky-500/10 hover:border-sky-400/35 transition-colors duration-200 no-underline text-white">
-              <div class="w-9 h-9 shrink-0 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-300 text-xs font-black">N</div>
-              <div>
-                <strong class="block text-xs font-extrabold text-slate-100">v2rayN</strong>
-                <span class="block mt-0.5 text-[10px] text-slate-400">Windows / macOS / Linux</span>
-              </div>
-            </a>
-            <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
-              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-slate-700/40 bg-dark-950/30 hover:bg-sky-500/10 hover:border-sky-400/35 transition-colors duration-200 no-underline text-white">
-              <div class="w-9 h-9 shrink-0 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-300 text-xs font-black">H</div>
-              <div>
-                <strong class="block text-xs font-extrabold text-slate-100">Hiddify</strong>
-                <span class="block mt-0.5 text-[10px] text-slate-400">Android / Windows / macOS / Linux</span>
-              </div>
-            </a>
-          </div>
-        </div>
-
-        <!-- Channel -->
-        <div class="mt-1 py-3.5 px-4 text-center rounded-xl border border-teal-400/20 bg-teal-500/5 text-xs text-slate-400">
-          پشتیبانی و اطلاعیه‌ها · <b class="text-teal-300">کانال تلگرام: logic_sec</b>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <style>
-    .status.good {{ color: #5eead4; border: 1px solid rgba(45,212,191,.3); background: rgba(45,212,191,.1); }}
-    .status.bad {{ color: #fda4af; border: 1px solid rgba(251,113,133,.3); background: rgba(251,113,133,.1); }}
-  </style>
-
-  <script>
-    function copyText(id, btn) {{
-      const el = document.getElementById(id);
-      if (!el) return;
-      const text = el.textContent.trim();
-      navigator.clipboard.writeText(text).then(() => {{
-        const label = btn.querySelector('.copy-label');
-        const original = label.textContent;
-        label.textContent = 'کپی شد!';
-        btn.classList.add('!bg-teal-500/20', '!border-teal-400/40', '!text-teal-200');
-        setTimeout(() => {{
-          label.textContent = original;
-          btn.classList.remove('!bg-teal-500/20', '!border-teal-400/40', '!text-teal-200');
-        }}, 1800);
-      }}).catch(() => {{
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        try {{ document.execCommand('copy'); }} catch(e) {{}}
-        sel.removeAllRanges();
-        const label = btn.querySelector('.copy-label');
-        label.textContent = 'کپی شد!';
-        setTimeout(() => label.textContent = 'کپی', 1800);
-      }});
-    }}
-  </script>
-</body>
-</html>"""
+<div class="channel">پشتیبانی و اطلاعیه‌ها · <b>کانال تلگرام: logic_sec</b></div>
+</div></div></div>
+</body></html>"""
     return HTMLResponse(info_html)
 
 
@@ -6009,152 +5824,7 @@ body{
     filter:brightness(1.08);
 }
 
-.tg-panel{
-    margin-top:14px;
-    border-radius:22px;
-    border:1px solid rgba(255,255,255,.10);
-    background:
-        linear-gradient(145deg, rgba(14,165,233,.08), rgba(37,99,235,.04)),
-        rgba(255,255,255,.035);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    box-shadow:
-        0 10px 40px rgba(0,0,0,.22),
-        inset 0 1px 0 rgba(255,255,255,.06);
-    overflow:hidden;
-}
-.tg-panel-head{
-    padding:16px 18px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    border-bottom:1px solid rgba(255,255,255,.07);
-    background:linear-gradient(90deg, rgba(14,165,233,.10), transparent);
-}
-.tg-panel-title{
-    font-size:13px;
-    font-weight:800;
-    display:flex;
-    align-items:center;
-    gap:8px;
-}
-.tg-panel-title span.dot{
-    width:8px;height:8px;border-radius:50%;
-    background:#38bdf8;
-    box-shadow:0 0 12px #38bdf8;
-}
-.tg-panel-sub{
-    margin-top:3px;
-    color:rgba(255,255,255,.38);
-    font-size:9.5px;
-}
-.tg-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-    gap:12px;
-    padding:14px;
-}
-.tg-card{
-    position:relative;
-    border-radius:18px;
-    padding:14px;
-    border:1px solid rgba(255,255,255,.09);
-    background:
-        linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    transition:.2s ease;
-}
-.tg-card:hover{
-    border-color:rgba(56,189,248,.28);
-    transform:translateY(-2px);
-    box-shadow:0 12px 28px rgba(14,165,233,.12);
-}
-.tg-card.off{
-    opacity:.55;
-    filter:grayscale(.35);
-}
-.tg-card-top{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:8px;
-    margin-bottom:10px;
-}
-.tg-card-name{
-    font-size:12px;
-    font-weight:800;
-}
-.tg-card-meta{
-    margin-top:4px;
-    font-size:9px;
-    color:rgba(255,255,255,.38);
-    direction:ltr;
-    text-align:right;
-}
-.tg-badge{
-    display:inline-flex;
-    padding:4px 9px;
-    border-radius:999px;
-    font-size:8px;
-    font-weight:700;
-}
-.tg-badge.on{
-    color:#7dd3fc;
-    background:rgba(14,165,233,.14);
-    border:1px solid rgba(14,165,233,.22);
-}
-.tg-badge.off{
-    color:#fca5a5;
-    background:rgba(239,68,68,.10);
-    border:1px solid rgba(239,68,68,.18);
-}
-.tg-link-box{
-    margin-top:10px;
-    padding:10px 11px;
-    border-radius:12px;
-    background:rgba(0,0,0,.22);
-    border:1px solid rgba(255,255,255,.06);
-    font-family:Consolas,monospace;
-    font-size:9px;
-    direction:ltr;
-    text-align:left;
-    color:#bae6fd;
-    word-break:break-all;
-    line-height:1.6;
-    max-height:52px;
-    overflow:hidden;
-}
-.tg-actions{
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-    margin-top:12px;
-}
-.tg-actions .action{
-    flex:1;
-    min-width:70px;
-    justify-content:center;
-}
-.tg-empty{
-    grid-column:1/-1;
-    text-align:center;
-    padding:28px 16px;
-    color:rgba(255,255,255,.40);
-    font-size:11px;
-    line-height:1.9;
-}
-.tg-hint{
-    margin:0 14px 14px;
-    padding:12px 14px;
-    border-radius:14px;
-    background:rgba(14,165,233,.07);
-    border:1px solid rgba(14,165,233,.15);
-    color:rgba(255,255,255,.58);
-    font-size:10px;
-    line-height:1.85;
-}
+
 
 
 .stats-grid{
@@ -6940,37 +6610,6 @@ class="stat-value"
 </div>
 
 
-
-<div class="tg-panel">
-  <div class="tg-panel-head">
-    <div>
-      <div class="tg-panel-title">
-        <span class="dot"></span>
-        مدیریت پروکسی تلگرام
-      </div>
-      <div class="tg-panel-sub">
-        لینک‌ها روی دامنه واقعی همین سرور ساخته می‌شوند · FakeTLS / Secure
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="top-btn tg-proxy" onclick="openTgCreateModal()">
-        + ساخت پروکسی
-      </button>
-      <button class="top-btn" onclick="refreshTgProxies()">↻ بروزرسانی</button>
-    </div>
-  </div>
-
-  <div id="tgProxyGrid" class="tg-grid">
-    <div class="tg-empty">در حال بارگذاری پروکسی‌ها...</div>
-  </div>
-
-  <div class="tg-hint">
-    <strong style="color:#7dd3fc">راهنما:</strong>
-    هر پروکسی با secret اختصاصی روی <b>هاست همین پنل</b> ساخته می‌شود.
-    برای اتصال واقعی کاربران، سرویس MTProto (مثل <code style="direction:ltr">mtg</code> یا <code style="direction:ltr">teleproxy</code>) باید روی همین سرور با همان secret و پورت اجرا شود.
-    تا آن زمان لینک‌ها آماده اشتراک‌گذاری و مدیریت داخل پنل هستند.
-  </div>
-</div>
 
 <div class="panel">
 
@@ -8448,10 +8087,6 @@ data-action="delete"
 
     }
 
-    try {
-        await refreshTgProxies();
-    } catch (e) {}
-
 }
 
 async function copyText(text){
@@ -8643,7 +8278,6 @@ async function submitTgCreate(){
 
     showTgResult(result);
     showToast("پروکسی ساخته شد");
-    await refreshTgProxies();
 }
 
 async function createTelegramProxy(){
@@ -8660,82 +8294,12 @@ async function createTelegramProxy(){
     }
     showTgResult(result);
     showToast("پروکسی تلگرام آماده شد");
-    await refreshTgProxies();
 }
 
 async function copyTgLink(id){
     const el = document.getElementById(id);
     if (el && el.value) {
         await copyText(el.value);
-    }
-}
-
-async function refreshTgProxies(){
-    const data = await api("/api/telegram-proxies");
-    const grid = document.getElementById("tgProxyGrid");
-    if (!grid) return;
-
-    if (!data || !data.ok) {
-        grid.innerHTML = '<div class="tg-empty">خطا در دریافت لیست پروکسی‌ها</div>';
-        return;
-    }
-
-    const list = data.proxies || [];
-    if (!list.length) {
-        grid.innerHTML = `
-          <div class="tg-empty">
-            هنوز پروکسی تلگرامی ساخته نشده است.<br>
-            از دکمه <b>ساخت پروکسی</b> استفاده کنید.
-          </div>`;
-        return;
-    }
-
-    grid.innerHTML = "";
-    for (const p of list) {
-        const card = document.createElement("div");
-        card.className = "tg-card" + (p.active ? "" : " off");
-        const status = p.active
-            ? '<span class="tg-badge on">فعال</span>'
-            : '<span class="tg-badge off">خاموش</span>';
-        card.innerHTML = `
-          <div class="tg-card-top">
-            <div>
-              <div class="tg-card-name">${escapeHtml(p.label || "بدون نام")}</div>
-              <div class="tg-card-meta">${escapeHtml(p.server)}:${p.port} · ${escapeHtml(p.mode || "ee")}</div>
-            </div>
-            ${status}
-          </div>
-          <div class="tg-link-box" title="${escapeHtml(p.tg_link)}">${escapeHtml(p.tg_link)}</div>
-          <div class="tg-actions">
-            <button class="action primary" data-act="copy">کپی لینک</button>
-            <button class="action" data-act="toggle">${p.active ? "خاموش" : "فعال"}</button>
-            <button class="action danger" data-act="del">حذف</button>
-          </div>
-        `;
-        card.querySelectorAll("button[data-act]").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-                const act = btn.dataset.act;
-                if (act === "copy") {
-                    await copyText(p.tg_link);
-                    return;
-                }
-                btn.disabled = true;
-                try {
-                    if (act === "toggle") {
-                        await api("/api/telegram-proxies/" + p.id + "/toggle", { method: "POST" });
-                        await refreshTgProxies();
-                    } else if (act === "del") {
-                        if (!confirm("این پروکسی حذف شود؟")) return;
-                        await api("/api/telegram-proxies/" + p.id, { method: "DELETE" });
-                        showToast("حذف شد");
-                        await refreshTgProxies();
-                    }
-                } finally {
-                    btn.disabled = false;
-                }
-            });
-        });
-        grid.appendChild(card);
     }
 }
 
