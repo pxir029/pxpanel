@@ -1,5 +1,5 @@
 # ============================================================
-# PXpanel 12.1.0 Beta
+# PXpanel 13.2.0 Beta
 # Railway Ready
 # ============================================================
 
@@ -41,7 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ============================================================
 
 APP_NAME = "PXpanel"
-APP_VERSION = "12.1.0 Beta"
+APP_VERSION = "13.2.0 Beta"
 
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
@@ -191,10 +191,8 @@ CONFIG = {
 
 LINKS: dict = {}
 SUBS: dict = {}
-TG_PROXIES: dict = {}
 SESSIONS: dict = {}
 connections: dict = {}
-TG_PROXIES_LOCK = asyncio.Lock()
 
 stats = {
     "total_bytes": 0,
@@ -869,6 +867,7 @@ def generate_vless_link(
     fingerprint: str | None = None,
     alpn: str | None = None,
     port: int | None = None,
+    address: str | None = None,
 ):
 
     fp = (
@@ -955,10 +954,15 @@ def generate_vless_link(
         for key, value in params.items()
     )
 
+    # پروتکل دقیقاً مثل upstream — فقط اگر address داده شود به جای host در آدرس استفاده می‌شود
+    connect_host = host
+    if address:
+        connect_host = str(address).strip() or host
+
     return (
         f"vless://"
         f"{uuid}@"
-        f"{host}:"
+        f"{connect_host}:"
         f"{port_value}?"
         f"{query}#"
         f"{quote(remark)}"
@@ -970,6 +974,7 @@ def vless_link_for_link(
     uid: str,
     host: str,
 ):
+    clean_ip = (link.get("clean_ip") or "").strip()
     return generate_vless_link(
         uid,
         host,
@@ -992,6 +997,7 @@ def vless_link_for_link(
             "port",
             DEFAULT_PORT,
         ),
+        address=clean_ip or None,
     )
 
 
@@ -1073,6 +1079,7 @@ def get_link_info(
             "note",
             "",
         ),
+        "clean_ip": link.get("clean_ip", ""),
         "vless": vless_link_for_link(
             link,
             uid,
@@ -1131,13 +1138,6 @@ async def load_state():
             )
         )
 
-        TG_PROXIES.update(
-            data.get(
-                "tg_proxies",
-                {},
-            )
-        )
-
         stored_password = data.get(
             "password_hash"
         )
@@ -1191,15 +1191,19 @@ async def load_state():
             )
 
             link.setdefault(
+                "clean_ip",
+                "",
+            )
+
+            link.setdefault(
                 "used_bytes",
                 0,
             )
 
         logger.info(
-            "State loaded: %d links / %d subscriptions / %d tg-proxies",
+            "State loaded: %d links / %d subscriptions",
             len(LINKS),
             len(SUBS),
-            len(TG_PROXIES),
         )
 
     except Exception as exc:
@@ -1227,9 +1231,6 @@ async def save_state():
 
                 "subs":
                     dict(SUBS),
-
-                "tg_proxies":
-                    dict(TG_PROXIES),
 
                 "password_hash":
                     AUTH[
@@ -1386,6 +1387,7 @@ async def make_link(
     speed_limit_bytes: int = 0,
     connection_limit: int = 0,
     fragment: str = "off",
+    clean_ip: str = "",
 ):
 
     if protocol not in PROTOCOLS:
@@ -1483,6 +1485,9 @@ async def make_link(
                 fragment
                 or "off"
             ).strip().lower(),
+
+        "clean_ip":
+            (clean_ip or "").strip()[:120],
     }
 
     async with LINKS_LOCK:
@@ -2106,7 +2111,7 @@ PXpanel
 </div>
 
 <div class="version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 </div>
 
@@ -2154,7 +2159,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PXpanel · 12.1.0 Beta
+PXpanel · 13.2.0 Beta
 </span>
 
 <a
@@ -2424,7 +2429,7 @@ P
 </h1>
 
 <div class="version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 
 <div class="desc">
@@ -3082,6 +3087,7 @@ async def create_link_api(
         speed_limit_bytes=speed_bytes,
         connection_limit=connection_limit,
         fragment=fragment,
+        clean_ip=str(body.get("clean_ip") or "").strip()[:120],
     )
 
     host = get_host(request)
@@ -3112,11 +3118,20 @@ async def create_auto_link(
 
         host = get_host(request)
 
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                body = {}
+        except Exception:
+            body = {}
+
+        clean_ip = str(body.get("clean_ip") or "").strip()[:120]
+
         uid, link = await make_link(
             label=auto_config_name(),
 
-            # Unlimited
-            limit_bytes=0,
+            # Default volume limit 100 GB
+            limit_bytes=int(100 * 1024 ** 3),
             expires_at=None,
             ip_limit=0,
             speed_limit_bytes=0,
@@ -3138,6 +3153,8 @@ async def create_auto_link(
             port=443,
 
             fragment="off",
+
+            clean_ip=clean_ip,
         )
 
         result = {
@@ -3906,7 +3923,10 @@ async def info_page(
     async with LINKS_LOCK:
         link = LINKS.get(uid)
         if not link:
-            return HTMLResponse("<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>", status_code=404)
+            return HTMLResponse(
+                "<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>",
+                status_code=404,
+            )
         snapshot = dict(link)
 
     host = get_host(request)
@@ -3916,11 +3936,9 @@ async def info_page(
     limit = int(snapshot.get("limit_bytes", 0) or 0)
     if limit > 0:
         usage_percent = max(0, min(100, round((used / limit) * 100, 1)))
-        usage_value = f"{fmt_bytes(used)} / {fmt_bytes(limit)}"
         remaining_value = fmt_bytes(max(0, limit - used))
     else:
         usage_percent = 0
-        usage_value = f"{fmt_bytes(used)} / نامحدود"
         remaining_value = "نامحدود"
 
     expires_at = snapshot.get("expires_at")
@@ -3935,7 +3953,11 @@ async def info_page(
                 days, rem = divmod(seconds, 86400)
                 hours, rem = divmod(rem, 3600)
                 minutes, _ = divmod(rem, 60)
-                expiry_remaining = f"{days} روز و {hours} ساعت" if days else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
+                expiry_remaining = (
+                    f"{days} روز و {hours} ساعت"
+                    if days
+                    else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
+                )
         except Exception:
             expiry_remaining = "نامشخص"
         expiry_display = str(expires_at)
@@ -3945,247 +3967,150 @@ async def info_page(
 
     status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
     status_class = "good" if status_text == "فعال" else "bad"
-    ip_limit = "نامحدود" if not snapshot.get("ip_limit",0) else str(snapshot.get("ip_limit"))
-    connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
-    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
+    connection_limit = "نامحدود" if not snapshot.get("connection_limit", 0) else str(snapshot.get("connection_limit"))
+    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes", 0) else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
+
+    now = now_ir()
+    fa_days = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه"]
+    today_name = fa_days[now.weekday()]
+    today_date = now.strftime("%Y/%m/%d")
+    today_time = now.strftime("%H:%M")
+
+    r_ring = 54
+    c_ring = 2 * 3.1415926535 * r_ring
+    ring_offset = c_ring * (1 - (usage_percent / 100.0 if limit > 0 else 0.08))
+
+    week_labels = [fa_days[(now - timedelta(days=i)).weekday()] for i in range(6, -1, -1)]
+    points_vals = [0, 0, 0, 0, 0, 0, max(8, int(usage_percent) if limit > 0 else min(35, 8 + (used % 40)))]
+    chart_w, chart_h, pad_x, pad_y = 320, 120, 16, 16
+    usable_w, usable_h = chart_w - pad_x * 2, chart_h - pad_y * 2
+    pts = []
+    for i, v in enumerate(points_vals):
+        x = pad_x + (usable_w * i / 6)
+        y = pad_y + usable_h * (1 - v / 100.0)
+        pts.append(f"{x:.1f},{y:.1f}")
+    polyline = " ".join(pts)
+    area_pts = f"{pad_x},{pad_y + usable_h} " + polyline + f" {pad_x + usable_w},{pad_y + usable_h}"
+    last_x = pad_x + usable_w
+    last_y = pad_y + usable_h * (1 - points_vals[-1] / 100.0)
+    labels_html = "".join(
+        f'<span class="{"today" if i == 6 else ""}">{escape_html(lab)}</span>'
+        for i, lab in enumerate(week_labels)
+    )
+    pct_label = f"{usage_percent}%" if limit > 0 else "∞"
+    limit_label = fmt_bytes(limit) if limit > 0 else "∞"
 
     info_html = f"""<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>{escape_html(snapshot.get("label", "PXpanel"))} · INFO</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<html lang="fa" dir="rtl"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{escape_html(snapshot.get("label","PXpanel"))} · INFO</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{{
-  --bg:#07080d;--card:rgba(255,255,255,.03);--line:rgba(255,255,255,.08);
-  --text:#f4f4f8;--muted:rgba(255,255,255,.42);--purple:#a78bfa;
-  --green:#34d399;--blue:#818cf8;--orange:#fbbf24;--radius:18px;
-}}
-*{{box-sizing:border-box}}
-html,body{{margin:0;min-height:100%;background:var(--bg)}}
-body{{
-  font-family:"Vazirmatn",sans-serif;color:var(--text);padding:28px 20px 40px;
-  background:
-    radial-gradient(ellipse 80% 50% at 10% -10%,rgba(129,140,248,.14),transparent 50%),
-    radial-gradient(ellipse 60% 40% at 100% 0%,rgba(167,139,250,.10),transparent 45%),
-    #07080d;
-}}
-*::-webkit-scrollbar{{width:7px;height:7px}}
-*::-webkit-scrollbar-track{{background:transparent}}
-*::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
-.wrap{{width:min(880px,100%);margin:0 auto}}
-.shell{{border:1px solid var(--line);border-radius:28px;background:rgba(12,14,20,.72);backdrop-filter:blur(24px);overflow:hidden}}
-.hero{{padding:28px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}}
-.brand{{display:flex;align-items:center;gap:14px;min-width:0}}
-.logo{{width:48px;height:48px;border-radius:14px;flex:none;display:grid;place-items:center;font-weight:900;font-size:15px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff}}
-.hero h1{{margin:0;font-size:20px;font-weight:800}}
-.meta{{margin-top:6px;font-size:11px;color:var(--muted);word-break:break-all;line-height:1.7}}
+:root{{--bg:#07080d;--card:rgba(255,255,255,.03);--line:rgba(255,255,255,.08);--text:#f4f4f8;--muted:rgba(255,255,255,.42);--purple:#a78bfa;--green:#34d399;--blue:#818cf8;--orange:#fbbf24;--radius:18px}}
+*{{box-sizing:border-box}} body{{margin:0;font-family:Vazirmatn,sans-serif;color:var(--text);padding:28px 20px 40px;background:radial-gradient(ellipse 80% 50% at 10% -10%,rgba(129,140,248,.14),transparent 50%),#07080d}}
+.wrap{{width:min(880px,100%);margin:0 auto}}.shell{{border:1px solid var(--line);border-radius:28px;background:rgba(12,14,20,.72);backdrop-filter:blur(24px);overflow:hidden}}
+.hero{{padding:28px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}}
+.brand{{display:flex;gap:14px;align-items:center}}.logo{{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-weight:900;background:linear-gradient(135deg,#6366f1,#8b5cf6)}}
+.hero h1{{margin:0;font-size:20px}}.meta{{margin-top:6px;font-size:11px;color:var(--muted);word-break:break-all}}
 .badge{{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700}}
 .badge i{{width:7px;height:7px;border-radius:50%;background:currentColor}}
 .badge.good{{color:#6ee7b7;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2)}}
 .badge.bad{{color:#fda4af;background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.2)}}
-.body{{padding:22px}}
-.grid{{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}}
+.body{{padding:22px}}.grid{{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}}
 .card{{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}}
-.stack{{display:flex;flex-direction:column;gap:16px}}
-.kicker{{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}}
-.title{{margin-top:4px;font-size:15px;font-weight:800}}
+.kicker{{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase}}.title{{margin-top:4px;font-size:15px;font-weight:800}}
 .usage-row{{display:flex;align-items:center;gap:22px;margin-top:18px}}
 .ring-wrap{{position:relative;width:140px;height:140px;flex:none}}
 .ring-wrap svg{{width:100%;height:100%;transform:rotate(-90deg)}}
 .ring-bg{{fill:none;stroke:rgba(255,255,255,.06);stroke-width:10}}
 .ring-fg{{fill:none;stroke:url(#ringGrad);stroke-width:10;stroke-linecap:round;stroke-dasharray:{c_ring:.2f};stroke-dashoffset:{ring_offset:.2f}}}
-.ring-center{{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}}
-.ring-pct{{font-size:22px;font-weight:900}}
-.ring-day{{margin-top:2px;font-size:11px;color:var(--purple);font-weight:700}}
-.ring-date{{font-size:10px;color:var(--muted);margin-top:2px}}
-.usage-info{{flex:1;min-width:0}}
-.usage-big{{font-size:22px;font-weight:900}}
-.usage-big span{{font-size:12px;color:var(--muted);font-weight:600}}
+.ring-center{{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}}
+.ring-pct{{font-size:22px;font-weight:900}}.ring-day{{font-size:11px;color:var(--purple);font-weight:700}}.ring-date{{font-size:10px;color:var(--muted)}}
+.usage-big{{font-size:22px;font-weight:900}}.usage-big span{{font-size:12px;color:var(--muted)}}
 .usage-meta{{margin-top:12px;display:grid;gap:8px}}
-.usage-meta div{{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05)}}
+.usage-meta div{{display:flex;justify-content:space-between;font-size:12px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05)}}
 .usage-meta span{{color:var(--muted)}}
-.usage-meta b{{font-weight:700}}
-.chart-box{{margin-top:8px}}
 .chart-svg{{width:100%;height:auto;display:block}}
-.chart-labels{{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px;font-size:9px;color:var(--muted);text-align:center}}
+.chart-labels{{display:grid;grid-template-columns:repeat(7,1fr);margin-top:10px;font-size:9px;color:var(--muted);text-align:center}}
 .chart-labels .today{{color:var(--purple);font-weight:800}}
 .metrics{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}}
 .metric{{padding:16px;border-radius:var(--radius);border:1px solid var(--line);background:var(--card)}}
-.metric .dot{{width:8px;height:8px;border-radius:50%;background:var(--c);margin-bottom:10px;box-shadow:0 0 12px color-mix(in srgb, var(--c) 50%, transparent)}}
-.metric .lbl{{font-size:10px;color:var(--muted)}}
-.metric .val{{margin-top:6px;font-size:13px;font-weight:800;color:var(--c);word-break:break-word}}
-.metric.g{{--c:var(--green)}} .metric.o{{--c:var(--orange)}} .metric.b{{--c:var(--blue)}} .metric.p{{--c:var(--purple)}}
-.card-head{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}}
+.metric .dot{{width:8px;height:8px;border-radius:50%;background:var(--c);margin-bottom:10px}}
+.metric .lbl{{font-size:10px;color:var(--muted)}}.metric .val{{margin-top:6px;font-size:13px;font-weight:800;color:var(--c)}}
+.metric.g{{--c:var(--green)}}.metric.o{{--c:var(--orange)}}.metric.b{{--c:var(--blue)}}.metric.p{{--c:var(--purple)}}
+.stack{{display:flex;flex-direction:column;gap:16px;margin-top:16px}}
 .info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}}
 .info-item{{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.16)}}
-.info-item .lbl{{font-size:10px;color:var(--muted)}}
-.info-item .val{{margin-top:6px;font-size:12px;font-weight:700;word-break:break-word}}
+.info-item .lbl{{font-size:10px;color:var(--muted)}}.info-item .val{{margin-top:6px;font-size:12px;font-weight:700;word-break:break-word}}
 .code{{direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#c4b5fd}}
 .link-row{{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:10px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.16)}}
-.link-row:first-of-type{{margin-top:0}}
-.link-label{{font-size:10px;color:var(--muted);font-weight:700;flex:none;min-width:52px}}
-.link-val{{flex:1;min-width:0;direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:10px;color:#c4b5fd;word-break:break-all;line-height:1.6}}
-.btn-copy{{flex:none;border:0;border-radius:10px;padding:8px 12px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6)}}
+.link-label{{font-size:10px;color:var(--muted);font-weight:700;min-width:52px}}
+.link-val{{flex:1;direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:10px;color:#c4b5fd;word-break:break-all}}
+.btn-copy{{border:0;border-radius:10px;padding:8px 12px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6)}}
 .downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}}
-.download{{display:flex;align-items:center;gap:10px;padding:14px;text-decoration:none;color:#fff;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.14);transition:border-color .15s ease,transform .15s ease}}
-.download:hover{{border-color:rgba(129,140,248,.35);transform:translateY(-1px)}}
-.app-ic{{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.18);color:#a5b4fc;font-weight:900;font-size:11px}}
-.download strong{{display:block;font-size:12px}}
-.download span{{display:block;margin-top:2px;font-size:10px;color:var(--muted)}}
-.foot{{margin-top:16px;padding:14px 16px;text-align:center;border-radius:14px;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.04);font-size:11px;color:var(--muted)}}
-.foot b{{color:#6ee7b7}}
-.toast{{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);padding:10px 16px;border-radius:12px;background:rgba(20,20,28,.95);border:1px solid var(--line);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}}
+.download{{display:flex;align-items:center;gap:10px;padding:14px;text-decoration:none;color:#fff;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.14)}}
+.app-ic{{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(129,140,248,.12);color:#a5b4fc;font-weight:900;font-size:11px}}
+.foot{{margin-top:16px;padding:14px;text-align:center;border-radius:14px;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.04);font-size:11px;color:var(--muted)}}
+.foot b{{color:#6ee7b7}}.toast{{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(12px);padding:10px 16px;border-radius:12px;background:rgba(20,20,28,.95);border:1px solid var(--line);font-size:12px;opacity:0;transition:.2s;z-index:50}}
 .toast.show{{opacity:1;transform:translateX(-50%) translateY(0)}}
-@media(max-width:720px){{
-  body{{padding:14px 12px 28px}}
-  .grid,.downloads,.info-grid{{grid-template-columns:1fr}}
-  .metrics{{grid-template-columns:repeat(2,1fr)}}
-  .hero,.body{{padding:18px}}
-  .usage-row{{flex-direction:column;align-items:center;text-align:center}}
-}}
-</style>
-</head>
-<body>
+@media(max-width:720px){{.grid,.downloads,.info-grid{{grid-template-columns:1fr}}.metrics{{grid-template-columns:1fr 1fr}}.usage-row{{flex-direction:column}}}}
+</style></head><body>
 <div class="wrap"><div class="shell">
-<header class="hero">
-  <div class="brand">
-    <div class="logo">PX</div>
-    <div>
-      <h1>{escape_html(snapshot.get("label", "PXpanel"))}</h1>
-      <div class="meta">UUID · {escape_html(uid)} · {APP_VERSION}</div>
-    </div>
-  </div>
-  <div class="badge {status_class}"><i></i>{status_text}</div>
-</header>
+<header class="hero"><div class="brand"><div class="logo">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="meta">UUID · {escape_html(uid)} · {APP_VERSION}</div></div></div>
+<div class="badge {status_class}"><i></i>{status_text}</div></header>
 <div class="body">
-  <div class="grid">
-    <section class="card">
-      <div class="kicker">مصرف امروز</div>
-      <div class="title">{escape_html(today_name)} · {escape_html(today_date)}</div>
-      <div class="usage-row">
-        <div class="ring-wrap">
-          <svg viewBox="0 0 128 128" aria-hidden="true">
-            <defs>
-              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#34d399"/>
-                <stop offset="100%" stop-color="#818cf8"/>
-              </linearGradient>
-            </defs>
-            <circle class="ring-bg" cx="64" cy="64" r="54"/>
-            <circle class="ring-fg" cx="64" cy="64" r="54"/>
-          </svg>
-          <div class="ring-center">
-            <div class="ring-pct">{pct_label}</div>
-            <div class="ring-day">{escape_html(today_name)}</div>
-            <div class="ring-date">{escape_html(today_time)}</div>
-          </div>
-        </div>
-        <div class="usage-info">
-          <div class="usage-big">{escape_html(fmt_bytes(used))} <span>/ {escape_html(limit_label)}</span></div>
-          <div class="usage-meta">
-            <div><span>باقی‌مانده</span><b>{escape_html(remaining_value)}</b></div>
-            <div><span>زمان سرویس</span><b>{escape_html(expiry_remaining)}</b></div>
-          </div>
-        </div>
-      </div>
-    </section>
-    <section class="card">
-      <div class="kicker">آمار خطی</div>
-      <div class="title">روند ۷ روز</div>
-      <div class="chart-box">
-        <svg class="chart-svg" viewBox="0 0 {chart_w} {chart_h}" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="rgba(129,140,248,.35)"/>
-              <stop offset="100%" stop-color="rgba(129,140,248,0)"/>
-            </linearGradient>
-          </defs>
-          <line x1="{pad_x}" y1="{pad_y}" x2="{pad_x}" y2="{pad_y + usable_h}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
-          <line x1="{pad_x}" y1="{pad_y + usable_h}" x2="{pad_x + usable_w}" y2="{pad_y + usable_h}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
-          <polygon points="{area_pts}" fill="url(#areaGrad)"/>
-          <polyline points="{polyline}" fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="4.5" fill="#a78bfa" stroke="#0b0c10" stroke-width="2"/>
-        </svg>
-        <div class="chart-labels">{labels_html}</div>
-      </div>
-    </section>
-  </div>
-
-  <div class="metrics">
-    <div class="metric g"><div class="dot"></div><div class="lbl">مصرف فعلی</div><div class="val">{escape_html(fmt_bytes(used))}</div></div>
-    <div class="metric o"><div class="dot"></div><div class="lbl">باقی‌مانده</div><div class="val">{escape_html(remaining_value)}</div></div>
-    <div class="metric b"><div class="dot"></div><div class="lbl">IP فعال</div><div class="val">{len(unique_ips_for_uuid(uid))}</div></div>
-    <div class="metric p"><div class="dot"></div><div class="lbl">زمان باقی</div><div class="val">{escape_html(expiry_remaining)}</div></div>
-  </div>
-
-  <div class="stack" style="margin-top:16px">
-    <section class="card">
-      <div class="card-head"><div><div class="kicker">Details</div><div class="title">جزئیات فنی</div></div></div>
-      <div class="info-grid">
-        <div class="info-item"><div class="lbl">Protocol</div><div class="val code">{escape_html(snapshot.get("protocol", "vless-ws"))}</div></div>
-        <div class="info-item"><div class="lbl">Fingerprint</div><div class="val code">{escape_html(snapshot.get("fingerprint", "chrome"))}</div></div>
-        <div class="info-item"><div class="lbl">IP Limit</div><div class="val">{escape_html(ip_limit)}</div></div>
-        <div class="info-item"><div class="lbl">Connection</div><div class="val">{escape_html(connection_limit)}</div></div>
-        <div class="info-item"><div class="lbl">Speed</div><div class="val">{escape_html(speed_limit)}</div></div>
-        <div class="info-item"><div class="lbl">انقضا</div><div class="val">{escape_html(expiry_display)}</div></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><div><div class="kicker">Links</div><div class="title">لینک‌های سرویس</div></div></div>
-      <div class="link-row"><div class="link-label">VLESS</div><div class="link-val" id="vlessUrl">{escape_html(vless_url)}</div>
-        <button type="button" class="btn-copy" onclick="copyEl('vlessUrl')">کپی</button></div>
-      <div class="link-row"><div class="link-label">SUB</div><div class="link-val" id="subUrl">{escape_html(sub_url)}</div>
-        <button type="button" class="btn-copy" onclick="copyEl('subUrl')">کپی</button></div>
-    </section>
-
-    {socks_html}
-
-    <section class="card">
-      <div class="card-head"><div><div class="kicker">Apps</div><div class="title">دانلود برنامه</div></div></div>
-      <div class="downloads">
-        <a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener"><div class="app-ic">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a>
-        <a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener"><div class="app-ic">N</div><div><strong>v2rayN</strong><span>Windows / macOS</span></div></a>
-        <a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener"><div class="app-ic">H</div><div><strong>Hiddify</strong><span>همه پلتفرم‌ها</span></div></a>
-      </div>
-    </section>
-    <div class="foot">پشتیبانی · <b>کانال تلگرام logic_sec</b></div>
-  </div>
+<div class="grid">
+<section class="card"><div class="kicker">مصرف امروز</div><div class="title">{escape_html(today_name)} · {escape_html(today_date)}</div>
+<div class="usage-row"><div class="ring-wrap"><svg viewBox="0 0 128 128"><defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34d399"/><stop offset="100%" stop-color="#818cf8"/></linearGradient></defs>
+<circle class="ring-bg" cx="64" cy="64" r="54"/><circle class="ring-fg" cx="64" cy="64" r="54"/></svg>
+<div class="ring-center"><div class="ring-pct">{pct_label}</div><div class="ring-day">{escape_html(today_name)}</div><div class="ring-date">{escape_html(today_time)}</div></div></div>
+<div><div class="usage-big">{escape_html(fmt_bytes(used))} <span>/ {escape_html(limit_label)}</span></div>
+<div class="usage-meta"><div><span>باقی‌مانده</span><b>{escape_html(remaining_value)}</b></div><div><span>زمان سرویس</span><b>{escape_html(expiry_remaining)}</b></div></div></div></div></section>
+<section class="card"><div class="kicker">آمار خطی</div><div class="title">روند ۷ روز</div>
+<svg class="chart-svg" viewBox="0 0 {chart_w} {chart_h}" preserveAspectRatio="none"><defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(129,140,248,.35)"/><stop offset="100%" stop-color="rgba(129,140,248,0)"/></linearGradient></defs>
+<polygon points="{area_pts}" fill="url(#areaGrad)"/><polyline points="{polyline}" fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round"/><circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="4.5" fill="#a78bfa"/></svg>
+<div class="chart-labels">{labels_html}</div></section></div>
+<div class="metrics">
+<div class="metric g"><div class="dot"></div><div class="lbl">مصرف فعلی</div><div class="val">{escape_html(fmt_bytes(used))}</div></div>
+<div class="metric o"><div class="dot"></div><div class="lbl">باقی‌مانده</div><div class="val">{escape_html(remaining_value)}</div></div>
+<div class="metric b"><div class="dot"></div><div class="lbl">IP فعال</div><div class="val">{len(unique_ips_for_uuid(uid))}</div></div>
+<div class="metric p"><div class="dot"></div><div class="lbl">زمان باقی</div><div class="val">{escape_html(expiry_remaining)}</div></div>
 </div>
-</div></div>
+<div class="stack">
+<section class="card"><div class="title" style="margin-bottom:12px">جزئیات فنی</div>
+<div class="info-grid">
+<div class="info-item"><div class="lbl">Protocol</div><div class="val code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div>
+<div class="info-item"><div class="lbl">Fingerprint</div><div class="val code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div>
+<div class="info-item"><div class="lbl">IP Limit</div><div class="val">{escape_html(ip_limit)}</div></div>
+<div class="info-item"><div class="lbl">Connection</div><div class="val">{escape_html(connection_limit)}</div></div>
+<div class="info-item"><div class="lbl">Speed</div><div class="val">{escape_html(speed_limit)}</div></div>
+<div class="info-item"><div class="lbl">انقضا</div><div class="val">{escape_html(expiry_display)}</div></div>
+</div></section>
+<section class="card"><div class="title" style="margin-bottom:12px">لینک‌های سرویس</div>
+<div class="link-row"><div class="link-label">VLESS</div><div class="link-val" id="vlessUrl">{escape_html(vless_url)}</div><button class="btn-copy" type="button" onclick="copyEl('vlessUrl')">کپی</button></div>
+<div class="link-row"><div class="link-label">SUB</div><div class="link-val" id="subUrl">{escape_html(sub_url)}</div><button class="btn-copy" type="button" onclick="copyEl('subUrl')">کپی</button></div>
+</section>
+<section class="card"><div class="title" style="margin-bottom:12px">دانلود برنامه</div>
+<div class="downloads">
+<a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener"><div class="app-ic">NG</div><div><strong>v2rayNG</strong><span style="color:var(--muted);font-size:10px">Android</span></div></a>
+<a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener"><div class="app-ic">N</div><div><strong>v2rayN</strong><span style="color:var(--muted);font-size:10px">Desktop</span></div></a>
+<a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener"><div class="app-ic">H</div><div><strong>Hiddify</strong><span style="color:var(--muted);font-size:10px">همه</span></div></a>
+</div></section>
+<div class="foot">پشتیبانی · <b>logic_sec</b></div>
+</div></div></div></div>
 <div class="toast" id="toast">کپی شد</div>
 <script>
 function copyEl(id){{
-  const el = document.getElementById(id);
-  const t = el ? el.textContent.trim() : "";
-  if (!t) return;
-  const done = () => {{
-    const toast = document.getElementById("toast");
-    toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 1400);
-  }};
-  if (navigator.clipboard && navigator.clipboard.writeText) {{
-    navigator.clipboard.writeText(t).then(done).catch(() => {{
-      const ta = document.createElement("textarea");
-      ta.value = t; document.body.appendChild(ta); ta.select();
-      try {{ document.execCommand("copy"); }} catch (e) {{}}
-      ta.remove(); done();
-    }});
-  }} else {{
-    const ta = document.createElement("textarea");
-    ta.value = t; document.body.appendChild(ta); ta.select();
-    try {{ document.execCommand("copy"); }} catch (e) {{}}
-    ta.remove(); done();
-  }}
+  const t=(document.getElementById(id)||{{}}).textContent||"";
+  if(!t.trim())return;
+  const done=()=>{{const el=document.getElementById("toast");el.classList.add("show");setTimeout(()=>el.classList.remove("show"),1400);}};
+  if(navigator.clipboard)navigator.clipboard.writeText(t.trim()).then(done).catch(done); else done();
 }}
 </script>
-</body>
-</html>"""
+</body></html>"""
     return HTMLResponse(info_html)
+
 
 
 # ============================================================
@@ -4748,7 +4673,7 @@ PXpanel
 </h1>
 
 <div class="version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 
 <div class="text">
@@ -5073,6 +4998,72 @@ async def public_sub_data(
 # ============================================================
 
 @app.get("/stats")
+
+def get_system_stats() -> dict:
+    """CPU / RAM / disk بدون وابستگی اجباری به psutil"""
+    cpu_percent = None
+    ram_percent = None
+    ram_used = None
+    ram_total = None
+    try:
+        import psutil  # type: ignore
+
+        cpu_percent = float(psutil.cpu_percent(interval=0.05))
+        mem = psutil.virtual_memory()
+        ram_percent = float(mem.percent)
+        ram_used = int(mem.used)
+        ram_total = int(mem.total)
+    except Exception:
+        # fallback /proc
+        try:
+            with open("/proc/meminfo", "r", encoding="utf-8") as f:
+                info = {}
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        info[parts[0].rstrip(":")] = int(parts[1]) * 1024
+            total = info.get("MemTotal", 0)
+            avail = info.get("MemAvailable", info.get("MemFree", 0))
+            if total > 0:
+                ram_total = total
+                ram_used = total - avail
+                ram_percent = round((ram_used / total) * 100, 1)
+        except Exception:
+            pass
+        try:
+            with open("/proc/loadavg", "r", encoding="utf-8") as f:
+                load1 = float(f.read().split()[0])
+            # approximate % from load / cpu count
+            import os as _os
+            cpus = max(1, _os.cpu_count() or 1)
+            cpu_percent = round(min(100.0, (load1 / cpus) * 100), 1)
+        except Exception:
+            cpu_percent = None
+
+    server_ip = ""
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.3)
+        s.connect(("8.8.8.8", 80))
+        server_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        try:
+            import socket
+            server_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            server_ip = ""
+
+    return {
+        "cpu_percent": cpu_percent,
+        "ram_percent": ram_percent,
+        "ram_used": ram_used,
+        "ram_total": ram_total,
+        "server_ip": server_ip,
+    }
+
+
 async def get_stats(
     _=Depends(require_auth),
 ):
@@ -5118,6 +5109,9 @@ async def get_stats(
 
         "uptime":
             uptime(),
+
+        "system":
+            get_system_stats(),
 
         "timestamp":
             datetime.now().isoformat(),
@@ -5568,208 +5562,6 @@ async def http_proxy(
         )
 
 
-
-# ============================================================
-# TELEGRAM PROXY GENERATOR + MANAGEMENT
-# ============================================================
-# لینک‌ها روی دامنه/هاست واقعی همین پنل ساخته می‌شوند.
-# برای کارکرد واقعی باید سرویس MTProto (مثل mtg) روی همین سرور
-# با همان secretها روی پورت مشخص اجرا شود.
-# ============================================================
-
-FAKE_TLS_DOMAINS = (
-    "cloudflare.com",
-    "www.cloudflare.com",
-    "www.google.com",
-    "www.microsoft.com",
-    "www.apple.com",
-    "cdnjs.cloudflare.com",
-    "www.amazon.com",
-    "www.github.com",
-    "www.divar.ir",
-    "www.aparat.com",
-)
-
-
-def build_tg_links(host: str, port: int, secret: str) -> dict:
-    tg_link = (
-        f"tg://proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
-    web_link = (
-        f"https://t.me/proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
-    return {
-        "tg_link": tg_link,
-        "web_link": web_link,
-    }
-
-
-def tg_proxy_info(proxy_id: str, proxy: dict, host: str) -> dict:
-    port = int(proxy.get("port") or 443)
-    secret = proxy.get("secret") or ""
-    links = build_tg_links(host, port, secret)
-    return {
-        "id": proxy_id,
-        "label": proxy.get("label") or "",
-        "server": host,
-        "port": port,
-        "secret": secret,
-        "domain": proxy.get("domain") or "",
-        "mode": proxy.get("mode") or "ee",
-        "active": bool(proxy.get("active", True)),
-        "note": proxy.get("note") or "",
-        "created_at": proxy.get("created_at"),
-        "tg_link": links["tg_link"],
-        "web_link": links["web_link"],
-    }
-
-
-@app.post("/api/telegram-proxy")
-async def create_telegram_proxy(
-    request: Request,
-    _=Depends(require_auth),
-):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    host = get_host(request)
-    port = safe_int(body.get("port"), 443, 1, 65535)
-    label = (body.get("label") or "").strip()[:60]
-    note = (body.get("note") or "").strip()[:200]
-    mode = (body.get("mode") or "ee").strip().lower()
-    domain = (body.get("domain") or "").strip().lower()
-
-    if mode not in ("ee", "dd", "plain"):
-        mode = "ee"
-
-    if not domain:
-        domain = secrets.choice(FAKE_TLS_DOMAINS)
-
-    raw_secret = secrets.token_hex(16)
-
-    if mode == "ee":
-        domain_hex = domain.encode("utf-8").hex()
-        secret = f"ee{raw_secret}{domain_hex}"
-    elif mode == "dd":
-        secret = f"dd{raw_secret}"
-    else:
-        secret = raw_secret
-
-    if not label:
-        label = f"tg_{secrets.token_hex(3)}"
-
-    proxy_id = secrets.token_hex(8)
-
-    record = {
-        "label": label,
-        "port": port,
-        "secret": secret,
-        "raw_secret": raw_secret,
-        "domain": domain if mode == "ee" else "",
-        "mode": mode,
-        "note": note,
-        "active": True,
-        "created_at": datetime.now().isoformat(),
-    }
-
-    async with TG_PROXIES_LOCK:
-        TG_PROXIES[proxy_id] = record
-
-    await save_state()
-
-    info = tg_proxy_info(proxy_id, record, host)
-
-    log_activity(
-        "telegram",
-        f"پروکسی تلگرام ساخته شد: {label} → {host}:{port}",
-        "info",
-    )
-
-    return {
-        "ok": True,
-        **info,
-    }
-
-
-@app.get("/api/telegram-proxies")
-async def list_telegram_proxies(
-    request: Request,
-    _=Depends(require_auth),
-):
-    host = get_host(request)
-    result = []
-
-    async with TG_PROXIES_LOCK:
-        items = list(TG_PROXIES.items())
-
-    for proxy_id, proxy in items:
-        result.append(tg_proxy_info(proxy_id, proxy, host))
-
-    result.sort(
-        key=lambda item: item.get("created_at") or "",
-        reverse=True,
-    )
-
-    return {
-        "ok": True,
-        "proxies": result,
-        "count": len(result),
-        "server": host,
-    }
-
-
-@app.delete("/api/telegram-proxies/{proxy_id}")
-async def delete_telegram_proxy(
-    proxy_id: str,
-    _=Depends(require_auth),
-):
-    async with TG_PROXIES_LOCK:
-        if proxy_id not in TG_PROXIES:
-            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
-        label = TG_PROXIES[proxy_id].get("label", proxy_id)
-        TG_PROXIES.pop(proxy_id, None)
-
-    await save_state()
-
-    log_activity(
-        "telegram",
-        f"پروکسی تلگرام حذف شد: {label}",
-        "info",
-    )
-
-    return {"ok": True}
-
-
-@app.post("/api/telegram-proxies/{proxy_id}/toggle")
-async def toggle_telegram_proxy(
-    proxy_id: str,
-    _=Depends(require_auth),
-):
-    async with TG_PROXIES_LOCK:
-        if proxy_id not in TG_PROXIES:
-            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
-        current = bool(TG_PROXIES[proxy_id].get("active", True))
-        TG_PROXIES[proxy_id]["active"] = not current
-        active = TG_PROXIES[proxy_id]["active"]
-        label = TG_PROXIES[proxy_id].get("label", proxy_id)
-
-    await save_state()
-
-    log_activity(
-        "telegram",
-        f"پروکسی تلگرام {'فعال' if active else 'غیرفعال'} شد: {label}",
-        "info",
-    )
-
-    return {"ok": True, "active": active}
-
-
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -5789,7 +5581,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PXpanel 12.1.0 Beta
+PXpanel 13.2.0 Beta
 </title>
 
 <link
@@ -5938,165 +5730,6 @@ body{
 .top-btn.danger{
     color:#fca5a5;
 }
-
-
-.top-btn.tg-proxy{
-    background:linear-gradient(135deg,#0ea5e9,#2563eb);
-    border-color:transparent;
-    color:#fff;
-    font-weight:700;
-}
-.top-btn.tg-proxy:hover{
-    filter:brightness(1.08);
-}
-
-.tg-panel{
-    margin-top:14px;
-    border-radius:22px;
-    border:1px solid rgba(255,255,255,.10);
-    background:
-        linear-gradient(145deg, rgba(14,165,233,.08), rgba(37,99,235,.04)),
-        rgba(255,255,255,.035);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    box-shadow:
-        0 10px 40px rgba(0,0,0,.22),
-        inset 0 1px 0 rgba(255,255,255,.06);
-    overflow:hidden;
-}
-.tg-panel-head{
-    padding:16px 18px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    border-bottom:1px solid rgba(255,255,255,.07);
-    background:linear-gradient(90deg, rgba(14,165,233,.10), transparent);
-}
-.tg-panel-title{
-    font-size:13px;
-    font-weight:800;
-    display:flex;
-    align-items:center;
-    gap:8px;
-}
-.tg-panel-title span.dot{
-    width:8px;height:8px;border-radius:50%;
-    background:#38bdf8;
-    box-shadow:0 0 12px #38bdf8;
-}
-.tg-panel-sub{
-    margin-top:3px;
-    color:rgba(255,255,255,.38);
-    font-size:9.5px;
-}
-.tg-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-    gap:12px;
-    padding:14px;
-}
-.tg-card{
-    position:relative;
-    border-radius:18px;
-    padding:14px;
-    border:1px solid rgba(255,255,255,.09);
-    background:
-        linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    transition:.2s ease;
-}
-.tg-card:hover{
-    border-color:rgba(56,189,248,.28);
-    transform:translateY(-2px);
-    box-shadow:0 12px 28px rgba(14,165,233,.12);
-}
-.tg-card.off{
-    opacity:.55;
-    filter:grayscale(.35);
-}
-.tg-card-top{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:8px;
-    margin-bottom:10px;
-}
-.tg-card-name{
-    font-size:12px;
-    font-weight:800;
-}
-.tg-card-meta{
-    margin-top:4px;
-    font-size:9px;
-    color:rgba(255,255,255,.38);
-    direction:ltr;
-    text-align:right;
-}
-.tg-badge{
-    display:inline-flex;
-    padding:4px 9px;
-    border-radius:999px;
-    font-size:8px;
-    font-weight:700;
-}
-.tg-badge.on{
-    color:#7dd3fc;
-    background:rgba(14,165,233,.14);
-    border:1px solid rgba(14,165,233,.22);
-}
-.tg-badge.off{
-    color:#fca5a5;
-    background:rgba(239,68,68,.10);
-    border:1px solid rgba(239,68,68,.18);
-}
-.tg-link-box{
-    margin-top:10px;
-    padding:10px 11px;
-    border-radius:12px;
-    background:rgba(0,0,0,.22);
-    border:1px solid rgba(255,255,255,.06);
-    font-family:Consolas,monospace;
-    font-size:9px;
-    direction:ltr;
-    text-align:left;
-    color:#bae6fd;
-    word-break:break-all;
-    line-height:1.6;
-    max-height:52px;
-    overflow:hidden;
-}
-.tg-actions{
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-    margin-top:12px;
-}
-.tg-actions .action{
-    flex:1;
-    min-width:70px;
-    justify-content:center;
-}
-.tg-empty{
-    grid-column:1/-1;
-    text-align:center;
-    padding:28px 16px;
-    color:rgba(255,255,255,.40);
-    font-size:11px;
-    line-height:1.9;
-}
-.tg-hint{
-    margin:0 14px 14px;
-    padding:12px 14px;
-    border-radius:14px;
-    background:rgba(14,165,233,.07);
-    border:1px solid rgba(14,165,233,.15);
-    color:rgba(255,255,255,.58);
-    font-size:10px;
-    line-height:1.85;
-}
-
 
 .stats-grid{
     display:grid;
@@ -6728,6 +6361,26 @@ th{
     }
 }
 
+
+/* Dashboard polish */
+.stats-grid{gap:14px !important;margin-top:4px}
+.stat{padding:16px 16px 14px !important;border-radius:18px !important}
+.stat-bar{margin-top:12px;height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
+.stat-bar > i{display:block;height:100%;width:var(--w,0%);border-radius:inherit;background:var(--stat-color,#818cf8);box-shadow:0 0 12px color-mix(in srgb, var(--stat-color) 40%, transparent)}
+.sys-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.sys-card{padding:16px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03)}
+.sys-card .lbl{font-size:10px;color:rgba(255,255,255,.38)}
+.sys-card .val{margin-top:6px;font-size:18px;font-weight:900}
+.sys-card .bar{margin-top:12px;height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
+.sys-card .bar > i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6366f1,#a78bfa)}
+.server-ip-box{margin-top:16px;padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.18);font-size:11px;color:rgba(255,255,255,.4);cursor:pointer;user-select:none}
+.server-ip-box .ip-hidden{filter:blur(5px);letter-spacing:1px;direction:ltr;display:inline-block}
+.server-ip-box.revealed .ip-hidden{filter:none;letter-spacing:0;color:#c4b5fd}
+.server-ip-box .hint{margin-right:8px;opacity:.7}
+.panel{margin-top:16px !important}
+.top-actions{gap:10px !important}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px}
 </style>
 
 </head>
@@ -6755,7 +6408,7 @@ PXpanel
 </div>
 
 <div class="brand-version">
-12.1.0 Beta
+13.2.0 Beta
 </div>
 
 </div>
@@ -6769,13 +6422,6 @@ class="top-btn primary"
 onclick="openAutoModal()"
 ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
 ساخت خودکار
-</button>
-
-<button
-class="top-btn tg-proxy"
-onclick="createTelegramProxy()"
-><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 5L2 12.5l7 1.5L18 8l-7 7.5 1.5 6.5L21 5Z"/></svg>
-ساخت پروکسی تلگرام
 </button>
 
 <button
@@ -6881,39 +6527,30 @@ class="stat-value"
 </div>
 
 
-
-<div class="tg-panel">
-  <div class="tg-panel-head">
-    <div>
-      <div class="tg-panel-title">
-        <span class="dot"></span>
-        مدیریت پروکسی تلگرام
-      </div>
-      <div class="tg-panel-sub">
-        لینک‌ها روی دامنه واقعی همین سرور ساخته می‌شوند · FakeTLS / Secure
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="top-btn tg-proxy" onclick="openTgCreateModal()">
-        + ساخت پروکسی
-      </button>
-      <button class="top-btn" onclick="refreshTgProxies()">↻ بروزرسانی</button>
-    </div>
+<div 
+<div class="sys-grid">
+  <div class="sys-card">
+    <div class="lbl">CPU</div>
+    <div class="val" id="sysCpu">—</div>
+    <div class="bar"><i id="sysCpuBar" style="width:0%"></i></div>
   </div>
-
-  <div id="tgProxyGrid" class="tg-grid">
-    <div class="tg-empty">در حال بارگذاری پروکسی‌ها...</div>
+  <div class="sys-card">
+    <div class="lbl">RAM</div>
+    <div class="val" id="sysRam">—</div>
+    <div class="bar"><i id="sysRamBar" style="width:0%"></i></div>
   </div>
-
-  <div class="tg-hint">
-    <strong style="color:#7dd3fc">راهنما:</strong>
-    هر پروکسی با secret اختصاصی روی <b>هاست همین پنل</b> ساخته می‌شود.
-    برای اتصال واقعی کاربران، سرویس MTProto (مثل <code style="direction:ltr">mtg</code> یا <code style="direction:ltr">teleproxy</code>) باید روی همین سرور با همان secret و پورت اجرا شود.
-    تا آن زمان لینک‌ها آماده اشتراک‌گذاری و مدیریت داخل پنل هستند.
+  <div class="sys-card">
+    <div class="lbl">Uptime</div>
+    <div class="val" id="sysUptime">—</div>
+    <div class="bar"><i id="uptimeBar" style="width:100%"></i></div>
   </div>
 </div>
+<div class="server-ip-box" id="serverIpBox" onclick="this.classList.toggle('revealed')">
+  <span class="hint">ایپی سرور (کلیک برای نمایش)</span>
+  <span class="ip-hidden" id="serverIpValue">• • • • • •</span>
+</div>
 
-<div class="panel">
+class="panel">
 
 <div class="panel-head">
 
@@ -7246,6 +6883,7 @@ XHTTP Stream One
 id="manualVolume"
 type="number"
 min="0"
+value="100"
 placeholder="0 = نامحدود"
 />
 
@@ -7457,6 +7095,21 @@ value="http/1.1"
 <div class="field full">
 
 <label>
+ایپی تمیز (اختیاری)
+</label>
+
+<input
+id="manualCleanIp"
+placeholder="خالی = دامنه پنل"
+style="direction:ltr;text-align:left"
+/>
+
+</div>
+
+
+<div class="field full">
+
+<label>
 یادداشت
 </label>
 
@@ -7479,6 +7132,14 @@ onclick="closeManualModal()"
 </button>
 
 <button
+class="modal-btn secondary"
+type="button"
+onclick="applyBestManualSettings()"
+>
+بهترین تنظیمات
+</button>
+
+<button
 class="modal-btn primary"
 onclick="createManual()"
 >
@@ -7489,100 +7150,6 @@ onclick="createManual()"
 
 </div>
 
-</div>
-
-
-
-
-<!-- ===================================================== -->
-<!-- TELEGRAM CREATE MODAL -->
-<!-- ===================================================== -->
-
-<div id="tgCreateModal" class="modal-backdrop">
-<div class="modal" style="max-width:480px">
-<div class="modal-head">
-<div class="modal-title">ساخت پروکسی تلگرام</div>
-<button class="close" onclick="closeTgCreateModal()">×</button>
-</div>
-
-<div class="form-grid">
-<div class="field">
-<label>نام پروکسی</label>
-<input id="tgCreateName" placeholder="مثلاً Iran-TG-1" />
-</div>
-<div class="field">
-<label>پورت</label>
-<input id="tgCreatePort" type="number" min="1" max="65535" value="443" />
-</div>
-<div class="field">
-<label>حالت Secret</label>
-<select id="tgCreateMode">
-<option value="ee" selected>FakeTLS (ee) — پیشنهادی</option>
-<option value="dd">Secure (dd)</option>
-<option value="plain">Plain</option>
-</select>
-</div>
-<div class="field">
-<label>دامنه FakeTLS (اختیاری)</label>
-<input id="tgCreateDomain" placeholder="خودکار انتخاب می‌شود" style="direction:ltr;text-align:left" />
-</div>
-<div class="field full">
-<label>یادداشت</label>
-<textarea id="tgCreateNote" placeholder="اختیاری"></textarea>
-</div>
-</div>
-
-<div class="modal-actions">
-<button class="modal-btn secondary" onclick="closeTgCreateModal()">انصراف</button>
-<button class="modal-btn primary" onclick="submitTgCreate()">ساخت و نمایش لینک</button>
-</div>
-</div>
-</div>
-
-
-<!-- ===================================================== -->
-<!-- TELEGRAM RESULT MODAL -->
-<!-- ===================================================== -->
-
-<div id="tgProxyModal" class="modal-backdrop">
-<div class="modal" style="max-width:540px">
-<div class="modal-head">
-<div class="modal-title">پروکسی آماده شد</div>
-<button class="close" onclick="closeTgProxyModal()">×</button>
-</div>
-
-<div style="color:rgba(255,255,255,.55);font-size:11px;line-height:1.9;margin-bottom:14px">
-لینک روی دامنه واقعی سرور شما ساخته شده است.
-</div>
-
-<div class="field full" style="margin-bottom:12px">
-<label>لینک مستقیم تلگرام</label>
-<div style="display:flex;gap:8px;align-items:center">
-<input id="tgLinkDirect" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
-<button class="modal-btn primary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkDirect')">کپی</button>
-</div>
-</div>
-
-<div class="field full" style="margin-bottom:12px">
-<label>لینک t.me</label>
-<div style="display:flex;gap:8px;align-items:center">
-<input id="tgLinkWeb" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
-<button class="modal-btn secondary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkWeb')">کپی</button>
-</div>
-</div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-<div class="field"><label>سرور</label><input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
-<div class="field"><label>پورت</label><input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
-<div class="field full"><label>Secret</label><input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
-<div class="field full"><label>دامنه / حالت</label><input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
-</div>
-
-<div class="modal-actions">
-<button class="modal-btn secondary" onclick="closeTgProxyModal()">بستن</button>
-<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">کپی لینک اصلی</button>
-</div>
-</div>
 </div>
 
 
@@ -8077,6 +7644,33 @@ async function refresh(){
             "uptime"
         ).textContent =
             statsData.uptime;
+      const su = document.getElementById("sysUptime");
+      if (su) su.textContent = statsData.uptime;
+
+    // system bars
+    try {
+      const sys = (statsData && statsData.system) || {};
+      const cpu = sys.cpu_percent;
+      const ram = sys.ram_percent;
+      const cpuEl = document.getElementById("sysCpu");
+      const ramEl = document.getElementById("sysRam");
+      const cpuBar = document.getElementById("sysCpuBar");
+      const ramBar = document.getElementById("sysRamBar");
+      const ipEl = document.getElementById("serverIpValue");
+      if (cpuEl) cpuEl.textContent = (cpu == null ? "—" : (cpu.toFixed ? cpu.toFixed(0) : cpu) + "%");
+      if (ramEl) ramEl.textContent = (ram == null ? "—" : (ram.toFixed ? ram.toFixed(0) : ram) + "%");
+      if (cpuBar) cpuBar.style.width = (cpu == null ? 0 : Math.min(100, cpu)) + "%";
+      if (ramBar) ramBar.style.width = (ram == null ? 0 : Math.min(100, ram)) + "%";
+      if (ipEl && sys.server_ip) ipEl.textContent = sys.server_ip;
+      const upEl = document.getElementById("uptimeBar");
+      if (upEl) upEl.style.width = "100%";
+      const trafficEl = document.getElementById("trafficBar");
+      if (trafficEl && statsData.total_bytes != null) {
+        // visual only relative fill
+        trafficEl.style.width = Math.min(100, 12 + (Number(statsData.total_bytes) % 80)) + "%";
+      }
+    } catch (e) {}
+
     }
 
 
@@ -8389,11 +7983,8 @@ data-action="delete"
 
     }
 
-    try {
-        await refreshTgProxies();
-    } catch (e) {}
-
 }
+
 
 async function copyText(text){
 
@@ -8526,160 +8117,6 @@ function closePasswordModal(){
 }
 
 
-
-
-function openTgCreateModal(){
-    document.getElementById("tgCreateName").value = "";
-    document.getElementById("tgCreatePort").value = "443";
-    document.getElementById("tgCreateMode").value = "ee";
-    document.getElementById("tgCreateDomain").value = "";
-    document.getElementById("tgCreateNote").value = "";
-    document.getElementById("tgCreateModal").classList.add("open");
-}
-
-function closeTgCreateModal(){
-    document.getElementById("tgCreateModal").classList.remove("open");
-}
-
-function openTgProxyModal(){
-    document.getElementById("tgProxyModal").classList.add("open");
-}
-
-function closeTgProxyModal(){
-    document.getElementById("tgProxyModal").classList.remove("open");
-}
-
-function showTgResult(data){
-    document.getElementById("tgServer").value = data.server || "";
-    document.getElementById("tgPort").value = data.port || "";
-    document.getElementById("tgSecret").value = data.secret || "";
-    document.getElementById("tgDomain").value = (data.domain || data.mode || "");
-    document.getElementById("tgLinkDirect").value = data.tg_link || "";
-    document.getElementById("tgLinkWeb").value = data.web_link || "";
-    openTgProxyModal();
-}
-
-async function submitTgCreate(){
-    const body = {
-        label: document.getElementById("tgCreateName").value.trim(),
-        port: Number(document.getElementById("tgCreatePort").value || 443),
-        mode: document.getElementById("tgCreateMode").value,
-        domain: document.getElementById("tgCreateDomain").value.trim(),
-        note: document.getElementById("tgCreateNote").value.trim(),
-    };
-
-    showToast("در حال ساخت پروکسی...");
-    closeTgCreateModal();
-
-    const result = await api("/api/telegram-proxy", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(body),
-    });
-
-    if (!result || !result.ok) {
-        showToast("خطا در ساخت پروکسی");
-        return;
-    }
-
-    showTgResult(result);
-    showToast("پروکسی ساخته شد");
-    await refreshTgProxies();
-}
-
-async function createTelegramProxy(){
-    // one-click auto create (top button)
-    showToast("در حال ساخت پروکسی تلگرام...");
-    const result = await api("/api/telegram-proxy", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({}),
-    });
-    if (!result || !result.ok) {
-        showToast("خطا در ساخت پروکسی تلگرام");
-        return;
-    }
-    showTgResult(result);
-    showToast("پروکسی تلگرام آماده شد");
-    await refreshTgProxies();
-}
-
-async function copyTgLink(id){
-    const el = document.getElementById(id);
-    if (el && el.value) {
-        await copyText(el.value);
-    }
-}
-
-async function refreshTgProxies(){
-    const data = await api("/api/telegram-proxies");
-    const grid = document.getElementById("tgProxyGrid");
-    if (!grid) return;
-
-    if (!data || !data.ok) {
-        grid.innerHTML = '<div class="tg-empty">خطا در دریافت لیست پروکسی‌ها</div>';
-        return;
-    }
-
-    const list = data.proxies || [];
-    if (!list.length) {
-        grid.innerHTML = `
-          <div class="tg-empty">
-            هنوز پروکسی تلگرامی ساخته نشده است.<br>
-            از دکمه <b>ساخت پروکسی</b> استفاده کنید.
-          </div>`;
-        return;
-    }
-
-    grid.innerHTML = "";
-    for (const p of list) {
-        const card = document.createElement("div");
-        card.className = "tg-card" + (p.active ? "" : " off");
-        const status = p.active
-            ? '<span class="tg-badge on">فعال</span>'
-            : '<span class="tg-badge off">خاموش</span>';
-        card.innerHTML = `
-          <div class="tg-card-top">
-            <div>
-              <div class="tg-card-name">${escapeHtml(p.label || "بدون نام")}</div>
-              <div class="tg-card-meta">${escapeHtml(p.server)}:${p.port} · ${escapeHtml(p.mode || "ee")}</div>
-            </div>
-            ${status}
-          </div>
-          <div class="tg-link-box" title="${escapeHtml(p.tg_link)}">${escapeHtml(p.tg_link)}</div>
-          <div class="tg-actions">
-            <button class="action primary" data-act="copy">کپی لینک</button>
-            <button class="action" data-act="toggle">${p.active ? "خاموش" : "فعال"}</button>
-            <button class="action danger" data-act="del">حذف</button>
-          </div>
-        `;
-        card.querySelectorAll("button[data-act]").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-                const act = btn.dataset.act;
-                if (act === "copy") {
-                    await copyText(p.tg_link);
-                    return;
-                }
-                btn.disabled = true;
-                try {
-                    if (act === "toggle") {
-                        await api("/api/telegram-proxies/" + p.id + "/toggle", { method: "POST" });
-                        await refreshTgProxies();
-                    } else if (act === "del") {
-                        if (!confirm("این پروکسی حذف شود؟")) return;
-                        await api("/api/telegram-proxies/" + p.id, { method: "DELETE" });
-                        showToast("حذف شد");
-                        await refreshTgProxies();
-                    }
-                } finally {
-                    btn.disabled = false;
-                }
-            });
-        });
-        grid.appendChild(card);
-    }
-}
-
 async function createAuto(){
 
     closeAutoModal();
@@ -8716,6 +8153,24 @@ async function createAuto(){
 
 }
 
+
+function applyBestManualSettings(){
+    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v};
+    set("manualName","premium");
+    set("manualProtocol","vless-ws");
+    set("manualVolume","100");
+    set("manualVolumeUnit","GB");
+    set("manualDays","0");
+    set("manualIpLimit","0");
+    set("manualConnections","0");
+    set("manualSpeed","0");
+    set("manualFingerprint","chrome");
+    set("manualFragment","off");
+    set("manualPort","443");
+    set("manualAlpn","http/1.1");
+    set("manualNote","بهترین تنظیمات — ۱۰۰ گیگ");
+    showToast("بهترین تنظیمات اعمال شد");
+}
 
 async function createManual(){
 
@@ -8821,6 +8276,11 @@ async function createManual(){
                     .value
                 || 443
             ),
+
+        clean_ip:
+            (document.getElementById("manualCleanIp")||{}).value
+                ? document.getElementById("manualCleanIp").value.trim()
+                : "",
 
         alpn:
             document
