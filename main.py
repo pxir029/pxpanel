@@ -3968,11 +3968,11 @@ tailwind.config = {{
       }},
       colors: {{
         dark: {{
-          950: '#05060a',
-          900: '#0a0c12',
-          800: '#11141c',
-          700: '#1a1e2a',
-          600: '#252a38'
+          950: '#06070c',
+          900: '#0c0e15',
+          800: '#13161f',
+          700: '#1c202c',
+          600: '#272c3a'
         }}
       }}
     }}
@@ -3986,17 +3986,17 @@ tailwind.config = {{
 </head>
 <body class="bg-dark-950 text-slate-100 min-h-screen p-4 md:p-7">
   <div class="max-w-3xl mx-auto">
-    <div class="bg-dark-900/80 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl">
+    <div class="bg-dark-900/90 border border-slate-700/40 rounded-3xl overflow-hidden backdrop-blur-xl">
 
       <!-- Hero -->
-      <div class="px-6 pt-6 pb-5 border-b border-white/5">
+      <div class="px-6 pt-6 pb-5 border-b border-slate-700/30">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center gap-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-400/25 flex items-center justify-center text-blue-300 font-black text-sm">
+            <div class="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-300 font-black text-sm">
               PX
             </div>
             <div>
-              <h1 class="text-xl font-black tracking-tight">{escape_html(snapshot.get("label","PXpanel"))}</h1>
+              <h1 class="text-xl font-black tracking-tight text-slate-50">{escape_html(snapshot.get("label","PXpanel"))}</h1>
               <p class="text-[11px] text-slate-400 mt-1 break-all">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</p>
             </div>
           </div>
@@ -4006,30 +4006,30 @@ tailwind.config = {{
           </div>
         </div>
 
-        <div class="mt-5 flex gap-3 items-start p-3.5 rounded-2xl border border-violet-400/20 bg-gradient-to-l from-violet-500/10 to-blue-500/5">
-          <div class="w-7 h-7 shrink-0 rounded-lg bg-violet-500/15 border border-violet-400/20 flex items-center justify-center text-violet-300 text-xs font-bold">!</div>
-          <div class="text-xs text-slate-300/80 leading-7">
-            <strong class="text-violet-200">اطلاعیه اتصال</strong><br>
+        <div class="mt-5 flex gap-3 items-start p-3.5 rounded-2xl border border-indigo-400/20 bg-gradient-to-l from-indigo-500/10 via-sky-500/5 to-transparent">
+          <div class="w-7 h-7 shrink-0 rounded-lg bg-indigo-500/20 border border-indigo-400/25 flex items-center justify-center text-indigo-300 text-xs font-bold">!</div>
+          <div class="text-xs text-slate-300/90 leading-7">
+            <strong class="text-indigo-200">اطلاعیه اتصال</strong><br>
             لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید.
-            <strong class="text-violet-200">کانال تلگرام: logic_sec</strong>
+            <strong class="text-indigo-200">کانال تلگرام: logic_sec</strong>
           </div>
         </div>
       </div>
 
       <!-- Dashboard -->
       <div class="grid grid-cols-1 md:grid-cols-[1.4fr_0.6fr] gap-3.5 p-5 pb-2">
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
           <div class="text-[10px] font-extrabold tracking-widest text-slate-500 uppercase">Traffic Overview</div>
-          <div class="text-[15px] font-black mt-1">مصرف سرویس</div>
+          <div class="text-[15px] font-black mt-1 text-slate-100">مصرف سرویس</div>
           <div class="flex items-end justify-between gap-3 mt-4">
-            <div class="text-2xl font-black tracking-tight">
+            <div class="text-2xl font-black tracking-tight text-slate-50">
               {escape_html(fmt_bytes(used))}
               <span class="text-sm text-slate-400 font-semibold">/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
             </div>
-            <div class="text-sm font-black text-emerald-300">{usage_percent}%</div>
+            <div class="text-sm font-black text-teal-300">{usage_percent}%</div>
           </div>
-          <div class="h-2.5 mt-3.5 rounded-full bg-white/5 border border-white/5 overflow-hidden">
-            <div class="h-full rounded-full bg-gradient-to-l from-amber-400 to-emerald-400" style="width:{usage_percent}%"></div>
+          <div class="h-2.5 mt-3.5 rounded-full bg-slate-700/60 border border-slate-600/30 overflow-hidden">
+            <div class="h-full rounded-full bg-gradient-to-l from-amber-400 via-teal-400 to-emerald-400" style="width:{usage_percent}%"></div>
           </div>
           <div class="flex justify-between gap-2 mt-3 text-[11px] text-slate-400">
             <span>باقی‌مانده: {escape_html(remaining_value)}</span>
@@ -4037,24 +4037,24 @@ tailwind.config = {{
           </div>
         </div>
 
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
           <div class="text-[10px] font-extrabold tracking-widest text-slate-500 uppercase mb-1">Service</div>
-          <div class="divide-y divide-white/5">
+          <div class="divide-y divide-slate-700/40">
             <div class="flex items-center justify-between py-2.5">
               <span class="text-[11px] text-slate-400">انقضا</span>
-              <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
+              <span class="text-xs font-extrabold text-slate-200">{escape_html(expiry_display)}</span>
             </div>
             <div class="flex items-center justify-between py-2.5">
               <span class="text-[11px] text-slate-400">IP Limit</span>
-              <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
+              <span class="text-xs font-extrabold text-slate-200">{escape_html(ip_limit)}</span>
             </div>
             <div class="flex items-center justify-between py-2.5">
               <span class="text-[11px] text-slate-400">Connection</span>
-              <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
+              <span class="text-xs font-extrabold text-slate-200">{escape_html(connection_limit)}</span>
             </div>
             <div class="flex items-center justify-between py-2.5">
               <span class="text-[11px] text-slate-400">Speed</span>
-              <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
+              <span class="text-xs font-extrabold text-slate-200">{escape_html(speed_limit)}</span>
             </div>
           </div>
         </div>
@@ -4062,25 +4062,25 @@ tailwind.config = {{
 
       <!-- Stats -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 px-5 pt-2 pb-2">
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
           <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 mb-2.5"></div>
           <div class="text-[11px] text-slate-400">مصرف فعلی</div>
           <div class="mt-1.5 text-sm font-black text-emerald-400 break-words">{escape_html(fmt_bytes(used))}</div>
         </div>
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
           <div class="w-2.5 h-2.5 rounded-full bg-amber-400 mb-2.5"></div>
           <div class="text-[11px] text-slate-400">باقی‌مانده</div>
           <div class="mt-1.5 text-sm font-black text-amber-400 break-words">{escape_html(remaining_value)}</div>
         </div>
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
-          <div class="w-2.5 h-2.5 rounded-full bg-blue-400 mb-2.5"></div>
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
+          <div class="w-2.5 h-2.5 rounded-full bg-sky-400 mb-2.5"></div>
           <div class="text-[11px] text-slate-400">اتصالات فعال</div>
-          <div class="mt-1.5 text-sm font-black text-blue-400 break-words">{len(unique_ips_for_uuid(uid))}</div>
+          <div class="mt-1.5 text-sm font-black text-sky-400 break-words">{len(unique_ips_for_uuid(uid))}</div>
         </div>
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
-          <div class="w-2.5 h-2.5 rounded-full bg-violet-400 mb-2.5"></div>
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
+          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 mb-2.5"></div>
           <div class="text-[11px] text-slate-400">زمان باقی‌مانده</div>
-          <div class="mt-1.5 text-sm font-black text-violet-400 break-words">{escape_html(expiry_remaining)}</div>
+          <div class="mt-1.5 text-sm font-black text-indigo-400 break-words">{escape_html(expiry_remaining)}</div>
         </div>
       </div>
 
@@ -4088,78 +4088,78 @@ tailwind.config = {{
       <div class="px-5 pb-6 space-y-3.5">
 
         <!-- Technical Details -->
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
           <div class="flex items-end justify-between gap-3 mb-1">
-            <div class="text-[15px] font-black">جزئیات فنی</div>
+            <div class="text-[15px] font-black text-slate-100">جزئیات فنی</div>
             <div class="text-[11px] text-slate-400">Configuration Details</div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3.5">
-            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
               <div class="text-[11px] text-slate-400">Protocol</div>
-              <div class="mt-1.5 text-xs font-bold text-violet-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("protocol","vless-ws"))}</div>
+              <div class="mt-1.5 text-xs font-bold text-indigo-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("protocol","vless-ws"))}</div>
             </div>
-            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
               <div class="text-[11px] text-slate-400">Fingerprint</div>
-              <div class="mt-1.5 text-xs font-bold text-violet-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("fingerprint","chrome"))}</div>
+              <div class="mt-1.5 text-xs font-bold text-indigo-300 font-mono dir-ltr text-left">{escape_html(snapshot.get("fingerprint","chrome"))}</div>
             </div>
-            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
               <div class="text-[11px] text-slate-400">IP Limit</div>
-              <div class="mt-1.5 text-xs font-bold">{escape_html(ip_limit)}</div>
+              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(ip_limit)}</div>
             </div>
-            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
               <div class="text-[11px] text-slate-400">Connection Limit</div>
-              <div class="mt-1.5 text-xs font-bold">{escape_html(connection_limit)}</div>
+              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(connection_limit)}</div>
             </div>
-            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
               <div class="text-[11px] text-slate-400">Speed Limit</div>
-              <div class="mt-1.5 text-xs font-bold">{escape_html(speed_limit)}</div>
+              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(speed_limit)}</div>
             </div>
-            <div class="p-3.5 rounded-xl border border-white/5 bg-black/20">
+            <div class="p-3.5 rounded-xl border border-slate-700/40 bg-dark-950/50">
               <div class="text-[11px] text-slate-400">تاریخ انقضا</div>
-              <div class="mt-1.5 text-xs font-bold">{escape_html(expiry_display)}</div>
+              <div class="mt-1.5 text-xs font-bold text-slate-200">{escape_html(expiry_display)}</div>
             </div>
           </div>
         </div>
 
-        <!-- Service Links (Professional + Copy) -->
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+        <!-- Service Links -->
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
           <div class="flex items-end justify-between gap-3 mb-1">
-            <div class="text-[15px] font-black">لینک‌های سرویس</div>
+            <div class="text-[15px] font-black text-slate-100">لینک‌های سرویس</div>
             <div class="text-[11px] text-slate-400">Copy / Import</div>
           </div>
 
           <div class="mt-4 space-y-3">
             <!-- VLESS -->
-            <div class="group flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-white/8 bg-black/25 hover:bg-white/[0.04] hover:border-violet-400/25 transition-colors duration-200">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-slate-700/50 bg-dark-950/40 hover:bg-indigo-500/5 hover:border-indigo-400/30 transition-colors duration-200">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1.5">
-                  <span class="text-[10px] font-extrabold tracking-wide text-violet-300/90 uppercase">VLESS</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-300/80 font-bold">Direct</span>
+                  <span class="text-[10px] font-extrabold tracking-wide text-indigo-300 uppercase">VLESS</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 font-bold">Direct</span>
                 </div>
-                <div id="vless-url" class="font-mono text-[11px] text-violet-200/90 break-all leading-relaxed dir-ltr text-left select-all">
+                <div id="vless-url" class="font-mono text-[11px] text-indigo-200/90 break-all leading-relaxed dir-ltr text-left select-all">
                   {escape_html(vless_url)}
                 </div>
               </div>
               <button type="button" onclick="copyText('vless-url', this)"
-                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-400/25 text-violet-200 text-xs font-bold hover:bg-violet-500/25 hover:border-violet-400/40 active:scale-[0.98] transition-all duration-150">
+                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-400/30 text-indigo-200 text-xs font-bold hover:bg-indigo-500/25 hover:border-indigo-400/50 active:scale-[0.98] transition-all duration-150">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 <span class="copy-label">کپی</span>
               </button>
             </div>
 
             <!-- SUBSCRIPTION -->
-            <div class="group flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-white/8 bg-black/25 hover:bg-white/[0.04] hover:border-blue-400/25 transition-colors duration-200">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border border-slate-700/50 bg-dark-950/40 hover:bg-sky-500/5 hover:border-sky-400/30 transition-colors duration-200">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1.5">
-                  <span class="text-[10px] font-extrabold tracking-wide text-blue-300/90 uppercase">Subscription</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-300/80 font-bold">SUB</span>
+                  <span class="text-[10px] font-extrabold tracking-wide text-sky-300 uppercase">Subscription</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-300 font-bold">SUB</span>
                 </div>
-                <div id="sub-url" class="font-mono text-[11px] text-blue-200/90 break-all leading-relaxed dir-ltr text-left select-all">
+                <div id="sub-url" class="font-mono text-[11px] text-sky-200/90 break-all leading-relaxed dir-ltr text-left select-all">
                   {escape_html(sub_url)}
                 </div>
               </div>
               <button type="button" onclick="copyText('sub-url', this)"
-                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-200 text-xs font-bold hover:bg-blue-500/25 hover:border-blue-400/40 active:scale-[0.98] transition-all duration-150">
+                class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500/15 border border-sky-400/30 text-sky-200 text-xs font-bold hover:bg-sky-500/25 hover:border-sky-400/50 active:scale-[0.98] transition-all duration-150">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 <span class="copy-label">کپی</span>
               </button>
@@ -4168,33 +4168,33 @@ tailwind.config = {{
         </div>
 
         <!-- Downloads -->
-        <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+        <div class="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-5">
           <div class="flex items-end justify-between gap-3 mb-1">
-            <div class="text-[15px] font-black">دانلود برنامه‌ها</div>
+            <div class="text-[15px] font-black text-slate-100">دانلود برنامه‌ها</div>
             <div class="text-[11px] text-slate-400">Official Releases</div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3.5">
             <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
-              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-400/30 transition-colors duration-200 no-underline text-white">
-              <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center text-blue-300 text-xs font-black">NG</div>
+              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-slate-700/40 bg-dark-950/30 hover:bg-sky-500/10 hover:border-sky-400/35 transition-colors duration-200 no-underline text-white">
+              <div class="w-9 h-9 shrink-0 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-300 text-xs font-black">NG</div>
               <div>
-                <strong class="block text-xs font-extrabold">v2rayNG</strong>
+                <strong class="block text-xs font-extrabold text-slate-100">v2rayNG</strong>
                 <span class="block mt-0.5 text-[10px] text-slate-400">Android</span>
               </div>
             </a>
             <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
-              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-400/30 transition-colors duration-200 no-underline text-white">
-              <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center text-blue-300 text-xs font-black">N</div>
+              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-slate-700/40 bg-dark-950/30 hover:bg-sky-500/10 hover:border-sky-400/35 transition-colors duration-200 no-underline text-white">
+              <div class="w-9 h-9 shrink-0 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-300 text-xs font-black">N</div>
               <div>
-                <strong class="block text-xs font-extrabold">v2rayN</strong>
+                <strong class="block text-xs font-extrabold text-slate-100">v2rayN</strong>
                 <span class="block mt-0.5 text-[10px] text-slate-400">Windows / macOS / Linux</span>
               </div>
             </a>
             <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
-              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-400/30 transition-colors duration-200 no-underline text-white">
-              <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center text-blue-300 text-xs font-black">H</div>
+              class="flex items-center gap-3 min-h-[72px] p-3.5 rounded-2xl border border-slate-700/40 bg-dark-950/30 hover:bg-sky-500/10 hover:border-sky-400/35 transition-colors duration-200 no-underline text-white">
+              <div class="w-9 h-9 shrink-0 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-300 text-xs font-black">H</div>
               <div>
-                <strong class="block text-xs font-extrabold">Hiddify</strong>
+                <strong class="block text-xs font-extrabold text-slate-100">Hiddify</strong>
                 <span class="block mt-0.5 text-[10px] text-slate-400">Android / Windows / macOS / Linux</span>
               </div>
             </a>
@@ -4202,16 +4202,16 @@ tailwind.config = {{
         </div>
 
         <!-- Channel -->
-        <div class="mt-1 py-3.5 px-4 text-center rounded-xl border border-emerald-400/15 bg-emerald-500/5 text-xs text-slate-400">
-          پشتیبانی و اطلاعیه‌ها · <b class="text-emerald-300">کانال تلگرام: logic_sec</b>
+        <div class="mt-1 py-3.5 px-4 text-center rounded-xl border border-teal-400/20 bg-teal-500/5 text-xs text-slate-400">
+          پشتیبانی و اطلاعیه‌ها · <b class="text-teal-300">کانال تلگرام: logic_sec</b>
         </div>
       </div>
     </div>
   </div>
 
   <style>
-    .status.good {{ color: #6ee7b7; border: 1px solid rgba(52,211,153,.25); background: rgba(52,211,153,.1); }}
-    .status.bad {{ color: #fda4af; border: 1px solid rgba(251,113,133,.25); background: rgba(251,113,133,.1); }}
+    .status.good {{ color: #5eead4; border: 1px solid rgba(45,212,191,.3); background: rgba(45,212,191,.1); }}
+    .status.bad {{ color: #fda4af; border: 1px solid rgba(251,113,133,.3); background: rgba(251,113,133,.1); }}
   </style>
 
   <script>
@@ -4223,13 +4223,12 @@ tailwind.config = {{
         const label = btn.querySelector('.copy-label');
         const original = label.textContent;
         label.textContent = 'کپی شد!';
-        btn.classList.add('!bg-emerald-500/20', '!border-emerald-400/40', '!text-emerald-200');
+        btn.classList.add('!bg-teal-500/20', '!border-teal-400/40', '!text-teal-200');
         setTimeout(() => {{
           label.textContent = original;
-          btn.classList.remove('!bg-emerald-500/20', '!border-emerald-400/40', '!text-emerald-200');
+          btn.classList.remove('!bg-teal-500/20', '!border-teal-400/40', '!text-teal-200');
         }}, 1800);
       }}).catch(() => {{
-        // fallback
         const range = document.createRange();
         range.selectNodeContents(el);
         const sel = window.getSelection();
