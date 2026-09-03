@@ -191,8 +191,10 @@ CONFIG = {
 
 LINKS: dict = {}
 SUBS: dict = {}
+TG_PROXIES: dict = {}
 SESSIONS: dict = {}
 connections: dict = {}
+TG_PROXIES_LOCK = asyncio.Lock()
 
 stats = {
     "total_bytes": 0,
@@ -954,6 +956,7 @@ def generate_vless_link(
         for key, value in params.items()
     )
 
+    # address = IP تمیز برای اتصال؛ host/sni روی دامنه واقعی پنل می‌ماند
     connect_host = (address or host or "").strip() or host
 
     return (
@@ -966,62 +969,22 @@ def generate_vless_link(
     )
 
 
-def parse_clean_ips(value) -> list:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        raw = chr(10).join(str(x) for x in value)
-    else:
-        raw = str(value).replace(",", chr(10))
-    seen = set()
-    result = []
-    for line in raw.splitlines():
-        ip = line.strip()[:120]
-        if ip and ip not in seen:
-            seen.add(ip)
-            result.append(ip)
-    return result
-
-
-def link_clean_ip_list(link: dict) -> list:
-    raw_list = link.get("clean_ips")
-    if isinstance(raw_list, list) and raw_list:
-        out = []
-        seen = set()
-        for item in raw_list:
-            ip = str(item or "").strip()[:120]
-            if ip and ip not in seen:
-                seen.add(ip)
-                out.append(ip)
-        if out:
-            return out
-    single = (link.get("clean_ip") or "").strip()
-    if single:
-        parsed = parse_clean_ips(single)
-        return parsed if parsed else [single]
-    return []
-
-
 def vless_link_for_link(
     link: dict,
     uid: str,
     host: str,
-    clean_ip: str | None = None,
 ):
-    if clean_ip is None:
-        ips = link_clean_ip_list(link)
-        if len(ips) == 1:
-            clean_ip = ips[0]
-        else:
-            clean_ip = ""
-    clean_ip = (clean_ip or "").strip()
+    clean_ip = (
+        link.get("clean_ip")
+        or ""
+    ).strip()
+
     return generate_vless_link(
         uid,
         host,
         remark=(
             f"pxpanel-"
             f"{link.get('label', '')}"
-            + (f"-{clean_ip}" if clean_ip else "")
         ),
         protocol=link.get(
             "protocol",
@@ -1040,13 +1003,6 @@ def vless_link_for_link(
         ),
         address=clean_ip or None,
     )
-
-
-def vless_links_for_link(link: dict, uid: str, host: str) -> list:
-    ips = link_clean_ip_list(link)
-    if not ips:
-        return [vless_link_for_link(link, uid, host, clean_ip="")]
-    return [vless_link_for_link(link, uid, host, clean_ip=ip) for ip in ips]
 
 
 def get_link_info(
@@ -1127,15 +1083,15 @@ def get_link_info(
             "note",
             "",
         ),
-        "clean_ip": link.get("clean_ip", ""),
-        "clean_ips": link_clean_ip_list(link),
-        "multi_ip": len(link_clean_ip_list(link)) > 1,
-        "vless": (
-            ""
-            if len(link_clean_ip_list(link)) > 1
-            else vless_link_for_link(link, uid, host)
+        "clean_ip": link.get(
+            "clean_ip",
+            "",
         ),
-        "vless_list": vless_links_for_link(link, uid, host),
+        "vless": vless_link_for_link(
+            link,
+            uid,
+            host,
+        ),
         "sub": (
             f"https://{host}"
             f"/sub/{uid}"
@@ -1185,6 +1141,13 @@ async def load_state():
         SUBS.update(
             data.get(
                 "subs",
+                {},
+            )
+        )
+
+        TG_PROXIES.update(
+            data.get(
+                "tg_proxies",
                 {},
             )
         )
@@ -1247,19 +1210,15 @@ async def load_state():
             )
 
             link.setdefault(
-                "clean_ips",
-                [],
-            )
-
-            link.setdefault(
                 "used_bytes",
                 0,
             )
 
         logger.info(
-            "State loaded: %d links / %d subscriptions",
+            "State loaded: %d links / %d subscriptions / %d tg-proxies",
             len(LINKS),
             len(SUBS),
+            len(TG_PROXIES),
         )
 
     except Exception as exc:
@@ -1287,6 +1246,9 @@ async def save_state():
 
                 "subs":
                     dict(SUBS),
+
+                "tg_proxies":
+                    dict(TG_PROXIES),
 
                 "password_hash":
                     AUTH[
@@ -1429,6 +1391,25 @@ async def ensure_default_link():
 # LINK MANAGEMENT
 # ============================================================
 
+
+def parse_clean_ips(value) -> list[str]:
+    """چند ایپی تمیز؛ هر خط یا جدا با کاما"""
+    if value is None:
+        return []
+    raw = str(value).replace(",", "\n")
+    seen = set()
+    result = []
+    for line in raw.splitlines():
+        ip = line.strip()[:120]
+        if not ip:
+            continue
+        if ip in seen:
+            continue
+        seen.add(ip)
+        result.append(ip)
+    return result
+
+
 async def make_link(
     label: str = "لینک جدید",
     limit_bytes: int = 0,
@@ -1444,7 +1425,6 @@ async def make_link(
     connection_limit: int = 0,
     fragment: str = "off",
     clean_ip: str = "",
-    clean_ips: list | None = None,
 ):
 
     if protocol not in PROTOCOLS:
@@ -1545,15 +1525,9 @@ async def make_link(
 
         "clean_ip":
             (
-                (clean_ips[0] if clean_ips else None)
-                or clean_ip
+                clean_ip
                 or ""
             ).strip()[:120],
-
-        "clean_ips":
-            list(clean_ips)
-            if clean_ips
-            else (parse_clean_ips(clean_ip) if clean_ip else []),
     }
 
     async with LINKS_LOCK:
@@ -2163,20 +2137,19 @@ h1{
 
 .alert-red{
     margin-top:16px;
-    padding:14px 15px;
+    padding:13px 14px;
     border-radius:14px;
-    background:rgba(239,68,68,.10);
-    border:1px solid rgba(248,113,113,.40);
+    background:rgba(239,68,68,.12);
+    border:1px solid rgba(239,68,68,.35);
     color:#fecaca;
     font-size:11.5px;
     line-height:1.9;
 }
 .alert-red strong{
     display:block;
-    margin-bottom:6px;
+    margin-bottom:4px;
     color:#fca5a5;
-    font-size:13px;
-    font-weight:800;
+    font-size:12.5px;
 }
 </style>
 </head>
@@ -2218,9 +2191,11 @@ PXpanel
 
 <div class="alert-red">
 <strong>اطلاعیه مهم</strong>
-اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید (پینگ بالاتر).
+اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
+<span style="opacity:.85">(پینگ بالاتر)</span>.
 <br>
-اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید (پینگ بهتر).
+اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
+<span style="opacity:.85">(پینگ بهتر)</span>.
 </div>
 
 <div class="path">
@@ -2505,20 +2480,19 @@ button{
 
 .alert-red{
     margin-top:16px;
-    padding:14px 15px;
+    padding:13px 14px;
     border-radius:14px;
-    background:rgba(239,68,68,.10);
-    border:1px solid rgba(248,113,113,.40);
+    background:rgba(239,68,68,.12);
+    border:1px solid rgba(239,68,68,.35);
     color:#fecaca;
     font-size:11.5px;
     line-height:1.9;
 }
 .alert-red strong{
     display:block;
-    margin-bottom:6px;
+    margin-bottom:4px;
     color:#fca5a5;
-    font-size:13px;
-    font-weight:800;
+    font-size:12.5px;
 }
 
 </style>
@@ -2547,9 +2521,11 @@ P
 
 <div class="alert-red">
 <strong>اطلاعیه مهم</strong>
-اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید (پینگ بالاتر).
+اگر می‌خواهید از وب‌سایت‌های هوش مصنوعی استفاده کنید، در ریلوی کشور را روی <b>آمریکا (USA)</b> تنظیم کنید
+<span style="opacity:.85">(پینگ بالاتر)</span>.
 <br>
-اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید (پینگ بهتر).
+اگر نیاز زیادی ندارید، روی <b>هلند (Netherlands)</b> قرار دهید
+<span style="opacity:.85">(پینگ بهتر)</span>.
 </div>
 
 <form
@@ -3175,52 +3151,78 @@ async def create_link_api(
     if fragment not in allowed_fragments:
         fragment = "off"
 
-    clean_ips = parse_clean_ips(body.get("clean_ip", ""))
-    base_label = (body.get("label") or "").strip() or auto_config_name()
-    label = (
-        f"{base_label}-x{len(clean_ips)}"[:60]
-        if len(clean_ips) > 1
-        else base_label
+    clean_ips = parse_clean_ips(
+        body.get(
+            "clean_ip",
+            "",
+        )
     )
 
-    uid, link = await make_link(
-        label=label,
-        limit_bytes=limit_bytes,
-        expires_at=expires_at,
-        note=body.get(
-            "note",
-            "",
-        ),
-        sub_id=body.get(
-            "sub_id"
-        ),
-        protocol=protocol,
-        fingerprint=fingerprint,
-        alpn=body.get(
-            "alpn",
-            DEFAULT_ALPN_BY_PROTOCOL.get(
-                protocol,
-                "http/1.1",
-            ),
-        ),
-        port=port,
-        ip_limit=ip_limit,
-        speed_limit_bytes=speed_bytes,
-        connection_limit=connection_limit,
-        fragment=fragment,
-        clean_ip=clean_ips[0] if len(clean_ips) == 1 else "",
-        clean_ips=clean_ips,
-    )
+    if not clean_ips:
+        clean_ips = [""]
 
     host = get_host(request)
+    base_label = (
+        body.get(
+            "label",
+            "",
+        )
+        or ""
+    ).strip()
+
+    created = []
+
+    for index, clean_ip in enumerate(clean_ips):
+        if len(clean_ips) == 1:
+            label = base_label or auto_config_name()
+        else:
+            suffix = clean_ip or str(index + 1)
+            if base_label:
+                label = f"{base_label}-{suffix}"[:60]
+            else:
+                label = f"{auto_config_name()}-{suffix}"[:60]
+
+        uid, link = await make_link(
+            label=label,
+            limit_bytes=limit_bytes,
+            expires_at=expires_at,
+            note=body.get(
+                "note",
+                "",
+            ),
+            sub_id=body.get(
+                "sub_id"
+            ),
+            protocol=protocol,
+            fingerprint=fingerprint,
+            alpn=body.get(
+                "alpn",
+                DEFAULT_ALPN_BY_PROTOCOL.get(
+                    protocol,
+                    "http/1.1",
+                ),
+            ),
+            port=port,
+            ip_limit=ip_limit,
+            speed_limit_bytes=speed_bytes,
+            connection_limit=connection_limit,
+            fragment=fragment,
+            clean_ip=clean_ip,
+        )
+
+        created.append(
+            get_link_info(
+                link,
+                uid,
+                host,
+            )
+        )
 
     result = {
-        **get_link_info(
-            link,
-            uid,
-            host,
-        ),
+        **created[0],
         "ok": True,
+        "created_count": len(created),
+        "items": created,
     }
 
     return result
@@ -3247,56 +3249,69 @@ async def create_auto_link(
         except Exception:
             body = {}
 
-        clean_ips = parse_clean_ips(body.get("clean_ip"))
-        label = auto_config_name()
-        if len(clean_ips) > 1:
-            label = f"{label}-x{len(clean_ips)}"[:60]
-
-        uid, link = await make_link(
-            label=label,
-
-            # Unlimited
-            limit_bytes=0,
-            expires_at=None,
-            ip_limit=0,
-            speed_limit_bytes=0,
-            connection_limit=0,
-
-            note=(
-                "Auto generated by "
-                "PXpanel"
-            ),
-
-            # IMPORTANT:
-            # Keep working protocol.
-            protocol="vless-ws",
-
-            fingerprint="chrome",
-
-            alpn="http/1.1",
-
-            port=443,
-
-            fragment="off",
-
-            clean_ip=clean_ips[0] if len(clean_ips) == 1 else "",
-            clean_ips=clean_ips,
+        clean_ips = parse_clean_ips(
+            body.get("clean_ip")
         )
 
+        if not clean_ips:
+            clean_ips = [""]
+
+        created = []
+
+        for index, clean_ip in enumerate(clean_ips):
+            label = auto_config_name()
+            if clean_ip:
+                label = f"{label}-{clean_ip}"[:60]
+
+            uid, link = await make_link(
+                label=label,
+
+                # Unlimited
+                limit_bytes=0,
+                expires_at=None,
+                ip_limit=0,
+                speed_limit_bytes=0,
+                connection_limit=0,
+
+                note=(
+                    "Auto generated by "
+                    "PXpanel"
+                ),
+
+                # IMPORTANT:
+                # Keep working protocol.
+                protocol="vless-ws",
+
+                fingerprint="chrome",
+
+                alpn="http/1.1",
+
+                port=443,
+
+                fragment="off",
+
+                clean_ip=clean_ip,
+            )
+
+            created.append(
+                get_link_info(
+                    link,
+                    uid,
+                    host,
+                )
+            )
+
         result = {
-            **get_link_info(
-                link,
-                uid,
-                host,
-            ),
+            **created[0],
             "ok": True,
+            "created_count": len(created),
+            "items": created,
         }
 
         log_activity(
             "link",
             (
-                f"کانفیگ خودکار "
-                f"«{link['label']}» ساخته شد"
+                f"{len(created)} کانفیگ خودکار ساخته شد"
             ),
             "ok",
         )
@@ -3957,7 +3972,7 @@ async def subscription_single(
 
     host = get_host(request)
 
-    lines = vless_links_for_link(
+    vless = vless_link_for_link(
         link,
         uuid,
         host,
@@ -3966,7 +3981,7 @@ async def subscription_single(
     content = (
         base64
         .b64encode(
-            chr(10).join(lines).encode()
+            vless.encode()
         )
         .decode()
     )
@@ -4005,10 +4020,18 @@ async def subscription_all(
 
     async with LINKS_LOCK:
 
-        lines = []
-        for uid, link in LINKS.items():
-            if is_link_allowed(link):
-                lines.extend(vless_links_for_link(link, uid, host))
+        lines = [
+            vless_link_for_link(
+                link,
+                uid,
+                host,
+            )
+
+            for uid, link
+            in LINKS.items()
+
+            if is_link_allowed(link)
+        ]
 
     content = (
         base64
@@ -4045,10 +4068,7 @@ async def info_page(
         snapshot = dict(link)
 
     host = get_host(request)
-    clean_ips_list = link_clean_ip_list(snapshot)
-    multi_ip = len(clean_ips_list) > 1
-    vless_list = vless_links_for_link(snapshot, uid, host)
-    vless_url = "" if multi_ip else (vless_list[0] if vless_list else "")
+    vless_url = vless_link_for_link(snapshot, uid, host)
     sub_url = f"https://{host}/sub/{uid}"
     used = int(snapshot.get("used_bytes", 0) or 0)
     limit = int(snapshot.get("limit_bytes", 0) or 0)
@@ -4087,32 +4107,7 @@ async def info_page(
     connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
     speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
 
-    if multi_ip:
-        vless_cards = "".join(
-            f'<div class="link-card"><div class="link-main"><div class="link-name">VLESS · {escape_html(ip)}</div><div class="link-url">{escape_html(url)}</div></div><div class="copy-hint">VLESS</div></div>'
-            for ip, url in zip(clean_ips_list, vless_list)
-        )
-        links_section = (
-            f'<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div>'
-            f'<div class="section-sub">{len(clean_ips_list)} ایپی تمیز · فقط ساب در پنل</div></div>'
-            f'<div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div>'
-            f'<div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div>'
-            f'<div style="margin:12px 0 8px;color:rgba(255,255,255,.5);font-size:12px;line-height:1.8">'
-            f'با افزودن ساب، {len(clean_ips_list)} کانفیگ در برنامه اضافه می‌شود. لینک‌های تکی:</div>'
-            f'{vless_cards}</section>'
-        )
-    else:
-        links_section = (
-            f'<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div>'
-            f'<div class="section-sub">Copy / Import</div></div>'
-            f'<div class="link-card"><div class="link-main"><div class="link-name">VLESS</div>'
-            f'<div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div>'
-            f'<div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div>'
-            f'<div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>'
-        )
-
     info_html = f"""<!DOCTYPE html>
-
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -4215,7 +4210,7 @@ body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;backgrou
 <div class="content">
 <section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
 
-{links_section}
+<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
 
 <section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
 
@@ -5606,17 +5601,206 @@ async def http_proxy(
 
 
 
-_CLEAN_IP_SCANNER_B64 = "aW1wb3J0IGNvbmN1cnJlbnQuZnV0dXJlcwppbXBvcnQgc29ja2V0CmltcG9ydCBzc2wKSVBfVEFSR0VUUyA9IFsKICAgICpbZiI5MS4xOTMuNTkue2l9IiBmb3IgaSBpbiByYW5nZSgxLCAyNTUpXSwKXQpQT1JUUyA9IFs0NDMsIDIwOTYsIDIwODcsIDIwODNdClRJTUVPVVQgPSAxLjUKCmRlZiBjaGVja19pcChpcCwgcG9ydCk6CiAgICBjb250ZXh0ID0gc3NsLmNyZWF0ZV9kZWZhdWx0X2NvbnRleHQoKQogICAgY29udGV4dC5jaGVja19ob3N0bmFtZSA9IEZhbHNlCiAgICBjb250ZXh0LnZlcmlmeV9tb2RlID0gc3NsLkNFUlRfTk9ORQogICAgdHJ5OgogICAgICAgIHdpdGggc29ja2V0LmNyZWF0ZV9jb25uZWN0aW9uKChpcCwgcG9ydCksIHRpbWVvdXQ9VElNRU9VVCkgYXMgc29jazoKICAgICAgICAgICAgd2l0aCBjb250ZXh0LndyYXBfc29ja2V0KHNvY2ssIHNlcnZlcl9ob3N0bmFtZT0iY2xvdWRmbGFyZS5jb20iKToKICAgICAgICAgICAgICAgIHJldHVybiBmIlsrXSBDbGVhbiBJUCBGb3VuZDoge2lwfTp7cG9ydH0iCiAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgIHJldHVybiBOb25lCgpkZWYgbWFpbigpOgogICAgcHJpbnQoZiJTY2FubmluZyB7bGVuKElQX1RBUkdFVFMpfSBJUHMgb24gcG9ydHMge1BPUlRTfS4uLiIpCiAgICB3b3JraW5nX2lwcyA9IFtdCiAgICB3aXRoIGNvbmN1cnJlbnQuZnV0dXJlcy5UaHJlYWRQb29sRXhlY3V0b3IobWF4X3dvcmtlcnM9MTUwKSBhcyBleGVjdXRvcjoKICAgICAgICBmdXR1cmVzID0gW2V4ZWN1dG9yLnN1Ym1pdChjaGVja19pcCwgaXAsIHBvcnQpIGZvciBpcCBpbiBJUF9UQVJHRVRTIGZvciBwb3J0IGluIFBPUlRTXQogICAgICAgIGZvciBmdXR1cmUgaW4gY29uY3VycmVudC5mdXR1cmVzLmFzX2NvbXBsZXRlZChmdXR1cmVzKToKICAgICAgICAgICAgcmVzdWx0ID0gZnV0dXJlLnJlc3VsdCgpCiAgICAgICAgICAgIGlmIHJlc3VsdDoKICAgICAgICAgICAgICAgIHByaW50KHJlc3VsdCkKICAgICAgICAgICAgICAgIHdvcmtpbmdfaXBzLmFwcGVuZChyZXN1bHQpCiAgICB3aXRoIG9wZW4oIndvcmtpbmdfOTFfaXBzLnR4dCIsICJ3IiwgZW5jb2Rpbmc9InV0Zi04IikgYXMgZjoKICAgICAgICBmLndyaXRlKCJcbiIuam9pbih3b3JraW5nX2lwcykpCiAgICBwcmludChmIkRvbmUhIEZvdW5kIHtsZW4od29ya2luZ19pcHMpfSB3b3JraW5nIElQcy4gU2F2ZWQgdG8gd29ya2luZ185MV9pcHMudHh0IikKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBtYWluKCkK"
+# ============================================================
+# TELEGRAM PROXY GENERATOR + MANAGEMENT
+# ============================================================
+# لینک‌ها روی دامنه/هاست واقعی همین پنل ساخته می‌شوند.
+# برای کارکرد واقعی باید سرویس MTProto (مثل mtg) روی همین سرور
+# با همان secretها روی پورت مشخص اجرا شود.
+# ============================================================
 
-@app.get("/download/clean-ip-scanner.py")
-async def download_clean_ip_scanner():
-    import base64 as _b64mod
-    content = _b64mod.b64decode(_CLEAN_IP_SCANNER_B64).decode("utf-8")
-    return Response(
-        content=content,
-        media_type="text/x-python; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="clean_ip_scanner.py"'},
+FAKE_TLS_DOMAINS = (
+    "cloudflare.com",
+    "www.cloudflare.com",
+    "www.google.com",
+    "www.microsoft.com",
+    "www.apple.com",
+    "cdnjs.cloudflare.com",
+    "www.amazon.com",
+    "www.github.com",
+    "www.divar.ir",
+    "www.aparat.com",
+)
+
+
+def build_tg_links(host: str, port: int, secret: str) -> dict:
+    tg_link = (
+        f"tg://proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
     )
+    web_link = (
+        f"https://t.me/proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+    return {
+        "tg_link": tg_link,
+        "web_link": web_link,
+    }
+
+
+def tg_proxy_info(proxy_id: str, proxy: dict, host: str) -> dict:
+    port = int(proxy.get("port") or 443)
+    secret = proxy.get("secret") or ""
+    links = build_tg_links(host, port, secret)
+    return {
+        "id": proxy_id,
+        "label": proxy.get("label") or "",
+        "server": host,
+        "port": port,
+        "secret": secret,
+        "domain": proxy.get("domain") or "",
+        "mode": proxy.get("mode") or "ee",
+        "active": bool(proxy.get("active", True)),
+        "note": proxy.get("note") or "",
+        "created_at": proxy.get("created_at"),
+        "tg_link": links["tg_link"],
+        "web_link": links["web_link"],
+    }
+
+
+@app.post("/api/telegram-proxy")
+async def create_telegram_proxy(
+    request: Request,
+    _=Depends(require_auth),
+):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    host = get_host(request)
+    port = safe_int(body.get("port"), 443, 1, 65535)
+    label = (body.get("label") or "").strip()[:60]
+    note = (body.get("note") or "").strip()[:200]
+    mode = (body.get("mode") or "ee").strip().lower()
+    domain = (body.get("domain") or "").strip().lower()
+
+    if mode not in ("ee", "dd", "plain"):
+        mode = "ee"
+
+    if not domain:
+        domain = secrets.choice(FAKE_TLS_DOMAINS)
+
+    raw_secret = secrets.token_hex(16)
+
+    if mode == "ee":
+        domain_hex = domain.encode("utf-8").hex()
+        secret = f"ee{raw_secret}{domain_hex}"
+    elif mode == "dd":
+        secret = f"dd{raw_secret}"
+    else:
+        secret = raw_secret
+
+    if not label:
+        label = f"tg_{secrets.token_hex(3)}"
+
+    proxy_id = secrets.token_hex(8)
+
+    record = {
+        "label": label,
+        "port": port,
+        "secret": secret,
+        "raw_secret": raw_secret,
+        "domain": domain if mode == "ee" else "",
+        "mode": mode,
+        "note": note,
+        "active": True,
+        "created_at": datetime.now().isoformat(),
+    }
+
+    async with TG_PROXIES_LOCK:
+        TG_PROXIES[proxy_id] = record
+
+    await save_state()
+
+    info = tg_proxy_info(proxy_id, record, host)
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام ساخته شد: {label} → {host}:{port}",
+        "info",
+    )
+
+    return {
+        "ok": True,
+        **info,
+    }
+
+
+@app.get("/api/telegram-proxies")
+async def list_telegram_proxies(
+    request: Request,
+    _=Depends(require_auth),
+):
+    host = get_host(request)
+    result = []
+
+    async with TG_PROXIES_LOCK:
+        items = list(TG_PROXIES.items())
+
+    for proxy_id, proxy in items:
+        result.append(tg_proxy_info(proxy_id, proxy, host))
+
+    result.sort(
+        key=lambda item: item.get("created_at") or "",
+        reverse=True,
+    )
+
+    return {
+        "ok": True,
+        "proxies": result,
+        "count": len(result),
+        "server": host,
+    }
+
+
+@app.delete("/api/telegram-proxies/{proxy_id}")
+async def delete_telegram_proxy(
+    proxy_id: str,
+    _=Depends(require_auth),
+):
+    async with TG_PROXIES_LOCK:
+        if proxy_id not in TG_PROXIES:
+            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
+        label = TG_PROXIES[proxy_id].get("label", proxy_id)
+        TG_PROXIES.pop(proxy_id, None)
+
+    await save_state()
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام حذف شد: {label}",
+        "info",
+    )
+
+    return {"ok": True}
+
+
+@app.post("/api/telegram-proxies/{proxy_id}/toggle")
+async def toggle_telegram_proxy(
+    proxy_id: str,
+    _=Depends(require_auth),
+):
+    async with TG_PROXIES_LOCK:
+        if proxy_id not in TG_PROXIES:
+            raise HTTPException(status_code=404, detail="پروکسی پیدا نشد")
+        current = bool(TG_PROXIES[proxy_id].get("active", True))
+        TG_PROXIES[proxy_id]["active"] = not current
+        active = TG_PROXIES[proxy_id]["active"]
+        label = TG_PROXIES[proxy_id].get("label", proxy_id)
+
+    await save_state()
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام {'فعال' if active else 'غیرفعال'} شد: {label}",
+        "info",
+    )
+
+    return {"ok": True, "active": active}
+
 
 # ============================================================
 # DASHBOARD
@@ -5786,6 +5970,20 @@ body{
 .top-btn.danger{
     color:#fca5a5;
 }
+
+
+.top-btn.tg-proxy{
+    background:linear-gradient(135deg,#0ea5e9,#2563eb);
+    border-color:transparent;
+    color:#fff;
+    font-weight:700;
+}
+.top-btn.tg-proxy:hover{
+    filter:brightness(1.08);
+}
+
+
+
 
 .stats-grid{
     display:grid;
@@ -6461,6 +6659,13 @@ onclick="openAutoModal()"
 </button>
 
 <button
+class="top-btn tg-proxy"
+onclick="createTelegramProxy()"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 5L2 12.5l7 1.5L18 8l-7 7.5 1.5 6.5L21 5Z"/></svg>
+ساخت پروکسی تلگرام
+</button>
+
+<button
 class="top-btn"
 onclick="openManualModal()"
 ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>
@@ -6561,6 +6766,7 @@ class="stat-value"
 </div>
 
 </div>
+
 
 
 <div class="panel">
@@ -7093,19 +7299,16 @@ value="443"
 <div class="field full">
 
 <label>
-ایپی تمیز — هر خط یک IP
+ایپی تمیز
+<span style="opacity:.55;font-weight:500">— هر خط یک IP (Ctrl+Enter خط جدید)</span>
 </label>
 
 <textarea
 id="manualCleanIp"
 rows="4"
-placeholder="هر خط یک ایپی تمیز"
+placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8&#10;خالی = دامنه پنل"
 style="direction:ltr;text-align:left;min-height:96px;resize:vertical"
 ></textarea>
-
-<div style="margin-top:10px">
-<a href="/download/clean-ip-scanner.py" download="clean_ip_scanner.py" class="top-btn" style="text-decoration:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:0;color:#fff;font-weight:700">دانلود برنامه اسکن ایپی تمیز (.py)</a>
-</div>
 
 </div>
 
@@ -7159,6 +7362,100 @@ onclick="createManual()"
 
 </div>
 
+</div>
+
+
+
+
+<!-- ===================================================== -->
+<!-- TELEGRAM CREATE MODAL -->
+<!-- ===================================================== -->
+
+<div id="tgCreateModal" class="modal-backdrop">
+<div class="modal" style="max-width:480px">
+<div class="modal-head">
+<div class="modal-title">ساخت پروکسی تلگرام</div>
+<button class="close" onclick="closeTgCreateModal()">×</button>
+</div>
+
+<div class="form-grid">
+<div class="field">
+<label>نام پروکسی</label>
+<input id="tgCreateName" placeholder="مثلاً Iran-TG-1" />
+</div>
+<div class="field">
+<label>پورت</label>
+<input id="tgCreatePort" type="number" min="1" max="65535" value="443" />
+</div>
+<div class="field">
+<label>حالت Secret</label>
+<select id="tgCreateMode">
+<option value="ee" selected>FakeTLS (ee) — پیشنهادی</option>
+<option value="dd">Secure (dd)</option>
+<option value="plain">Plain</option>
+</select>
+</div>
+<div class="field">
+<label>دامنه FakeTLS (اختیاری)</label>
+<input id="tgCreateDomain" placeholder="خودکار انتخاب می‌شود" style="direction:ltr;text-align:left" />
+</div>
+<div class="field full">
+<label>یادداشت</label>
+<textarea id="tgCreateNote" placeholder="اختیاری"></textarea>
+</div>
+</div>
+
+<div class="modal-actions">
+<button class="modal-btn secondary" onclick="closeTgCreateModal()">انصراف</button>
+<button class="modal-btn primary" onclick="submitTgCreate()">ساخت و نمایش لینک</button>
+</div>
+</div>
+</div>
+
+
+<!-- ===================================================== -->
+<!-- TELEGRAM RESULT MODAL -->
+<!-- ===================================================== -->
+
+<div id="tgProxyModal" class="modal-backdrop">
+<div class="modal" style="max-width:540px">
+<div class="modal-head">
+<div class="modal-title">پروکسی آماده شد</div>
+<button class="close" onclick="closeTgProxyModal()">×</button>
+</div>
+
+<div style="color:rgba(255,255,255,.55);font-size:11px;line-height:1.9;margin-bottom:14px">
+لینک روی دامنه واقعی سرور شما ساخته شده است.
+</div>
+
+<div class="field full" style="margin-bottom:12px">
+<label>لینک مستقیم تلگرام</label>
+<div style="display:flex;gap:8px;align-items:center">
+<input id="tgLinkDirect" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
+<button class="modal-btn primary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkDirect')">کپی</button>
+</div>
+</div>
+
+<div class="field full" style="margin-bottom:12px">
+<label>لینک t.me</label>
+<div style="display:flex;gap:8px;align-items:center">
+<input id="tgLinkWeb" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
+<button class="modal-btn secondary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkWeb')">کپی</button>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+<div class="field"><label>سرور</label><input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field"><label>پورت</label><input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field full"><label>Secret</label><input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+<div class="field full"><label>دامنه / حالت</label><input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" /></div>
+</div>
+
+<div class="modal-actions">
+<button class="modal-btn secondary" onclick="closeTgProxyModal()">بستن</button>
+<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">کپی لینک اصلی</button>
+</div>
+</div>
 </div>
 
 
@@ -7233,10 +7530,15 @@ Port:
 </div>
 
 <div class="field" style="margin-top:14px">
-<label>ایپی تمیز — هر خط یک IP</label>
-<textarea id="autoCleanIp" rows="4" placeholder="هر خط یک ایپی تمیز" style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18);color:#fff;font-family:Vazirmatn,sans-serif;font-size:12px;outline:none;box-sizing:border-box;min-height:96px;resize:vertical"></textarea>
-<div style="margin-top:10px">
-<a href="/download/clean-ip-scanner.py" download="clean_ip_scanner.py" class="top-btn" style="text-decoration:none;display:inline-flex;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:0;color:#fff;font-weight:700">دانلود برنامه اسکن ایپی تمیز (.py)</a>
+<label>ایپی تمیز (اختیاری) — هر خط یک IP</label>
+<textarea
+id="autoCleanIp"
+rows="4"
+placeholder="هر خط یک ایپی تمیز&#10;1.2.3.4&#10;5.6.7.8"
+style="direction:ltr;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18);color:#fff;font-family:Vazirmatn,sans-serif;font-size:12px;outline:none;box-sizing:border-box;min-height:96px;resize:vertical"
+></textarea>
+<div style="margin-top:7px;color:rgba(255,255,255,.38);font-size:10px;line-height:1.7">
+هر خط = یک کانفیگ جدا با همان ایپی تمیز. SNI روی دامنه پنل می‌ماند تا پینگ درست باشد.
 </div>
 </div>
 
@@ -7371,7 +7673,9 @@ onclick="changePassword()"
 <b>نکته:</b> لینک SUB را داخل برنامه Import / Subscription اضافه کنید. برای اتصال مستقیم نیز می‌توانید لینک VLESS را وارد کنید.
 <div class="region-warning">
 <div class="warning-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>هشدار منطقه‌ای اتصال</div>
-⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️
+⚠️ اگر برای هوش مصنوعی استفاده می‌کنید، کشور ریلوی را روی <b>آمریکا (USA)</b> بگذارید (پینگ بالاتر).<br>
+اگر نیاز ندارید، روی <b>هلند (Netherlands)</b> قرار دهید (پینگ بهتر).<br>
+اگر کانفیگ پینگ نداد، دامنه ممکن است فیلتر شده باشد — با ایپی تمیز دوباره بسازید.
 </div>
 </div>
 <div class="notice-downloads">
@@ -7813,9 +8117,9 @@ ${link.connected_ips || 0}
 
 <div
 class="url-box"
-title="${escapeHtml(link.multi_ip ? link.sub : link.vless)}"
+title="${escapeHtml(link.vless)}"
 >
-${escapeHtml(link.multi_ip ? ("SUB · " + (link.clean_ips||[]).length + " IP") : link.vless)}
+${escapeHtml(link.vless)}
 </div>
 
 </td>
@@ -7825,13 +8129,13 @@ ${escapeHtml(link.multi_ip ? ("SUB · " + (link.clean_ips||[]).length + " IP") :
 
 <div class="actions">
 
-${link.multi_ip ? "" : `<button
+<button
 class="action primary"
 type="button"
 data-action="copy-vless"
 >
 VLESS
-</button>`}
+</button>
 
 <button
 class="action"
@@ -7897,10 +8201,6 @@ data-action="delete"
                                     button.dataset.action;
 
                                 if (action === "copy-vless") {
-                                    if (link.multi_ip) {
-                                        showToast("برای چندایپی فقط از SUB استفاده کنید");
-                                        return;
-                                    }
                                     await copyText(link.vless);
                                     return;
                                 }
@@ -7978,7 +8278,6 @@ data-action="delete"
     }
 
 }
-
 
 async function copyText(text){
 
@@ -8111,6 +8410,89 @@ function closePasswordModal(){
 }
 
 
+
+
+function openTgCreateModal(){
+    document.getElementById("tgCreateName").value = "";
+    document.getElementById("tgCreatePort").value = "443";
+    document.getElementById("tgCreateMode").value = "ee";
+    document.getElementById("tgCreateDomain").value = "";
+    document.getElementById("tgCreateNote").value = "";
+    document.getElementById("tgCreateModal").classList.add("open");
+}
+
+function closeTgCreateModal(){
+    document.getElementById("tgCreateModal").classList.remove("open");
+}
+
+function openTgProxyModal(){
+    document.getElementById("tgProxyModal").classList.add("open");
+}
+
+function closeTgProxyModal(){
+    document.getElementById("tgProxyModal").classList.remove("open");
+}
+
+function showTgResult(data){
+    document.getElementById("tgServer").value = data.server || "";
+    document.getElementById("tgPort").value = data.port || "";
+    document.getElementById("tgSecret").value = data.secret || "";
+    document.getElementById("tgDomain").value = (data.domain || data.mode || "");
+    document.getElementById("tgLinkDirect").value = data.tg_link || "";
+    document.getElementById("tgLinkWeb").value = data.web_link || "";
+    openTgProxyModal();
+}
+
+async function submitTgCreate(){
+    const body = {
+        label: document.getElementById("tgCreateName").value.trim(),
+        port: Number(document.getElementById("tgCreatePort").value || 443),
+        mode: document.getElementById("tgCreateMode").value,
+        domain: document.getElementById("tgCreateDomain").value.trim(),
+        note: document.getElementById("tgCreateNote").value.trim(),
+    };
+
+    showToast("در حال ساخت پروکسی...");
+    closeTgCreateModal();
+
+    const result = await api("/api/telegram-proxy", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+    });
+
+    if (!result || !result.ok) {
+        showToast("خطا در ساخت پروکسی");
+        return;
+    }
+
+    showTgResult(result);
+    showToast("پروکسی ساخته شد");
+}
+
+async function createTelegramProxy(){
+    // one-click auto create (top button)
+    showToast("در حال ساخت پروکسی تلگرام...");
+    const result = await api("/api/telegram-proxy", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({}),
+    });
+    if (!result || !result.ok) {
+        showToast("خطا در ساخت پروکسی تلگرام");
+        return;
+    }
+    showTgResult(result);
+    showToast("پروکسی تلگرام آماده شد");
+}
+
+async function copyTgLink(id){
+    const el = document.getElementById(id);
+    if (el && el.value) {
+        await copyText(el.value);
+    }
+}
+
 async function createAuto(){
 
     const cleanIpEl = document.getElementById("autoCleanIp");
@@ -8127,8 +8509,12 @@ async function createAuto(){
             "/api/links/auto",
             {
                 method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({ clean_ip: cleanIp })
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body: JSON.stringify({
+                    clean_ip: cleanIp
+                })
             }
         );
 
@@ -8140,13 +8526,16 @@ async function createAuto(){
         return;
     }
 
-    if (result.multi_ip && result.sub) {
-        await copyText(result.sub);
-        showToast("کانفیگ چندایپی ساخته شد — لینک ساب کپی شد");
-    } else if (result.vless) {
-        await copyText(result.vless);
-        showToast("کانفیگ ساخته شد و VLESS کپی شد");
-    }
+    await copyText(
+        result.vless
+    );
+
+    const count = result.created_count || 1;
+    showToast(
+        count > 1
+            ? (count + " کانفیگ ساخته شد — اولی کپی شد")
+            : "کانفیگ ساخته شد و VLESS کپی شد"
+    );
 
     await refresh();
 
@@ -8311,12 +8700,19 @@ async function createManual(){
 
     closeManualModal();
 
-    if (result.multi_ip && result.sub) {
-        await copyText(result.sub);
-        showToast("کانفیگ چندایپی ساخته شد — لینک ساب کپی شد");
-    } else if (result.vless) {
-        await copyText(result.vless);
-        showToast("کانفیگ ساخته شد");
+    if(result.vless){
+
+        await copyText(
+            result.vless
+        );
+
+        const count = result.created_count || 1;
+        showToast(
+            count > 1
+                ? (count + " کانفیگ ساخته شد")
+                : "کانفیگ ساخته شد"
+        );
+
     }
 
     await refresh();
