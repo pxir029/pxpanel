@@ -1,12 +1,11 @@
 # ============================================================
-# PXPanel 13.0.1 Beta
+# PXpanel 12.1.0 Beta
 # Railway Ready
 # ============================================================
 
 import asyncio
 import base64
 import hashlib
-import ipaddress
 import json
 import logging
 import os
@@ -41,8 +40,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # APP
 # ============================================================
 
-APP_NAME = "PXPanel"
-APP_VERSION = "13.0.1 Beta"
+APP_NAME = "PXpanel"
+APP_VERSION = "12.1.0 Beta"
 
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
@@ -94,8 +93,8 @@ DATA_DIR.mkdir(
     exist_ok=True,
 )
 
-DATA_FILE = DATA_DIR / "pixonpanel_state.json"
-SECRET_FILE = DATA_DIR / "pixonpanel_secret.key"
+DATA_FILE = DATA_DIR / "pxpanel_state.json"
+SECRET_FILE = DATA_DIR / "pxpanel_secret.key"
 
 
 # ============================================================
@@ -219,35 +218,7 @@ PROTOCOLS = (
     "xhttp-packet-up",
     "xhttp-stream-up",
     "xhttp-stream-one",
-    "vmess-ws",
-    "trojan-ws",
-    "shadowsocks",
-    "socks5",
-    "http",
-    "hysteria2",
-    "tuic",
-    "wireguard",
 )
-
-PROTOCOL_LABELS = {
-    "vless-ws": "VLESS WebSocket",
-    "xhttp-packet-up": "XHTTP Packet Up",
-    "xhttp-stream-up": "XHTTP Stream Up",
-    "xhttp-stream-one": "XHTTP Stream One",
-    "vmess-ws": "VMess WebSocket",
-    "trojan-ws": "Trojan WebSocket",
-    "shadowsocks": "Shadowsocks",
-    "socks5": "SOCKS5",
-    "http": "HTTP Proxy",
-    "hysteria2": "Hysteria 2",
-    "tuic": "TUIC",
-    "wireguard": "WireGuard",
-}
-
-PROTOCOL_ALIASES = {
-    "vmess": "vmess-ws", "trojan": "trojan-ws", "ss": "shadowsocks",
-    "socks": "socks5", "hy2": "hysteria2", "hysteria": "hysteria2",
-}
 
 DEFAULT_PROTOCOL = "vless-ws"
 
@@ -278,56 +249,6 @@ MIN_PORT = 1
 MAX_PORT = 65535
 
 DEFAULT_SPEED_LIMIT = 0
-
-# کشورها برای کانفیگ‌های دستی. مقدار کد برای ذخیره‌سازی پایدار است.
-COUNTRIES = {
-    "NL": "🇳🇱 هلند",
-    "DE": "🇩🇪 آلمان",
-    "FR": "🇫🇷 فرانسه",
-    "GB": "🇬🇧 انگلیس",
-    "US": "🇺🇸 آمریکا",
-    "FI": "🇫🇮 فنلاند",
-    "TR": "🇹🇷 ترکیه",
-    "IR": "🇮🇷 ایران",
-    "RU": "🇷🇺 روسیه",
-    "AE": "🇦🇪 امارات",
-    "OTHER": "🌍 سایر",
-}
-DEFAULT_COUNTRY = "OTHER"
-
-
-def normalize_country(country: str | None) -> str:
-    value = str(country or DEFAULT_COUNTRY).strip().upper()
-    return value if value in COUNTRIES else DEFAULT_COUNTRY
-
-
-def normalize_manual_host(value: str | None) -> str:
-    """Validate an entered IP/domain without performing any network scan."""
-    host = str(value or "").strip()
-    if not host:
-        return ""
-    if len(host) > 253:
-        raise ValueError("IP/Host بیش از حد طولانی است")
-    # IPv4/IPv6 را می‌پذیریم؛ برای دامنه نیز کاراکترهای معمول DNS مجازند.
-    try:
-        ipaddress.ip_address(host)
-        return host
-    except ValueError:
-        pass
-    if " " in host or "/" in host or "\\" in host:
-        raise ValueError("IP/Host واردشده معتبر نیست")
-    labels = host.rstrip(".").split(".")
-    if not labels or any(not label or len(label) > 63 for label in labels):
-        raise ValueError("IP/Host واردشده معتبر نیست")
-    if any(not all(ch.isalnum() or ch == "-" for ch in label) or label.startswith("-") or label.endswith("-") for label in labels):
-        raise ValueError("IP/Host واردشده معتبر نیست")
-    return host
-
-
-def normalize_protocol(protocol: str | None) -> str:
-    value = str(protocol or DEFAULT_PROTOCOL).strip().lower()
-    value = PROTOCOL_ALIASES.get(value, value)
-    return value if value in PROTOCOLS else DEFAULT_PROTOCOL
 
 
 # ============================================================
@@ -824,7 +745,7 @@ def clear_login_failures(ip: str):
 # SESSION
 # ============================================================
 
-SESSION_COOKIE = "pixonpanel_session"
+SESSION_COOKIE = "pxpanel_session"
 
 SESSION_TTL = (
     60
@@ -939,53 +860,119 @@ def set_auth_cookie(
 # ============================================================
 
 def generate_vless_link(
-    uuid: str, host: str, remark: str = "PXPanel",
-    protocol: str = DEFAULT_PROTOCOL, fingerprint: str | None = None,
-    alpn: str | None = None, port: int | None = None,
-    sni_host: str | None = None,
+    uuid: str,
+    host: str,
+    remark: str = "PXpanel",
+    protocol: str = DEFAULT_PROTOCOL,
+    fingerprint: str | None = None,
+    alpn: str | None = None,
+    port: int | None = None,
 ):
-    protocol = normalize_protocol(protocol)
-    fp = (fingerprint or DEFAULT_FINGERPRINT).strip().lower()
-    if fp not in FINGERPRINTS: fp = DEFAULT_FINGERPRINT
-    port_value = safe_int(port, DEFAULT_PORT, MIN_PORT, MAX_PORT)
-    alpn_value = (alpn or DEFAULT_ALPN_BY_PROTOCOL.get(protocol, "http/1.1")).strip()
-    label = quote(str(remark or "PXPanel"), safe="")
-    tls_host = str(sni_host or host).strip() or host
+
+    fp = (
+        fingerprint
+        or DEFAULT_FINGERPRINT
+    ).strip().lower()
+
+    if fp not in FINGERPRINTS:
+        fp = DEFAULT_FINGERPRINT
+
+    alpn_value = (
+        (
+            alpn
+            or ""
+        ).strip()
+        or DEFAULT_ALPN_BY_PROTOCOL.get(
+            protocol,
+            "http/1.1",
+        )
+    )
+
+    port_value = (
+        port
+        or DEFAULT_PORT
+    )
+
+    if not (
+        MIN_PORT
+        <= port_value
+        <= MAX_PORT
+    ):
+        port_value = DEFAULT_PORT
+
+    # ========================================================
+    # IMPORTANT:
+    # The working VLESS WebSocket core stays unchanged.
+    # ========================================================
+
     if protocol == "vless-ws":
-        q = {"encryption":"none","security":"tls","type":"ws","host":tls_host,"path":f"/ws/{uuid}","sni":tls_host,"fp":fp,"alpn":alpn_value}
-        return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
-    if protocol.startswith("xhttp-"):
-        mode = protocol.replace("xhttp-", "")
-        q = {"encryption":"none","security":"tls","type":"xhttp","mode":mode,"host":tls_host,"path":f"/xhttp-siz10/{mode}/{uuid}","sni":tls_host,"fp":fp,"alpn":alpn_value}
-        return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
-    if protocol == "vmess-ws":
-        raw = {"v":"2","ps":remark,"add":host,"port":port_value,"id":uuid,"aid":0,"scy":"auto","net":"ws","type":"none","host":tls_host,"path":f"/ws/{uuid}","tls":"tls","sni":tls_host,"fp":fp}
-        return "vmess://" + base64.b64encode(json.dumps(raw,separators=(",",":"),ensure_ascii=False).encode()).decode()
-    if protocol == "trojan-ws":
-        return f"trojan://{uuid}@{host}:{port_value}?security=tls&type=ws&host={quote(tls_host)}&path={quote('/ws/'+uuid)}&sni={quote(tls_host)}#{label}"
-    if protocol == "shadowsocks":
-        method = os.getenv("SS_METHOD", "aes-256-gcm")
-        userinfo = base64.urlsafe_b64encode(f"{method}:{uuid}".encode()).decode().rstrip("=")
-        return f"ss://{userinfo}@{host}:{port_value}#{label}"
-    if protocol == "socks5": return f"socks5://{uuid}:{uuid}@{host}:{port_value}#{label}"
-    if protocol == "http": return f"http://{uuid}:{uuid}@{host}:{port_value}#{label}"
-    if protocol == "hysteria2": return f"hysteria2://{uuid}@{host}:{port_value}/?sni={quote(host)}&insecure=0#{label}"
-    if protocol == "tuic": return f"tuic://{uuid}:{uuid}@{host}:{port_value}?sni={quote(host)}&alpn=h3#{label}"
-    if protocol == "wireguard": return f"wireguard://{uuid}@{host}:{port_value}?publicKey={uuid}#{label}"
-    return f"vless://{uuid}@{host}:{port_value}"
+
+        path = (
+            f"/ws/{uuid}"
+        )
+
+        params = {
+            "encryption": "none",
+            "security": "tls",
+            "type": "ws",
+            "host": host,
+            "path": path,
+            "sni": host,
+            "fp": fp,
+            "alpn": alpn_value,
+        }
+
+    else:
+
+        mode = protocol.replace(
+            "xhttp-",
+            "",
+        )
+
+        path = (
+            f"/xhttp-siz10/"
+            f"{mode}/"
+            f"{uuid}"
+        )
+
+        params = {
+            "encryption": "none",
+            "security": "tls",
+            "type": "xhttp",
+            "mode": mode,
+            "host": host,
+            "path": path,
+            "sni": host,
+            "fp": fp,
+            "alpn": alpn_value,
+        }
+
+    query = "&".join(
+        f"{key}="
+        f"{quote(str(value))}"
+        for key, value in params.items()
+    )
+
+    return (
+        f"vless://"
+        f"{uuid}@"
+        f"{host}:"
+        f"{port_value}?"
+        f"{query}#"
+        f"{quote(remark)}"
+    )
+
 
 def vless_link_for_link(
     link: dict,
     uid: str,
     host: str,
 ):
-    connect_host = str(link.get("clean_ip") or link.get("manual_host") or host).strip() or host
-    sni_host = str(link.get("sni_host") or host).strip() or host
     return generate_vless_link(
         uid,
-        connect_host,
+        host,
         remark=(
-            f"PixonPanel-"
+            f"pxpanel-"
             f"{link.get('label', '')}"
         ),
         protocol=link.get(
@@ -1003,7 +990,6 @@ def vless_link_for_link(
             "port",
             DEFAULT_PORT,
         ),
-        sni_host=sni_host,
     )
 
 
@@ -1081,10 +1067,6 @@ def get_link_info(
             "port",
             DEFAULT_PORT,
         ),
-        "manual_host": link.get("manual_host", ""),
-        "clean_ip": link.get("clean_ip", ""),
-        "country": normalize_country(link.get("country")),
-        "country_name": link.get("country_name") or COUNTRIES.get(normalize_country(link.get("country")), COUNTRIES[DEFAULT_COUNTRY]),
         "note": link.get(
             "note",
             "",
@@ -1203,12 +1185,6 @@ async def load_state():
                 "used_bytes",
                 0,
             )
-
-            link.setdefault("manual_host", "")
-            link.setdefault("clean_ip", "")
-            link.setdefault("country", DEFAULT_COUNTRY)
-            link.setdefault("country_name", COUNTRIES.get(link.get("country"), COUNTRIES[DEFAULT_COUNTRY]))
-            link.setdefault("sni_host", link.get("manual_host", ""))
 
         logger.info(
             "State loaded: %d links / %d subscriptions",
@@ -1370,12 +1346,6 @@ async def ensure_default_link():
 
                 "fragment":
                     "off",
-
-                "manual_host": "",
-                "clean_ip": "",
-                "country": DEFAULT_COUNTRY,
-                "country_name": COUNTRIES[DEFAULT_COUNTRY],
-                "sni_host": "",
             }
 
             asyncio.create_task(
@@ -1403,12 +1373,10 @@ async def make_link(
     speed_limit_bytes: int = 0,
     connection_limit: int = 0,
     fragment: str = "off",
-    manual_host: str = "",
-    clean_ip: str = "",
-    country: str = DEFAULT_COUNTRY,
 ):
 
-    protocol = normalize_protocol(protocol)
+    if protocol not in PROTOCOLS:
+        protocol = DEFAULT_PROTOCOL
 
     fingerprint = (
         fingerprint
@@ -1424,10 +1392,6 @@ async def make_link(
         <= MAX_PORT
     ):
         port = DEFAULT_PORT
-
-    manual_host = normalize_manual_host(manual_host) if manual_host else ""
-    clean_ip = normalize_manual_host(clean_ip) if clean_ip else ""
-    country = normalize_country(country)
 
     uid = generate_uuid()
 
@@ -1506,16 +1470,6 @@ async def make_link(
                 fragment
                 or "off"
             ).strip().lower(),
-
-        "manual_host": manual_host,
-        "clean_ip": clean_ip,
-        "country": country,
-        "country_name": COUNTRIES.get(country, COUNTRIES[DEFAULT_COUNTRY]),
-        "sni_host": manual_host or "",
-
-        "security_profile": "balanced",
-        "multi_login": False,
-        "protocol_label": PROTOCOL_LABELS.get(protocol, protocol),
     }
 
     async with LINKS_LOCK:
@@ -1918,7 +1872,7 @@ LANDING_HTML = r"""
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>PixonPanel</title>
+<title>PXpanel</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2122,12 +2076,6 @@ h1{
         flex-direction:column;
     }
 }
-
-/* PXPanel 13.0.1 responsive system */
-html{scroll-behavior:smooth} body{overflow-x:hidden} button,input,select,textarea{touch-action:manipulation} .modal{overscroll-behavior:contain}
-@media(max-width:900px){.container,.shell,.dashboard,.main,.content{max-width:100%!important;width:100%!important}.grid,.stats-grid,.cards-grid,.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sidebar{z-index:1000}}
-@media(max-width:640px){body{padding:10px!important;font-size:14px}.grid,.stats-grid,.cards-grid,.form-grid{grid-template-columns:1fr!important}.card,.panel,.section,.modal{border-radius:18px!important}.modal{max-height:92vh;overflow:auto;padding:14px!important}.header,.topbar,.toolbar,.actions{flex-wrap:wrap!important}.header>* ,.topbar>*{max-width:100%}.btn,button{min-height:44px}.field input,.field select,.field textarea,input,select,textarea{min-height:44px;font-size:16px;max-width:100%}table{display:block;overflow-x:auto;white-space:nowrap}.link-row,.config-row{flex-direction:column!important;align-items:stretch!important}.brand-name{font-size:15px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
 
@@ -2141,7 +2089,7 @@ html{scroll-behavior:smooth} body{overflow-x:hidden} button,input,select,textare
 
 <div>
 <div class="brand-name">
-PixonPanel
+PXpanel
 </div>
 
 <div class="version">
@@ -2162,7 +2110,7 @@ PixonPanel
 </h1>
 
 <div class="desc">
-این صفحه، درگاه عمومی PixonPanel است.
+این صفحه، درگاه عمومی PXpanel است.
 برای دسترسی به داشبورد مدیریت از مسیر ورود استفاده کنید.
 </div>
 
@@ -2193,7 +2141,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PixonPanel · 12.1.0 Beta
+PXpanel · 12.1.0 Beta
 </span>
 
 <a
@@ -2268,7 +2216,7 @@ name="viewport"
 content="width=device-width,initial-scale=1"
 >
 
-<title>ورود | PixonPanel</title>
+<title>ورود | PXpanel</title>
 
 <link
 rel="preconnect"
@@ -2459,7 +2407,7 @@ P
 </div>
 
 <h1>
-ورود به PixonPanel
+ورود به PXpanel
 </h1>
 
 <div class="version">
@@ -3053,14 +3001,6 @@ async def create_link_api(
         minimum=0,
     )
 
-    try:
-        manual_host = normalize_manual_host(body.get("manual_host", ""))
-        clean_ip = normalize_manual_host(body.get("clean_ip", ""))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    country = normalize_country(body.get("country"))
-
     protocol = str(
         body.get(
             "protocol",
@@ -3129,9 +3069,6 @@ async def create_link_api(
         speed_limit_bytes=speed_bytes,
         connection_limit=connection_limit,
         fragment=fragment,
-        manual_host=manual_host,
-        clean_ip=clean_ip,
-        country=country,
     )
 
     host = get_host(request)
@@ -3157,48 +3094,92 @@ async def create_auto_link(
     request: Request,
     _=Depends(require_auth),
 ):
+
     try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    if not isinstance(body, dict): body = {}
-    host = get_host(request)
-    protocol = normalize_protocol(body.get("protocol", DEFAULT_PROTOCOL))
-    profile = str(body.get("profile", "balanced")).strip().lower()
-    profiles = {
-        "normal": {"ip":0,"conn":0,"speed":0,"fp":"chrome","fragment":"off"},
-        "balanced": {"ip":2,"conn":4,"speed":0,"fp":"chrome","fragment":"safe"},
-        "gaming": {"ip":1,"conn":2,"speed":0,"fp":"chrome","fragment":"safe"},
-        "maximum": {"ip":0,"conn":0,"speed":0,"fp":"randomized","fragment":"safe"},
-    }
-    cfg = profiles.get(profile, profiles["balanced"])
-    uid, link = await make_link(
-        label=auto_config_name(), limit_bytes=0, expires_at=None,
-        ip_limit=cfg["ip"], speed_limit_bytes=cfg["speed"], connection_limit=cfg["conn"],
-        note=f"Auto generated by PXPanel | profile={profile}",
-        protocol=protocol, fingerprint=cfg["fp"],
-        alpn=DEFAULT_ALPN_BY_PROTOCOL.get(protocol, ""), port=443, fragment=cfg["fragment"],
-    )
-    link["security_profile"] = profile
-    result = {**get_link_info(link, uid, host), "ok": True, "profile": profile}
-    log_activity("link", f"کانفیگ خودکار «{link['label']}» با {PROTOCOL_LABELS.get(protocol, protocol)} ساخته شد", "ok")
-    return result
+
+        host = get_host(request)
+
+        uid, link = await make_link(
+            label=auto_config_name(),
+
+            # Unlimited
+            limit_bytes=0,
+            expires_at=None,
+            ip_limit=0,
+            speed_limit_bytes=0,
+            connection_limit=0,
+
+            note=(
+                "Auto generated by "
+                "PXpanel"
+            ),
+
+            # IMPORTANT:
+            # Keep working protocol.
+            protocol="vless-ws",
+
+            fingerprint="chrome",
+
+            alpn="http/1.1",
+
+            port=443,
+
+            fragment="off",
+        )
+
+        result = {
+            **get_link_info(
+                link,
+                uid,
+                host,
+            ),
+            "ok": True,
+        }
+
+        log_activity(
+            "link",
+            (
+                f"کانفیگ خودکار "
+                f"«{link['label']}» ساخته شد"
+            ),
+            "ok",
+        )
+
+        return result
+
+    except Exception as exc:
+
+        logger.exception(
+            "Auto config creation failed"
+        )
+
+        stats["total_errors"] += 1
+
+        error_logs.append(
+            {
+                "error":
+                    str(exc),
+
+                "path":
+                    "/api/links/auto",
+
+                "time":
+                    datetime.now().isoformat(),
+            }
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "خطا در ساخت کانفیگ: "
+                f"{exc}"
+            ),
+        )
 
 
 # ============================================================
 # LIST LINKS
 # ============================================================
-
-@app.get("/api/countries")
-async def api_countries(request: Request, _=Depends(require_auth)):
-    return {"countries": [{"id": code, "name": name} for code, name in COUNTRIES.items()]}
-
-
-@app.get("/api/protocols")
-async def api_protocols(request: Request):
-    require_auth(request)
-    return {"protocols": [{"id": p, "label": PROTOCOL_LABELS.get(p, p)} for p in PROTOCOLS], "default": DEFAULT_PROTOCOL}
-
 
 @app.get("/api/links")
 async def list_links(
@@ -3838,7 +3819,7 @@ async def subscription_single(
     limit = int(link.get("limit_bytes", 0) or 0)
     volume_text = f"{fmt_bytes(used)}/{fmt_bytes(limit)}" if limit > 0 else f"{fmt_bytes(used)}/∞"
     expiry_text = str(link.get("expires_at") or "∞")
-    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PixonPanel')} | کانال تلگرام: logic_sec"
+    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PXpanel')} | کانال تلگرام: logic_sec"
     headers = subscription_metadata_headers(
         used,
         limit,
@@ -3960,7 +3941,7 @@ async def info_page(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>{escape_html(snapshot.get("label","PixonPanel"))} | INFO</title>
+<title>{escape_html(snapshot.get("label","PXpanel"))} | INFO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -4039,7 +4020,7 @@ body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;backgrou
 <body>
 <div class="page"><div class="shell">
 <section class="hero">
-<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PixonPanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PixonPanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
+<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
 <div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
 </section>
 
@@ -4529,7 +4510,7 @@ content="width=device-width,initial-scale=1"
 >
 
 <title>
-PixonPanel
+PXpanel
 </title>
 
 <style>
@@ -4624,7 +4605,7 @@ h1{
 <div class="card">
 
 <h1>
-PixonPanel
+PXpanel
 </h1>
 
 <div class="version">
@@ -5448,6 +5429,65 @@ async def http_proxy(
         )
 
 
+
+# ============================================================
+# TELEGRAM PROXY GENERATOR
+# ============================================================
+
+FAKE_TLS_DOMAINS = (
+    "cloudflare.com",
+    "www.cloudflare.com",
+    "www.google.com",
+    "www.microsoft.com",
+    "www.apple.com",
+    "cdnjs.cloudflare.com",
+    "www.amazon.com",
+    "www.github.com",
+)
+
+
+@app.post("/api/telegram-proxy")
+async def create_telegram_proxy(
+    request: Request,
+    _=Depends(require_auth),
+):
+    host = get_host(request)
+    port = 443
+
+    raw_secret = secrets.token_hex(16)
+    domain = secrets.choice(FAKE_TLS_DOMAINS)
+    domain_hex = domain.encode("utf-8").hex()
+    secret = f"ee{raw_secret}{domain_hex}"
+
+    tg_link = (
+        f"tg://proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+
+    web_link = (
+        f"https://t.me/proxy?server={host}"
+        f"&port={port}"
+        f"&secret={secret}"
+    )
+
+    log_activity(
+        "telegram",
+        f"پروکسی تلگرام ساخته شد → {host}:{port} ({domain})",
+        "info",
+    )
+
+    return {
+        "ok": True,
+        "server": host,
+        "port": port,
+        "secret": secret,
+        "domain": domain,
+        "tg_link": tg_link,
+        "web_link": web_link,
+    }
+
+
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -5467,7 +5507,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PixonPanel 12.1.0 Beta
+PXpanel 12.1.0 Beta
 </title>
 
 <link
@@ -5616,6 +5656,17 @@ body{
 .top-btn.danger{
     color:#fca5a5;
 }
+
+.top-btn.tg-proxy{
+    background:linear-gradient(135deg,#0ea5e9,#2563eb);
+    border-color:transparent;
+    color:#fff;
+    font-weight:700;
+}
+.top-btn.tg-proxy:hover{
+    filter:brightness(1.08);
+}
+
 
 .stats-grid{
     display:grid;
@@ -6266,7 +6317,7 @@ P
 <div>
 
 <div class="brand-name">
-PixonPanel
+PXpanel
 </div>
 
 <div class="brand-desc">
@@ -6288,6 +6339,13 @@ class="top-btn primary"
 onclick="openAutoModal()"
 ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
 ساخت خودکار
+</button>
+
+<button
+class="top-btn tg-proxy"
+onclick="createTelegramProxy()"
+><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 5L2 12.5l7 1.5L18 8l-7 7.5 1.5 6.5L21 5Z"/></svg>
+ساخت پروکسی تلگرام
 </button>
 
 <button
@@ -6428,14 +6486,6 @@ onclick="refresh()"
 
 <th>
 نام
-</th>
-
-<th>
-کشور
-</th>
-
-<th>
-IP / Host
 </th>
 
 <th>
@@ -6703,49 +6753,26 @@ placeholder="نام کانفیگ"
 
 <select id="manualProtocol">
 
-<option value="vless-ws">VLESS WebSocket</option>
-<option value="xhttp-packet-up">XHTTP Packet Up</option>
-<option value="xhttp-stream-up">XHTTP Stream Up</option>
-<option value="xhttp-stream-one">XHTTP Stream One</option>
-<option value="vmess-ws">VMess WebSocket</option>
-<option value="trojan-ws">Trojan WebSocket</option>
-<option value="shadowsocks">Shadowsocks</option>
-<option value="socks5">SOCKS5</option>
-<option value="http">HTTP Proxy</option>
-<option value="hysteria2">Hysteria 2</option>
-<option value="tuic">TUIC</option>
-<option value="wireguard">WireGuard</option>
+<option value="vless-ws">
+VLESS WebSocket
+</option>
+
+<option value="xhttp-packet-up">
+XHTTP Packet Up
+</option>
+
+<option value="xhttp-stream-up">
+XHTTP Stream Up
+</option>
+
+<option value="xhttp-stream-one">
+XHTTP Stream One
+</option>
 
 </select>
 
 </div>
 
-<div class="field">
-<label>کشور پروکسی</label>
-<select id="manualCountry">
-<option value="NL">🇳🇱 هلند</option>
-<option value="DE">🇩🇪 آلمان</option>
-<option value="FR">🇫🇷 فرانسه</option>
-<option value="GB">🇬🇧 انگلیس</option>
-<option value="US">🇺🇸 آمریکا</option>
-<option value="FI">🇫🇮 فنلاند</option>
-<option value="TR">🇹🇷 ترکیه</option>
-<option value="IR">🇮🇷 ایران</option>
-<option value="RU">🇷🇺 روسیه</option>
-<option value="AE">🇦🇪 امارات</option>
-<option value="OTHER" selected>🌍 سایر</option>
-</select>
-</div>
-
-<div class="field">
-<label>IP / Host دستی</label>
-<input id="manualHost" placeholder="مثلاً example.com یا 1.2.3.4" autocomplete="off" />
-</div>
-
-<div class="field">
-<label>Clean IP</label>
-<input id="manualCleanIp" placeholder="مثلاً 1.2.3.4 یا IPv6" autocomplete="off" />
-</div>
 
 <div class="field">
 
@@ -7003,6 +7030,91 @@ onclick="createManual()"
 </div>
 
 
+
+<!-- ===================================================== -->
+<!-- TELEGRAM PROXY MODAL -->
+<!-- ===================================================== -->
+
+<div
+id="tgProxyModal"
+class="modal-backdrop"
+>
+
+<div class="modal" style="max-width:540px">
+
+<div class="modal-head">
+
+<div class="modal-title">
+پروکسی تلگرام ساخته شد
+</div>
+
+<button
+class="close"
+onclick="closeTgProxyModal()"
+>
+×
+</button>
+
+</div>
+
+<div style="color:rgba(255,255,255,.55);font-size:11px;line-height:1.9;margin-bottom:14px">
+لینک آماده استفاده در تلگرام. روی لینک بزنید تا خودکار اضافه شود.
+</div>
+
+<div class="field full" style="margin-bottom:14px">
+<label>لینک مستقیم تلگرام (پیشنهادی)</label>
+<div style="display:flex;gap:8px;align-items:center">
+<input id="tgLinkDirect" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
+<button class="modal-btn primary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkDirect')">کپی</button>
+</div>
+</div>
+
+<div class="field full" style="margin-bottom:14px">
+<label>لینک t.me</label>
+<div style="display:flex;gap:8px;align-items:center">
+<input id="tgLinkWeb" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
+<button class="modal-btn secondary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkWeb')">کپی</button>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+<div class="field">
+<label>سرور</label>
+<input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" />
+</div>
+<div class="field">
+<label>پورت</label>
+<input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" />
+</div>
+<div class="field full">
+<label>Secret (FakeTLS)</label>
+<input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" />
+</div>
+<div class="field full">
+<label>دامنه FakeTLS</label>
+<input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" />
+</div>
+</div>
+
+<div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.18);border-radius:12px;padding:12px 14px;font-size:10.5px;line-height:1.85;color:rgba(255,255,255,.65)">
+<strong style="color:#7dd3fc">نکته مهم:</strong>
+این لینک با استاندارد FakeTLS ساخته شده است. برای کارکرد واقعی باید روی همین سرور یک سرویس MTProto (مثل mtg یا teleproxy) روی پورت ۴۴۳ در حال اجرا باشد. در غیر این صورت لینک فقط برای اشتراک‌گذاری آماده است.
+</div>
+
+<div class="modal-actions" style="margin-top:18px">
+<button class="modal-btn secondary" onclick="closeTgProxyModal()">
+بستن
+</button>
+<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">
+کپی لینک اصلی
+</button>
+</div>
+
+</div>
+
+</div>
+
+
 <!-- ===================================================== -->
 <!-- AUTO MODAL -->
 <!-- ===================================================== -->
@@ -7029,41 +7141,13 @@ onclick="closeAutoModal()"
 
 </div>
 
-<div class="form-grid" style="margin-top:14px">
-<div class="field">
-<label>پروتکل</label>
-<select id="autoProtocol">
-<option value="vless-ws">VLESS WebSocket</option>
-<option value="xhttp-packet-up">XHTTP Packet Up</option>
-<option value="xhttp-stream-up">XHTTP Stream Up</option>
-<option value="xhttp-stream-one">XHTTP Stream One</option>
-<option value="vmess-ws">VMess WebSocket</option>
-<option value="trojan-ws">Trojan WebSocket</option>
-<option value="shadowsocks">Shadowsocks</option>
-<option value="socks5">SOCKS5</option>
-<option value="http">HTTP Proxy</option>
-<option value="hysteria2">Hysteria 2</option>
-<option value="tuic">TUIC</option>
-<option value="wireguard">WireGuard</option>
-</select>
-</div>
-<div class="field">
-<label>پروفایل امنیتی</label>
-<select id="autoProfile">
-<option value="balanced">Balanced</option>
-<option value="gaming">Gaming</option>
-<option value="maximum">Maximum</option>
-<option value="normal">Normal</option>
-</select>
-</div>
-</div>
-
 <div
 style="
 color:rgba(255,255,255,.55);
 font-size:11px;
 line-height:2;
-">
+"
+>
 
 کانفیگ خودکار با نام تصادفی
 <code>pxpanel_********</code>
@@ -7543,7 +7627,7 @@ async function refresh(){
             table.innerHTML = `
                 <tr>
                     <td
-                    colspan="10"
+                    colspan="8"
                     class="empty"
                     >
                     هنوز کانفیگی ساخته نشده است.
@@ -7553,12 +7637,9 @@ async function refresh(){
 
         }else{
 
-            const countryFilter = document.getElementById("countryFilter")?.value || "ALL";
-            const visibleLinks = linksData.links.filter(link => countryFilter === "ALL" || String(link.country || "OTHER") === countryFilter);
-
             for(
                 const link
-                of visibleLinks
+                of linksData.links
             ){
 
                 const row =
@@ -7622,15 +7703,6 @@ ${escapeHtml(
 
 </td>
 
-
-<td>
-${escapeHtml(link.country_name || "🌍 سایر")}
-</td>
-
-<td>
-<div>${escapeHtml(link.clean_ip || link.manual_host || "پیش‌فرض سرور")}</div>
-${link.manual_host && link.clean_ip ? `<div style="margin-top:3px;color:rgba(255,255,255,.35);font-size:8px">SNI: ${escapeHtml(link.manual_host)}</div>` : ""}
-</td>
 
 <td>
 ${escapeHtml(
@@ -7980,21 +8052,82 @@ function closePasswordModal(){
 }
 
 
-async function createAuto(){
-    const protocol = document.getElementById("autoProtocol")?.value || "vless-ws";
-    const profile = document.getElementById("autoProfile")?.value || "balanced";
-    closeAutoModal();
-    showToast("در حال ساخت کانفیگ حرفه‌ای...");
-    const result = await api("/api/links/auto", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({protocol,profile})
+
+function openTgProxyModal(){
+    document.getElementById("tgProxyModal").classList.add("open");
+}
+
+function closeTgProxyModal(){
+    document.getElementById("tgProxyModal").classList.remove("open");
+}
+
+async function createTelegramProxy(){
+    showToast("در حال ساخت پروکسی تلگرام...");
+
+    const result = await api("/api/telegram-proxy", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}"
     });
-    if(!result || !result.ok) return;
-    const config = result.config || result.vless || result.link || "";
-    await copyText(config);
-    showToast("کانفیگ ساخته شد و در کلیپ‌بورد قرار گرفت");
+
+    if (!result || !result.ok) {
+        showToast("خطا در ساخت پروکسی تلگرام");
+        return;
+    }
+
+    document.getElementById("tgServer").value = result.server || "";
+    document.getElementById("tgPort").value = result.port || "";
+    document.getElementById("tgSecret").value = result.secret || "";
+    document.getElementById("tgDomain").value = result.domain || "";
+    document.getElementById("tgLinkDirect").value = result.tg_link || "";
+    document.getElementById("tgLinkWeb").value = result.web_link || "";
+
+    openTgProxyModal();
+    showToast("پروکسی تلگرام آماده شد");
+}
+
+async function copyTgLink(id){
+    const el = document.getElementById(id);
+    if (el && el.value) {
+        await copyText(el.value);
+    }
+}
+
+
+async function createAuto(){
+
+    closeAutoModal();
+
+    showToast(
+        "در حال ساخت کانفیگ..."
+    );
+
+    const result =
+        await api(
+            "/api/links/auto",
+            {
+                method:"POST"
+            }
+        );
+
+    if(
+        !result
+        ||
+        !result.ok
+    ){
+        return;
+    }
+
+    await copyText(
+        result.vless
+    );
+
+    showToast(
+        "کانفیگ ساخته شد و VLESS کپی شد"
+    );
+
     await refresh();
+
 }
 
 
@@ -8078,15 +8211,6 @@ async function createManual(){
                     "manualProtocol"
                 )
                 .value,
-
-        country:
-            document.getElementById("manualCountry").value,
-
-        manual_host:
-            document.getElementById("manualHost").value.trim(),
-
-        clean_ip:
-            document.getElementById("manualCleanIp").value.trim(),
 
         fingerprint:
             document
@@ -8635,7 +8759,7 @@ async def global_exception_handler(
             padding:40px;
         ">
             <h2>
-            خطای داخلی PixonPanel
+            خطای داخلی PXpanel
             </h2>
 
             <p>
