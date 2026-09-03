@@ -869,6 +869,7 @@ def generate_vless_link(
     fingerprint: str | None = None,
     alpn: str | None = None,
     port: int | None = None,
+    address: str | None = None,
 ):
 
     fp = (
@@ -955,10 +956,13 @@ def generate_vless_link(
         for key, value in params.items()
     )
 
+    # address = IP تمیز برای اتصال؛ host/sni روی دامنه واقعی پنل می‌ماند
+    connect_host = (address or host or "").strip() or host
+
     return (
         f"vless://"
         f"{uuid}@"
-        f"{host}:"
+        f"{connect_host}:"
         f"{port_value}?"
         f"{query}#"
         f"{quote(remark)}"
@@ -970,6 +974,11 @@ def vless_link_for_link(
     uid: str,
     host: str,
 ):
+    clean_ip = (
+        link.get("clean_ip")
+        or ""
+    ).strip()
+
     return generate_vless_link(
         uid,
         host,
@@ -992,6 +1001,7 @@ def vless_link_for_link(
             "port",
             DEFAULT_PORT,
         ),
+        address=clean_ip or None,
     )
 
 
@@ -1071,6 +1081,10 @@ def get_link_info(
         ),
         "note": link.get(
             "note",
+            "",
+        ),
+        "clean_ip": link.get(
+            "clean_ip",
             "",
         ),
         "vless": vless_link_for_link(
@@ -1188,6 +1202,11 @@ async def load_state():
             link.setdefault(
                 "fragment",
                 "off",
+            )
+
+            link.setdefault(
+                "clean_ip",
+                "",
             )
 
             link.setdefault(
@@ -1386,6 +1405,7 @@ async def make_link(
     speed_limit_bytes: int = 0,
     connection_limit: int = 0,
     fragment: str = "off",
+    clean_ip: str = "",
 ):
 
     if protocol not in PROTOCOLS:
@@ -1483,6 +1503,12 @@ async def make_link(
                 fragment
                 or "off"
             ).strip().lower(),
+
+        "clean_ip":
+            (
+                clean_ip
+                or ""
+            ).strip()[:120],
     }
 
     async with LINKS_LOCK:
@@ -3054,6 +3080,14 @@ async def create_link_api(
     if fragment not in allowed_fragments:
         fragment = "off"
 
+    clean_ip = str(
+        body.get(
+            "clean_ip",
+            "",
+        )
+        or ""
+    ).strip()[:120]
+
     uid, link = await make_link(
         label=body.get(
             "label",
@@ -3082,6 +3116,7 @@ async def create_link_api(
         speed_limit_bytes=speed_bytes,
         connection_limit=connection_limit,
         fragment=fragment,
+        clean_ip=clean_ip,
     )
 
     host = get_host(request)
@@ -7141,6 +7176,21 @@ value="443"
 <div class="field">
 
 <label>
+ایپی تمیز
+</label>
+
+<input
+id="manualCleanIp"
+placeholder="مثلاً 1.2.3.4 — خالی = دامنه پنل"
+style="direction:ltr;text-align:left"
+/>
+
+</div>
+
+
+<div class="field">
+
+<label>
 ALPN
 </label>
 
@@ -8444,6 +8494,14 @@ async function createManual(){
                     .value
                 || 443
             ),
+
+        clean_ip:
+            document
+                .getElementById(
+                    "manualCleanIp"
+                )
+                .value
+                .trim(),
 
         alpn:
             document
