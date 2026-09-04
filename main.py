@@ -3934,9 +3934,7 @@ async def info_page(
     connection_limit = "نامحدود" if not snapshot.get("connection_limit", 0) else str(snapshot.get("connection_limit"))
     speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes", 0) else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
 
-    # Real usage history data retrieval (fallback to empty list if history is not stored in snapshot)
     usage_history = snapshot.get("usage_history", [])
-    # Format SVG points dynamically from actual data history entries if available
     svg_points = "0,50 300,50"
     if usage_history and len(usage_history) > 1:
         max_hist = max(usage_history) if max(usage_history) > 0 else 1
@@ -4003,7 +4001,6 @@ async def info_page(
         </div>
       </div>
       <div class="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-        <!-- New Feature: QR Code Modal Trigger Button -->
         <button type="button" onclick="openQrModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-purple-300 border border-purple-400/30 bg-purple-400/10 hover:bg-purple-400/20 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           QR Code
@@ -4014,16 +4011,6 @@ async def info_page(
           {status_text}
         </div>
       </div>
-    </div>
-
-    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-gradient-to-l from-amber-400/[0.12] to-orange-400/[0.04] p-4 sm:p-5">
-      <div class="w-9 h-9 shrink-0 grid place-items-center rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-      </div>
-      <p class="text-[12px] sm:text-[12.5px] leading-7 sm:leading-8 text-amber-100/90">
-        <b class="text-amber-200 block mb-1">⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️</b>
-        ممکنه دسترسی دامنه به‌دلیل محدودیت‌های منطقه‌ای، اپراتور یا ISP متفاوت باشه. در این شرایط یک دامنه جدید امتحان کنید.
-      </p>
     </div>
   </section>
 
@@ -4066,11 +4053,10 @@ async def info_page(
             <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
           </div>
 
-          <!-- Real usage chart based on actual tracked historical traffic data -->
           <div class="mt-4 rounded-xl border border-white/[0.05] bg-black/15 px-3 pt-3 pb-1.5">
             <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
-              روند مصرف (واقعی)
+              روند مصرف
             </p>
             <svg viewBox="0 0 300 64" class="w-full h-14" preserveAspectRatio="none">
               <defs>
@@ -4294,7 +4280,7 @@ async def info_page(
 
 </div>
 
-<!-- New Feature: QR Code Modal Popup -->
+<!-- QR Code Modal Popup -->
 <div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
   <div class="w-full max-w-sm rounded-[24px] border border-white/15 bg-[#0b0c14] p-6 text-center shadow-2xl relative">
     <button type="button" onclick="closeQrModal()" class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/5 border border-white/10 grid place-items-center text-white/60 hover:text-white">✕</button>
@@ -4356,7 +4342,7 @@ function pxCopy(textId, btnId) {{
   if (navigator.clipboard && navigator.clipboard.writeText) {{
     navigator.clipboard.writeText(text).then(done).catch(function() {{ fallbackCopy(text, done); }});
   }} else {{
-    fallbackDocCopy(text, done);
+    fallbackCopy(text, done);
   }}
 }}
 function fallbackCopy(text, cb) {{
@@ -4374,7 +4360,6 @@ function fallbackCopy(text, cb) {{
 </body>
 </html>"""
     return HTMLResponse(info_html)
-
 # ============================================================
 # SUB GROUP API
 # ============================================================
