@@ -6961,11 +6961,8 @@ class="modal-backdrop"
 ساخـت کانفیـگ دستــی
 </div>
 
-<button
-class="close"
-onclick="closeManualModal()"
->
-×
+<button class="close" onclick="closeManualModal()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; color: rgba(255, 255, 255, 0.7); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.color='rgba(255, 255, 255, 0.7)';">
+  ×
 </button>
 
 </div>
@@ -7241,16 +7238,8 @@ class="modal-backdrop"
 
 
 
-<button
-
-class="close"
-
-onclick="closeAutoModal()"
-
->
-
-×
-
+<button class="close" onclick="closeAutoModal()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; color: rgba(255, 255, 255, 0.7); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.color='rgba(255, 255, 255, 0.7)';">
+  ×
 </button>
 
 
@@ -7470,11 +7459,8 @@ class="modal-backdrop"
 تغییر رمز پنـل
 </div>
 
-<button
-class="close"
-onclick="closePasswordModal()"
->
-×
+<button class="close" onclick="closePasswordModal()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; color: rgba(255, 255, 255, 0.7); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.color='rgba(255, 255, 255, 0.7)';">
+  ×
 </button>
 
 </div>
