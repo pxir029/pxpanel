@@ -3938,290 +3938,233 @@ async def info_page(
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{escape_html(snapshot.get("label","PXpanel"))} | INFO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-:root{{
-  --bg:#05060a;
-  --card:rgba(255,255,255,.035);
-  --card-hover:rgba(255,255,255,.055);
-  --border:rgba(255,255,255,.08);
-  --border-soft:rgba(255,255,255,.05);
-  --text:#f1f3f9;
-  --muted:rgba(255,255,255,.45);
-  --muted2:rgba(255,255,255,.28);
-  --green:#34d399;
-  --green-soft:rgba(52,211,153,.12);
-  --blue:#60a5fa;
-  --blue-soft:rgba(96,165,250,.12);
-  --orange:#f59e0b;
-  --orange-soft:rgba(245,158,11,.12);
-  --red:#fb7185;
-  --purple:#a78bfa;
-  --purple-soft:rgba(167,139,250,.12);
-  --radius:22px;
-  --radius-sm:14px;
-}}
-*{{box-sizing:border-box;margin:0;padding:0}}
-html,body{{min-height:100%;background:var(--bg)}}
-body{{
-  font-family:"Vazirmatn",system-ui,sans-serif;
-  color:var(--text);
-  padding:28px 16px;
-  background:
-    radial-gradient(ellipse 80% 50% at 10% -10%,rgba(96,165,250,.18),transparent 50%),
-    radial-gradient(ellipse 60% 40% at 95% 20%,rgba(167,139,250,.14),transparent 45%),
-    radial-gradient(ellipse 50% 30% at 70% 100%,rgba(52,211,153,.08),transparent 40%),
-    var(--bg);
-  line-height:1.6;
-}}
-.page{{width:min(880px,100%);margin:0 auto}}
-.shell{{
-  position:relative;
-  overflow:hidden;
-  border:1px solid var(--border);
-  background:linear-gradient(165deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 100%);
-  backdrop-filter:blur(32px);
-  -webkit-backdrop-filter:blur(32px);
-  border-radius:28px;
-  box-shadow:0 40px 80px -20px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03) inset;
-}}
-.shell::before{{
-  content:"";
-  position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(135deg,rgba(255,255,255,.05) 0%,transparent 40%,rgba(255,255,255,.02) 100%);
-  border-radius:inherit;
-}}
-
-/* Hero */
-.hero{{padding:28px 28px 22px;border-bottom:1px solid var(--border-soft)}}
-.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:18px}}
-.brand{{display:flex;align-items:center;gap:14px}}
-.brand-icon{{
-  width:48px;height:48px;
-  display:grid;place-items:center;
-  border-radius:16px;
-  background:linear-gradient(145deg,rgba(96,165,250,.18),rgba(167,139,250,.1));
-  border:1px solid rgba(96,165,250,.22);
-  color:#93c5fd;font-weight:900;font-size:15px;
-  box-shadow:0 8px 24px -6px rgba(96,165,250,.25);
-}}
-.hero h1{{margin:0;font-size:22px;font-weight:900;letter-spacing:-.4px}}
-.hero-meta{{margin-top:5px;color:var(--muted);font-size:11px;word-break:break-all;opacity:.85}}
-.status{{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:9px 14px;border-radius:999px;
-  font-size:12px;font-weight:800;white-space:nowrap;
-}}
-.status i{{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor}}
-.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.1)}}
-.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.25);background:rgba(251,113,133,.1)}}
-
-/* Notice */
-.notice{{
-  margin-top:20px;display:flex;gap:12px;align-items:flex-start;
-  padding:14px 16px;
-  border:1px solid rgba(167,139,250,.2);
-  background:linear-gradient(120deg,rgba(167,139,250,.12),rgba(96,165,250,.05));
-  border-radius:16px;
-  color:rgba(255,255,255,.65);font-size:12px;line-height:1.85;
-}}
-.notice-icon{{
-  width:28px;height:28px;flex:0 0 28px;
-  display:grid;place-items:center;border-radius:10px;
-  background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.2);
-  color:#c4b5fd;font-size:13px;font-weight:800;
-}}
-.notice strong{{color:#ddd6fe}}
-
-/* Dashboard */
-.dashboard{{display:grid;grid-template-columns:1.4fr .6fr;gap:14px;padding:20px 20px 8px}}
-.usage-card,.side-card{{
-  border:1px solid var(--border);
-  background:var(--card);
-  border-radius:var(--radius);
-}}
-.usage-card{{padding:22px}}
-.section-kicker{{
-  font-size:10px;color:var(--muted2);font-weight:800;
-  letter-spacing:1px;text-transform:uppercase;
-}}
-.section-title{{margin-top:5px;font-size:15px;font-weight:900}}
-.usage-line{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:18px}}
-.usage-number{{font-size:26px;font-weight:900;letter-spacing:-.6px}}
-.usage-number span{{font-size:13px;color:var(--muted);font-weight:600}}
-.usage-percent{{font-size:15px;font-weight:900;color:#86efac}}
-.track{{
-  height:10px;margin-top:14px;border-radius:999px;
-  background:rgba(255,255,255,.06);overflow:hidden;
-  border:1px solid rgba(255,255,255,.04);
-}}
-.track span{{
-  display:block;height:100%;width:{usage_percent}%;
-  border-radius:inherit;
-  background:linear-gradient(90deg,#34d399 0%,#f59e0b 100%);
-  box-shadow:0 0 18px rgba(52,211,153,.3);
-  transition:width .4s ease;
-}}
-.usage-bottom{{
-  display:flex;justify-content:space-between;gap:10px;
-  margin-top:12px;color:var(--muted);font-size:11px;
-}}
-.side-card{{padding:18px}}
-.side-row{{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:12px 0;border-bottom:1px solid var(--border-soft);
-}}
-.side-row:last-child{{border-bottom:0;padding-bottom:0}}
-.side-label{{font-size:11px;color:var(--muted)}}
-.side-value{{font-size:12px;font-weight:800}}
-
-/* Stats */
-.stats{{
-  display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
-  padding:12px 20px 8px;
-}}
-.metric{{
-  position:relative;overflow:hidden;
-  padding:16px;border-radius:18px;
-  border:1px solid var(--border);background:var(--card);
-  transition:background .2s,border-color .2s;
-}}
-.metric:hover{{background:var(--card-hover);border-color:rgba(255,255,255,.12)}}
-.metric::before{{
-  content:"";position:absolute;inset:0;
-  background:linear-gradient(145deg,rgba(255,255,255,.03),transparent 60%);
-  pointer-events:none;
-}}
-.metric .dot{{
-  width:9px;height:9px;border-radius:50%;margin-bottom:10px;
-  background:var(--c);box-shadow:0 0 16px color-mix(in srgb,var(--c) 50%,transparent);
-}}
-.metric-label{{color:var(--muted);font-size:11px}}
-.metric-value{{margin-top:6px;font-size:14px;font-weight:900;color:var(--c);word-break:break-word}}
-.metric.green{{--c:#34d399}}
-.metric.orange{{--c:#f59e0b}}
-.metric.blue{{--c:#60a5fa}}
-.metric.purple{{--c:#a78bfa}}
-
-/* Content sections */
-.content{{padding:8px 20px 24px}}
-.section{{
-  margin-top:14px;padding:20px;
-  border:1px solid var(--border);background:var(--card);
-  border-radius:var(--radius);
-}}
-.section-head{{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:4px}}
-.section-head .section-title{{margin:0;font-size:15px}}
-.section-sub{{color:var(--muted);font-size:11px}}
-.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}}
-.info-item{{
-  padding:14px;border-radius:var(--radius-sm);
-  border:1px solid var(--border-soft);background:rgba(0,0,0,.18);
-}}
-.info-label{{font-size:11px;color:var(--muted)}}
-.info-value{{margin-top:6px;font-size:12px;font-weight:700;color:rgba(255,255,255,.88);word-break:break-word}}
-.code{{direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#c4b5fd;font-weight:500}}
-
-/* Links */
-.link-card{{
-  display:flex;align-items:center;justify-content:space-between;gap:14px;
-  padding:14px;border-radius:var(--radius-sm);
-  border:1px solid var(--border-soft);background:rgba(0,0,0,.18);
-  margin-top:10px;transition:border-color .2s,background .2s;
-}}
-.link-card:first-of-type{{margin-top:14px}}
-.link-card:hover{{border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}}
-.link-main{{min-width:0;flex:1}}
-.link-name{{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:.3px}}
-.link-url{{
-  margin-top:5px;direction:ltr;text-align:left;
-  font-family:ui-monospace,Consolas,monospace;font-size:11px;
-  color:#c4b5fd;word-break:break-all;line-height:1.5;
-}}
-.copy-hint{{
-  flex:0 0 auto;font-size:10px;font-weight:700;
-  color:var(--muted2);padding:6px 10px;border-radius:8px;
-  background:rgba(255,255,255,.04);border:1px solid var(--border-soft);
-}}
-
-/* Downloads */
-.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}}
-.download{{
-  display:flex;align-items:center;gap:12px;min-height:72px;
-  padding:14px;text-decoration:none;color:#fff;
-  border:1px solid var(--border);background:var(--card);
-  border-radius:16px;
-  transition:transform .2s ease,border-color .2s,background .2s,box-shadow .2s;
-}}
-.download:hover{{
-  transform:translateY(-3px);
-  border-color:rgba(96,165,250,.3);
-  background:linear-gradient(145deg,rgba(96,165,250,.1),rgba(255,255,255,.03));
-  box-shadow:0 12px 28px -8px rgba(96,165,250,.2);
-}}
-.app-icon{{
-  width:34px;height:34px;flex:0 0 34px;
-  display:grid;place-items:center;border-radius:11px;
-  background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.18);
-  color:#93c5fd;font-size:12px;font-weight:900;
-}}
-.download strong{{display:block;font-size:12px;font-weight:800}}
-.download span{{display:block;margin-top:3px;color:var(--muted);font-size:10px}}
-
-/* Channel */
-.channel{{
-  margin-top:18px;padding:14px 16px;text-align:center;
-  border:1px solid rgba(52,211,153,.15);background:rgba(52,211,153,.06);
-  border-radius:14px;color:var(--muted);font-size:12px;
-}}
-.channel b{{color:#6ee7b7}}
-
-/* Responsive */
-@media(max-width:760px){{
-  body{{padding:12px}}
-  .hero{{padding:20px 18px 16px}}
-  .dashboard{{grid-template-columns:1fr;padding:14px}}
-  .stats{{grid-template-columns:repeat(2,1fr);padding:8px 14px}}
-  .content{{padding:6px 14px 18px}}
-  .downloads{{grid-template-columns:1fr}}
-  .hero-row{{align-items:flex-start;flex-direction:column}}
-  .info-grid{{grid-template-columns:1fr}}
-}}
-</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {{
+    theme: {{
+      extend: {{
+        fontFamily: {{
+          sans: ['Vazirmatn', 'system-ui', 'sans-serif'],
+          mono: ['ui-monospace', 'Consolas', 'monospace']
+        }}
+      }}
+    }}
+  }}
+</script>
 </head>
-<body>
-<div class="page"><div class="shell">
-<section class="hero">
-<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
-<div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
-</section>
+<body class="min-h-screen bg-[#05060a] text-[#f1f3f9] font-sans p-4 sm:p-7 relative overflow-x-hidden selection:bg-blue-500/30 selection:text-blue-200" style="background-image: radial-gradient(ellipse 80% 50% at 10% -10%, rgba(96,165,250,0.18), transparent 50%), radial-gradient(ellipse 60% 40% at 95% 20%, rgba(167,139,250,0.14), transparent 45%), radial-gradient(ellipse 50% 30% at 70% 100%, rgba(52,211,153,0.08), transparent 40%), #05060a;">
 
-<section class="dashboard">
-<div class="usage-card"><div class="section-kicker">Traffic Overview</div><div class="section-title">مصرف سرویس</div><div class="usage-line"><div class="usage-number">{escape_html(fmt_bytes(used))} <span>/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div><div class="usage-percent">{usage_percent}%</div></div><div class="track"><span></span></div><div class="usage-bottom"><span>باقی‌مانده: {escape_html(remaining_value)}</span><span>زمان: {escape_html(expiry_remaining)}</span></div></div>
-<div class="side-card"><div class="section-kicker">Service</div><div class="side-row"><span class="side-label">انقضا</span><span class="side-value">{escape_html(expiry_display)}</span></div><div class="side-row"><span class="side-label">IP Limit</span><span class="side-value">{escape_html(ip_limit)}</span></div><div class="side-row"><span class="side-label">Connection</span><span class="side-value">{escape_html(connection_limit)}</span></div><div class="side-row"><span class="side-label">Speed</span><span class="side-value">{escape_html(speed_limit)}</span></div></div>
-</section>
+  <div class="w-full max-w-[880px] mx-auto">
+    <div class="relative overflow-hidden border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-[32px] rounded-[28px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)_inset] p-6 sm:p-8 space-y-6">
 
-<section class="stats">
-<div class="metric green"><div class="dot"></div><div class="metric-label">مصرف فعلی</div><div class="metric-value">{escape_html(fmt_bytes(used))}</div></div>
-<div class="metric orange"><div class="dot"></div><div class="metric-label">باقی‌مانده</div><div class="metric-value">{escape_html(remaining_value)}</div></div>
-<div class="metric blue"><div class="dot"></div><div class="metric-label">اتصالات فعال</div><div class="metric-value">{len(unique_ips_for_uuid(uid))}</div></div>
-<div class="metric purple"><div class="dot"></div><div class="metric-label">زمان باقی‌مانده</div><div class="metric-value">{escape_html(expiry_remaining)}</div></div>
-</section>
+      <section class="pb-6 border-b border-white/[0.05]">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-4 min-w-0">
+            <div class="w-12 h-12 shrink-0 grid place-items-center rounded-2xl bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/30 text-blue-300 font-black text-[15px] shadow-[0_8px_24px_-6px_rgba(96,165,250,0.25)]">
+              PX
+            </div>
+            <div class="min-w-0">
+              <h1 class="text-xl sm:text-[22px] font-black tracking-tight truncate">{escape_html(snapshot.get("label","PXpanel"))}</h1>
+              <div class="mt-1 text-white/45 text-[11px] break-all opacity-85">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div>
+            </div>
+          </div>
+          
+          <div class="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap {status_class}">
+            <span class="w-2 h-2 rounded-full bg-current animate-pulse"></span>
+            {status_text}
+          </div>
+        </div>
 
-<div class="content">
-<section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
+        <div class="mt-5 flex gap-3 items-start p-4 border border-purple-500/20 bg-gradient-to-r from-purple-500/[0.12] to-blue-500/[0.05] rounded-2xl text-white/65 text-xs leading-relaxed">
+          <div class="w-7 h-7 shrink-0 grid place-items-center rounded-xl bg-purple-500/15 border border-purple-500/20 text-[#c4b5fd] font-extrabold text-[13px]">!</div>
+          <div>
+            <strong class="text-[#ddd6fe] font-bold">اطلاعیه اتصال</strong><br>
+            لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. 
+            <strong class="text-white/90">کانال تلگرام: logic_sec</strong>
+          </div>
+        </div>
+      </section>
 
-<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
+      <section class="grid grid-cols-1 lg:grid-cols-[1.4fr_0.6fr] gap-4">
+        <div class="border border-white/[0.08] bg-white/[0.035] rounded-[22px] p-5 sm:p-6">
+          <div class="text-[10px] text-white/30 font-extrabold tracking-widest uppercase">Traffic Overview</div>
+          <div class="mt-1 text-[15px] font-black">مصرف سرویس</div>
+          
+          <div class="flex items-end justify-between gap-3 mt-4">
+            <div class="text-2xl sm:text-[26px] font-black tracking-tight">
+              {escape_html(fmt_bytes(used))} <span class="text-xs sm:text-[13px] text-white/45 font-semibold">/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
+            </div>
+            <div class="text-[15px] font-black text-[#86efac]">{usage_percent}%</div>
+          </div>
 
-<section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
+          <div class="h-2.5 mt-3.5 rounded-full bg-white/[0.06] overflow-hidden border border-white/[0.04]">
+            <span class="block h-full rounded-full bg-gradient-to-r from-emerald-400 to-amber-500 shadow-[0_0_18px_rgba(52,211,153,0.3)] transition-all duration-500" style="width: {usage_percent}%;"></span>
+          </div>
 
-<div class="channel">پشتیبانی و اطلاعیه‌ها · <b>کانال تلگرام: logic_sec</b></div>
-</div></div></div>
-</body></html>"""
+          <div class="flex justify-between gap-2 mt-3 text-white/45 text-[11px]">
+            <span>باقی‌مانده: {escape_html(remaining_value)}</span>
+            <span>زمان: {escape_html(expiry_remaining)}</span>
+          </div>
+        </div>
+
+        <div class="border border-white/[0.08] bg-white/[0.035] rounded-[22px] p-5 flex flex-col justify-between">
+          <div>
+            <div class="text-[10px] text-white/30 font-extrabold tracking-widest uppercase">Service</div>
+          </div>
+          <div class="space-y-3 my-auto py-2">
+            <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-white/[0.05]">
+              <span class="text-[11px] text-white/45">انقضا</span>
+              <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
+            </div>
+            <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-white/[0.05]">
+              <span class="text-[11px] text-white/45">IP Limit</span>
+              <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
+            </div>
+            <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-white/[0.05]">
+              <span class="text-[11px] text-white/45">Connection</span>
+              <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] text-white/45">Speed</span>
+              <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="relative overflow-hidden p-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] hover:bg-white/[0.055] hover:border-white/[0.12] transition-colors">
+          <div class="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none"></div>
+          <div class="w-2.5 h-2.5 rounded-full mb-2.5 bg-[#34d399] shadow-[0_0_16px_rgba(52,211,153,0.5)]"></div>
+          <div class="text-white/45 text-[11px]">مصرف فعلی</div>
+          <div class="mt-1.5 text-sm font-black text-[#34d399] break-words">{escape_html(fmt_bytes(used))}</div>
+        </div>
+
+        <div class="relative overflow-hidden p-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] hover:bg-white/[0.055] hover:border-white/[0.12] transition-colors">
+          <div class="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none"></div>
+          <div class="w-2.5 h-2.5 rounded-full mb-2.5 bg-[#f59e0b] shadow-[0_0_16px_rgba(245,158,11,0.5)]"></div>
+          <div class="text-white/45 text-[11px]">باقی‌مانده</div>
+          <div class="mt-1.5 text-sm font-black text-[#f59e0b] break-words">{escape_html(remaining_value)}</div>
+        </div>
+
+        <div class="relative overflow-hidden p-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] hover:bg-white/[0.055] hover:border-white/[0.12] transition-colors">
+          <div class="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none"></div>
+          <div class="w-2.5 h-2.5 rounded-full mb-2.5 bg-[#60a5fa] shadow-[0_0_16px_rgba(96,165,250,0.5)]"></div>
+          <div class="text-white/45 text-[11px]">اتصالات فعال</div>
+          <div class="mt-1.5 text-sm font-black text-[#60a5fa] break-words">{len(unique_ips_for_uuid(uid))}</div>
+        </div>
+
+        <div class="relative overflow-hidden p-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] hover:bg-white/[0.055] hover:border-white/[0.12] transition-colors">
+          <div class="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none"></div>
+          <div class="w-2.5 h-2.5 rounded-full mb-2.5 bg-[#a78bfa] shadow-[0_0_16px_rgba(167,139,250,0.5)]"></div>
+          <div class="text-white/45 text-[11px]">زمان باقی‌مانده</div>
+          <div class="mt-1.5 text-sm font-black text-[#a78bfa] break-words">{escape_html(expiry_remaining)}</div>
+        </div>
+      </section>
+
+      <div class="space-y-4">
+        
+        <section class="p-5 sm:p-6 border border-white/[0.08] bg-white/[0.035] rounded-[22px]">
+          <div class="flex items-end justify-between gap-3 mb-4">
+            <h2 class="text-[15px] font-black">جزئیات فنی</h2>
+            <span class="text-white/45 text-[11px]">Configuration Details</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20">
+              <div class="text-[11px] text-white/45">Protocol</div>
+              <div class="mt-1.5 text-xs font-bold text-white/90 font-mono ltr text-left">{escape_html(snapshot.get("protocol","vless-ws"))}</div>
+            </div>
+            <div class="p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20">
+              <div class="text-[11px] text-white/45">Fingerprint</div>
+              <div class="mt-1.5 text-xs font-bold text-white/90 font-mono ltr text-left">{escape_html(snapshot.get("fingerprint","chrome"))}</div>
+            </div>
+            <div class="p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20">
+              <div class="text-[11px] text-white/45">IP Limit</div>
+              <div class="mt-1.5 text-xs font-bold text-white/95">{escape_html(ip_limit)}</div>
+            </div>
+            <div class="p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20">
+              <div class="text-[11px] text-white/45">Connection Limit</div>
+              <div class="mt-1.5 text-xs font-bold text-white/95">{escape_html(connection_limit)}</div>
+            </div>
+            <div class="p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20">
+              <div class="text-[11px] text-white/45">Speed Limit</div>
+              <div class="mt-1.5 text-xs font-bold text-white/95">{escape_html(speed_limit)}</div>
+            </div>
+            <div class="p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20">
+              <div class="text-[11px] text-white/45">تاریخ انقضا</div>
+              <div class="mt-1.5 text-xs font-bold text-white/95">{escape_html(expiry_display)}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="p-5 sm:p-6 border border-white/[0.08] bg-white/[0.035] rounded-[22px]">
+          <div class="flex items-end justify-between gap-3 mb-4">
+            <h2 class="text-[15px] font-black">لینک‌های سرویس</h2>
+            <span class="text-white/45 text-[11px]">Copy / Import</span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-4 p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20 hover:border-purple-500/25 hover:bg-purple-500/[0.06] transition-colors">
+              <div class="min-w-0 flex-1">
+                <div class="text-[11px] text-white/45 font-extrabold tracking-wide">VLESS</div>
+                <div class="mt-1 font-mono text-[11px] text-[#c4b5fd] break-all leading-relaxed ltr text-left">{escape_html(vless_url)}</div>
+              </div>
+              <div class="shrink-0 text-[10px] font-bold text-white/30 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.05]">VLESS</div>
+            </div>
+            <div class="flex items-center justify-between gap-4 p-3.5 rounded-[14px] border border-white/[0.05] bg-black/20 hover:border-purple-500/25 hover:bg-purple-500/[0.06] transition-colors">
+              <div class="min-w-0 flex-1">
+                <div class="text-[11px] text-white/45 font-extrabold tracking-wide">SUBSCRIPTION</div>
+                <div class="mt-1 font-mono text-[11px] text-[#c4b5fd] break-all leading-relaxed ltr text-left">{escape_html(sub_url)}</div>
+              </div>
+              <div class="shrink-0 text-[10px] font-bold text-white/30 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.05]">SUB</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="p-5 sm:p-6 border border-white/[0.08] bg-white/[0.035] rounded-[22px]">
+          <div class="flex items-end justify-between gap-3 mb-4">
+            <h2 class="text-[15px] font-black">دانلود برنامه‌ها</h2>
+            <span class="text-white/45 text-[11px]">Official Releases</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <a class="flex items-center gap-3 min-h-[72px] p-3.5 text-white border border-white/[0.08] bg-white/[0.035] rounded-2xl hover:border-blue-400/30 hover:bg-gradient-to-br hover:from-blue-400/10 hover:to-white/[0.03] transition-all" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer">
+              <div class="w-[34px] h-[34px] shrink-0 grid place-items-center rounded-[11px] bg-blue-400/10 border border-blue-400/20 text-[#93c5fd] text-xs font-black">NG</div>
+              <div>
+                <strong class="block text-xs font-extrabold">v2rayNG</strong>
+                <span class="block mt-0.5 text-white/45 text-[10px]">Android</span>
+              </div>
+            </a>
+            <a class="flex items-center gap-3 min-h-[72px] p-3.5 text-white border border-white/[0.08] bg-white/[0.035] rounded-2xl hover:border-blue-400/30 hover:bg-gradient-to-br hover:from-blue-400/10 hover:to-white/[0.03] transition-all" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer">
+              <div class="w-[34px] h-[34px] shrink-0 grid place-items-center rounded-[11px] bg-blue-400/10 border border-blue-400/20 text-[#93c5fd] text-xs font-black">N</div>
+              <div>
+                <strong class="block text-xs font-extrabold">v2rayN</strong>
+                <span class="block mt-0.5 text-white/45 text-[10px]">Windows / macOS / Linux</span>
+              </div>
+            </a>
+            <a class="flex items-center gap-3 min-h-[72px] p-3.5 text-white border border-white/[0.08] bg-white/[0.035] rounded-2xl hover:border-blue-400/30 hover:bg-gradient-to-br hover:from-blue-400/10 hover:to-white/[0.03] transition-all" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer">
+              <div class="w-[34px] h-[34px] shrink-0 grid place-items-center rounded-[11px] bg-blue-400/10 border border-blue-400/20 text-[#93c5fd] text-xs font-black">H</div>
+              <div>
+                <strong class="block text-xs font-extrabold">Hiddify</strong>
+                <span class="block mt-0.5 text-white/45 text-[10px]">Android / Windows / macOS / Linux</span>
+              </div>
+            </a>
+          </div>
+        </section>
+
+        <div class="p-4 text-center border border-emerald-500/15 bg-emerald-500/[0.06] rounded-[14px] text-white/45 text-xs">
+          پشتیبانی و اطلاعیه‌ها · <b class="text-[#6ee7b7]">کانال تلگرام: logic_sec</b>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>"""
     return HTMLResponse(info_html)
 
 
