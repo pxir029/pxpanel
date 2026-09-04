@@ -6689,15 +6689,14 @@ class="stat-value"
 </div>
 
 
-<div class="panel" style="background-color: #111827; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); direction: rtl;">
-  
-  <!-- Panel Header -->
-  <div class="panel-head" style="display: flex; flex-direction: column; md-flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 16px; margin-bottom: 16px;">
+<div class="panel" style="background: #111827; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); overflow: hidden; font-family: system-ui, -apple-system, sans-serif;">
+
+  <div class="panel-head" style="display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
     <div>
-      <div class="panel-title" style="font-size: 1.25rem; font-weight: 700; color: #ffffff; letter-spacing: -0.025em;">
+      <div class="panel-title" style="font-size: 1.1rem; font-weight: 700; color: #f9fafb; margin-bottom: 4px;">
         مدیریت کانفیگ‌هـا
       </div>
-      <div class="panel-sub" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); margin-top: 4px;">
+      <div class="panel-sub" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); direction: rtl;">
         <span style="opacity: 0.8;">پشتیبانــی:</span>
         <a href="https://t.me/logictop12" target="_blank" rel="noopener noreferrer" style="font-weight: 500; color: #34d399; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#6ee7b7'; this.style.textDecoration='underline';" onmouseout="this.style.color='#34d399'; this.style.textDecoration='none';">
           @logictop12
@@ -6706,23 +6705,22 @@ class="stat-value"
     </div>
   </div>
 
-  <!-- Table Container -->
-  <div class="table-wrap" style="overflow-x: auto; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06);">
-    <table style="width: 100%; border-collapse: collapse; text-align: right; white-space: nowrap; font-size: 0.875rem; color: #ffffff;">
+  <div class="table-wrap" style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; text-align: right; direction: rtl;">
       <thead>
-        <tr style="background-color: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.65); font-size: 0.8125rem;">
-          <th style="padding: 12px 16px; font-weight: 600;">نـام</th>
-          <th style="padding: 12px 16px; font-weight: 600;">پروتـکل</th>
-          <th style="padding: 12px 16px; font-weight: 600;">وضعیـت</th>
-          <th style="padding: 12px 16px; font-weight: 600;">مصـرف</th>
-          <th style="padding: 12px 16px; font-weight: 600;">زمـان</th>
-          <th style="padding: 12px 16px; font-weight: 600;">اتصـال</th>
-          <th style="padding: 12px 16px; font-weight: 600;">VLESS</th>
-          <th style="padding: 12px 16px; font-weight: 600;">عملیـات</th>
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: rgba(255, 255, 255, 0.02);">
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">نـام</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">پروتـکل</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">وضعیـت</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">مصـرف</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">زمـان</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">اتصـال</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">VLESS</th>
+          <th style="padding: 14px 20px; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.6);">عملیـات</th>
         </tr>
       </thead>
-      <tbody id="linksTable">
-        <!-- Rows will be dynamically injected here -->
+      <tbody id="linksTable" style="font-size: 0.85rem; color: #e5e7eb;">
+        <!-- محتوای جدول از طریق جاوااسکریپت لود می‌شود -->
       </tbody>
     </table>
   </div>
