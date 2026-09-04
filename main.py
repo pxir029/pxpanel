@@ -6689,88 +6689,45 @@ class="stat-value"
 </div>
 
 
-<div class="panel">
+<div class="panel" style="background-color: #111827; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); direction: rtl;">
+  
+  <!-- Panel Header -->
+  <div class="panel-head" style="display: flex; flex-direction: column; md-flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 16px; margin-bottom: 16px;">
+    <div>
+      <div class="panel-title" style="font-size: 1.25rem; font-weight: 700; color: #ffffff; letter-spacing: -0.025em;">
+        مدیریت کانفیگ‌هـا
+      </div>
+      <div class="panel-sub" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); margin-top: 4px;">
+        <span style="opacity: 0.8;">پشتیبانــی:</span>
+        <a href="https://t.me/logictop12" target="_blank" rel="noopener noreferrer" style="font-weight: 500; color: #34d399; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#6ee7b7'; this.style.textDecoration='underline';" onmouseout="this.style.color='#34d399'; this.style.textDecoration='none';">
+          @logictop12
+        </a>
+      </div>
+    </div>
+  </div>
 
-<div class="panel-head">
-
-<div>
-
-<div class="panel-title">
-مدیریت کانفیگ‌هـا
-</div>
-
-<div class="panel-sub" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); padding: 12px; text-align: center; direction: rtl;">
-  <span style="opacity: 0.8;">پشتیبانــی:</span>
-  <a href="https://t.me/logictop12" target="_blank" rel="noopener noreferrer" style="font-weight: 500; color: #34d399; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#6ee7b7'; this.style.textDecoration='underline';" onmouseout="this.style.color='#34d399'; this.style.textDecoration='none';">
-    @logictop12
-  </a>
-</div>
-
-</div>
-
-<button
-class="top-btn primary"
-onclick="refresh()"
->
-↻ بروزرسانـی
-</button>
-
-</div>
-
-<div class="table-wrap">
-
-<table>
-
-<thead>
-
-<tr>
-
-<th>
-نـام
-</th>
-
-<th>
-پروتـکل
-</th>
-
-<th>
-وضعیـت
-</th>
-
-<th>
-مصـرف
-</th>
-
-<th>
-زمـان
-</th>
-
-<th>
-اتصـال
-</th>
-
-<th>
-VLESS
-</th>
-
-<th>
-عملیـات
-</th>
-
-</tr>
-
-</thead>
-
-<tbody id="linksTable">
-
-</tbody>
-
-</table>
+  <!-- Table Container -->
+  <div class="table-wrap" style="overflow-x: auto; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06);">
+    <table style="width: 100%; border-collapse: collapse; text-align: right; white-space: nowrap; font-size: 0.875rem; color: #ffffff;">
+      <thead>
+        <tr style="background-color: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.65); font-size: 0.8125rem;">
+          <th style="padding: 12px 16px; font-weight: 600;">نـام</th>
+          <th style="padding: 12px 16px; font-weight: 600;">پروتـکل</th>
+          <th style="padding: 12px 16px; font-weight: 600;">وضعیـت</th>
+          <th style="padding: 12px 16px; font-weight: 600;">مصـرف</th>
+          <th style="padding: 12px 16px; font-weight: 600;">زمـان</th>
+          <th style="padding: 12px 16px; font-weight: 600;">اتصـال</th>
+          <th style="padding: 12px 16px; font-weight: 600;">VLESS</th>
+          <th style="padding: 12px 16px; font-weight: 600;">عملیـات</th>
+        </tr>
+      </thead>
+      <tbody id="linksTable">
+        <!-- Rows will be dynamically injected here -->
+      </tbody>
+    </table>
+  </div>
 
 </div>
-
-</div>
-
 
 <div class="panel">
 
@@ -7255,31 +7212,17 @@ class="modal-backdrop"
 <label>پروتکـل</label>
 
 <select id="autoProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-
   <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
-
   <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up</option>
-
   <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
-
   <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
-
   <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
-
   <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
-
   <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
-
   <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
-
   <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
-
   <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
-
   <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
-
-  <option value="wireguard" style="background-color: #1f2937; color: #ffffff;">WireGuard</option>
-
 </select>
 
 </div>
