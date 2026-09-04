@@ -3934,11 +3934,11 @@ async def info_page(
     connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
     speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
 
-   info_html = f"""<!DOCTYPE html>
+    info_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{escape_html(snapshot.get("label","PXpanel"))} | INFO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3948,245 +3948,249 @@ async def info_page(
   tailwind.config = {{
     theme: {{
       extend: {{
-        fontFamily: {{
-          sans: ['Vazirmatn', 'system-ui', 'sans-serif'],
-          mono: ['ui-monospace', 'Consolas', 'monospace']
+        fontFamily: {{ vazir: ['Vazirmatn','system-ui','sans-serif'] }},
+        colors: {{
+          panel: '#05060a'
         }}
       }}
     }}
   }}
 </script>
-<script>
-  function copyText(text, btnElement) {{
-    navigator.clipboard.writeText(text).then(() => {{
-      const originalHTML = btnElement.innerHTML;
-      btnElement.innerHTML = '<span class="text-emerald-300">کپی شد!</span>';
-      btnElement.classList.add('bg-emerald-500/20', 'border-emerald-500/40');
-      setTimeout(() => {{
-        btnElement.innerHTML = originalHTML;
-        btnElement.classList.remove('bg-emerald-500/20', 'border-emerald-500/40');
-      }}, 2000);
-    }}).catch(err => {{
-      console.error('Failed to copy: ', err);
-    }});
+<style>
+  html,body{{background:#05060a}}
+  body{{
+    background:
+      radial-gradient(ellipse 80% 50% at 10% -10%, rgba(96,165,250,.16), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 95% 15%, rgba(167,139,250,.13), transparent 45%),
+      radial-gradient(ellipse 55% 35% at 60% 100%, rgba(52,211,153,.08), transparent 40%),
+      #05060a;
   }}
-</script>
+  .status-dot{{box-shadow:0 0 10px currentColor}}
+  ::-webkit-scrollbar{{width:8px;height:8px}}
+  ::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
+  * {{ box-shadow: none !important; }}
+</style>
 </head>
-<body class="min-h-screen bg-[#07090e] text-[#f1f3f9] font-sans p-3 sm:p-6 md:p-8 selection:bg-purple-500/30 selection:text-purple-200">
+<body class="font-vazir text-slate-100 antialiased min-h-screen py-10 px-4 md:py-14">
 
-  <div class="w-full max-w-[840px] mx-auto space-y-4 sm:space-y-5">
-    
-    <!-- Hero / Header Card -->
-    <div class="p-5 sm:p-6 bg-[#0e121b] border border-white/[0.07] rounded-[24px] shadow-lg">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-3.5 min-w-0">
-          <div class="w-12 h-12 shrink-0 grid place-items-center rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-black text-base shadow-inner">
-            PX
-          </div>
-          <div class="min-w-0">
-            <h1 class="text-xl sm:text-2xl font-black tracking-tight truncate">{escape_html(snapshot.get("label","PXpanel"))}</h1>
-            <div class="mt-0.5 text-white/40 text-[11px] sm:text-xs break-all">UUID: {escape_html(uid)} · {APP_VERSION}</div>
-          </div>
-        </div>
-        
-        <!-- Status Badge -->
-        <div class="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap {status_class}">
-          <span class="w-2 h-2 rounded-full bg-current"></span>
-          {status_text}
-        </div>
-      </div>
+<div class="w-full max-w-4xl mx-auto space-y-6 md:space-y-8">
 
-      <!-- Notice Box -->
-      <div class="mt-4 sm:mt-5 p-3.5 sm:p-4 bg-[#141a26] border border-purple-500/20 rounded-xl text-white/70 text-xs sm:text-[13px] leading-relaxed flex gap-3 items-start">
-        <div class="w-6 h-6 shrink-0 grid place-items-center rounded-lg bg-purple-500/15 text-purple-300 font-bold text-xs mt-0.5">!</div>
+  <!-- Hero -->
+  <section class="rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300 font-black text-base">
+          PX
+        </div>
         <div>
-          <strong class="text-purple-200 font-bold block mb-0.5">اطلاعیه اتصال</strong>
-          لینک SUB را به‌عنوان Subscription در برنامه وارد کنید یا VLESS را مستقیماً Import نمایید. 
-          <span class="block sm:inline sm:mr-1 text-white/90 font-semibold">کانال تلگرام: logic_sec</span>
+          <h1 class="text-xl md:text-2xl font-black tracking-tight">{escape_html(snapshot.get("label","PXpanel"))}</h1>
+          <p class="mt-1.5 text-[11px] text-white/40 break-all">UUID: {escape_html(uid)} &nbsp;·&nbsp; PXpanel {APP_VERSION}</p>
+        </div>
+      </div>
+      <div class="status-badge inline-flex items-center gap-2 self-start md:self-auto px-4 py-2 rounded-full text-xs font-extrabold
+                  {'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'}">
+        <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
+        {status_text}
+      </div>
+    </div>
+
+    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-purple-400/20 bg-gradient-to-l from-purple-400/10 to-blue-400/5 p-4 md:p-5">
+      <div class="w-8 h-8 shrink-0 grid place-items-center rounded-xl bg-purple-400/15 border border-purple-400/20 text-purple-300 font-extrabold text-sm">!</div>
+      <p class="text-[12.5px] leading-8 text-white/65">
+        <b class="text-purple-200">اطلاعیه اتصال</b><br>
+        لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید.
+        <b class="text-purple-200">کانال تلگرام: logic_sec</b>
+      </p>
+    </div>
+  </section>
+
+  <!-- Usage overview -->
+  <section class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-6">
+
+    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
+      <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Traffic Overview</p>
+      <p class="mt-1.5 text-sm font-black">مصرف سرویس</p>
+
+      <div class="mt-6 flex items-end justify-between gap-4">
+        <div class="text-2xl md:text-[28px] font-black tracking-tight">
+          {escape_html(fmt_bytes(used))}
+          <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
+        </div>
+        <div class="text-base font-black text-emerald-300">{usage_percent}%</div>
+      </div>
+
+      <div class="mt-4 h-2.5 rounded-full bg-white/[0.06] border border-white/[0.04] overflow-hidden">
+        <div class="h-full rounded-full bg-gradient-to-l from-amber-400 to-emerald-400 transition-all duration-500" style="width:{usage_percent}%"></div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between text-[11px] text-white/40">
+        <span>باقی‌مانده: <b class="text-white/70 font-bold">{escape_html(remaining_value)}</b></span>
+        <span>زمان: <b class="text-white/70 font-bold">{escape_html(expiry_remaining)}</b></span>
+      </div>
+    </div>
+
+    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
+      <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
+      <div class="mt-4 divide-y divide-white/[0.06]">
+        <div class="flex items-center justify-between py-3 first:pt-0">
+          <span class="text-[11px] text-white/45">انقضا</span>
+          <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
+        </div>
+        <div class="flex items-center justify-between py-3">
+          <span class="text-[11px] text-white/45">IP Limit</span>
+          <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
+        </div>
+        <div class="flex items-center justify-between py-3">
+          <span class="text-[11px] text-white/45">Connection</span>
+          <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
+        </div>
+        <div class="flex items-center justify-between py-3 last:pb-0">
+          <span class="text-[11px] text-white/45">Speed</span>
+          <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
         </div>
       </div>
     </div>
 
-    <!-- Dashboard: Usage (Circular Progress) & Service Specs -->
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-      
-      <!-- Traffic Usage Card with Circular Ring -->
-      <div class="md:col-span-7 p-5 sm:p-6 bg-[#0e121b] border border-white/[0.07] rounded-[24px] flex flex-col justify-between">
+  </section>
+
+  <!-- Stats -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-emerald-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-400/10 border border-emerald-400/20 text-emerald-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">مصرف فعلی</p>
+      <p class="mt-1 text-[15px] font-black text-emerald-300 break-words">{escape_html(fmt_bytes(used))}</p>
+    </div>
+
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-amber-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-amber-400/10 border border-amber-400/20 text-amber-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">باقی‌مانده</p>
+      <p class="mt-1 text-[15px] font-black text-amber-300 break-words">{escape_html(remaining_value)}</p>
+    </div>
+
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-blue-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M4 9h16"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">اتصالات فعال</p>
+      <p class="mt-1 text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
+    </div>
+
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-purple-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-purple-400/10 border border-purple-400/20 text-purple-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v6c0 5-3.6 8.7-9 9.5-5.4-.8-9-4.5-9-9.5v-6L12 2z"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">زمان باقی‌مانده</p>
+      <p class="mt-1 text-[15px] font-black text-purple-300 break-words">{escape_html(expiry_remaining)}</p>
+    </div>
+
+  </section>
+
+  <!-- Technical details -->
+  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
+    <div class="flex items-end justify-between gap-3 mb-5">
+      <p class="text-sm font-black">جزئیات فنی</p>
+      <p class="text-[11px] text-white/40">Configuration Details</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+        <p class="text-[11px] text-white/45">Protocol</p>
+        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("protocol","vless-ws"))}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+        <p class="text-[11px] text-white/45">Fingerprint</p>
+        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("fingerprint","chrome"))}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+        <p class="text-[11px] text-white/45">IP Limit</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(ip_limit)}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+        <p class="text-[11px] text-white/45">Connection Limit</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(connection_limit)}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+        <p class="text-[11px] text-white/45">Speed Limit</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(speed_limit)}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+        <p class="text-[11px] text-white/45">تاریخ انقضا</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(expiry_display)}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Links -->
+  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
+    <div class="flex items-end justify-between gap-3 mb-5">
+      <p class="text-sm font-black">لینک‌های سرویس</p>
+      <p class="text-[11px] text-white/40">Copy / Import</p>
+    </div>
+
+    <div class="space-y-3">
+      <div class="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">VLESS</p>
+          <p class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(vless_url)}</p>
+        </div>
+        <span class="shrink-0 text-[10px] font-bold text-white/40 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">VLESS</span>
+      </div>
+
+      <div class="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">SUBSCRIPTION</p>
+          <p class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(sub_url)}</p>
+        </div>
+        <span class="shrink-0 text-[10px] font-bold text-white/40 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">SUB</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Downloads -->
+  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
+    <div class="flex items-end justify-between gap-3 mb-5">
+      <p class="text-sm font-black">دانلود برنامه‌ها</p>
+      <p class="text-[11px] text-white/40">Official Releases</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">NG</div>
         <div>
-          <div class="text-[10px] text-white/35 font-extrabold tracking-widest uppercase">Traffic Overview</div>
-          <div class="text-base sm:text-lg font-black mt-0.5">مصرف سرویس</div>
+          <p class="text-xs font-extrabold">v2rayNG</p>
+          <p class="mt-0.5 text-[10px] text-white/40">Android</p>
         </div>
-
-        <div class="my-5 flex flex-col sm:flex-row items-center justify-around gap-5">
-          <!-- Circular Progress Ring -->
-          <div class="relative w-32 h-32 shrink-0 flex items-center justify-center">
-            <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" class="text-white/[0.06]" fill="transparent" />
-              <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" class="text-emerald-400" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="{251.2 - (251.2 * float(usage_percent) / 100)}" stroke-linecap="round" />
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span class="text-lg font-black text-emerald-400">{usage_percent}%</span>
-              <span class="text-[10px] text-white/40 font-bold">مصرف شده</span>
-            </div>
-          </div>
-
-          <!-- Traffic Details -->
-          <div class="space-y-2 w-full sm:w-auto text-center sm:text-right">
-            <div>
-              <div class="text-[11px] text-white/40">حجم مصرفی / کل</div>
-              <div class="text-sm sm:text-base font-black mt-0.5">{escape_html(fmt_bytes(used))} <span class="text-xs text-white/40 font-normal">/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div>
-            </div>
-            <div>
-              <div class="text-[11px] text-white/40">حجم باقی‌مانده</div>
-              <div class="text-sm font-bold text-amber-400 mt-0.5">{escape_html(remaining_value)}</div>
-            </div>
-            <div>
-              <div class="text-[11px] text-white/40">زمان باقی‌مانده</div>
-              <div class="text-xs font-bold text-purple-300 mt-0.5">{escape_html(expiry_remaining)}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="text-[11px] text-white/40 text-center sm:text-right pt-2 border-t border-white/[0.05]">
-          تاریخ انقضا: <span class="text-white font-semibold">{escape_html(expiry_display)}</span>
-        </div>
-      </div>
-
-      <!-- Side Limits Card -->
-      <div class="md:col-span-5 p-5 sm:p-6 bg-[#0e121b] border border-white/[0.07] rounded-[24px] flex flex-col justify-between">
+      </a>
+      <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">N</div>
         <div>
-          <div class="text-[10px] text-white/35 font-extrabold tracking-widest uppercase">Service Limits</div>
-          <div class="text-base sm:text-lg font-black mt-0.5">محدودیت‌های پلن</div>
+          <p class="text-xs font-extrabold">v2rayN</p>
+          <p class="mt-0.5 text-[10px] text-white/40">Windows / macOS / Linux</p>
         </div>
-
-        <div class="space-y-3.5 my-4">
-          <div class="flex items-center justify-between pb-3 border-b border-white/[0.05]">
-            <span class="text-xs text-white/45">IP Limit</span>
-            <span class="text-xs font-bold text-white">{escape_html(ip_limit)}</span>
-          </div>
-          <div class="flex items-center justify-between pb-3 border-b border-white/[0.05]">
-            <span class="text-xs text-white/45">Connection Limit</span>
-            <span class="text-xs font-bold text-white">{escape_html(connection_limit)}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-white/45">Speed Limit</span>
-            <span class="text-xs font-bold text-white">{escape_html(speed_limit)}</span>
-          </div>
+      </a>
+      <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">H</div>
+        <div>
+          <p class="text-xs font-extrabold">Hiddify</p>
+          <p class="mt-0.5 text-[10px] text-white/40">Android / Windows / macOS / Linux</p>
         </div>
-
-        <div class="p-3 bg-[#141a26] rounded-xl text-center text-[11px] text-white/50">
-          وضعیت پایداری: <span class="text-emerald-400 font-bold">عالی</span>
-        </div>
-      </div>
-
+      </a>
     </div>
+  </section>
 
-    <!-- Quick Stats Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div class="p-4 bg-[#0e121b] border border-white/[0.07] rounded-2xl">
-        <div class="w-2 h-2 rounded-full bg-emerald-400 mb-2"></div>
-        <div class="text-[11px] text-white/40">مصرف فعلی</div>
-        <div class="text-xs sm:text-sm font-black text-emerald-400 mt-1 truncate">{escape_html(fmt_bytes(used))}</div>
-      </div>
-      <div class="p-4 bg-[#0e121b] border border-white/[0.07] rounded-2xl">
-        <div class="w-2 h-2 rounded-full bg-amber-400 mb-2"></div>
-        <div class="text-[11px] text-white/40">باقی‌مانده</div>
-        <div class="text-xs sm:text-sm font-black text-amber-400 mt-1 truncate">{escape_html(remaining_value)}</div>
-      </div>
-      <div class="p-4 bg-[#0e121b] border border-white/[0.07] rounded-2xl">
-        <div class="w-2 h-2 rounded-full bg-blue-400 mb-2"></div>
-        <div class="text-[11px] text-white/40">اتصالات فعال</div>
-        <div class="text-xs sm:text-sm font-black text-blue-400 mt-1">{len(unique_ips_for_uuid(uid))} IP</div>
-      </div>
-      <div class="p-4 bg-[#0e121b] border border-white/[0.07] rounded-2xl">
-        <div class="w-2 h-2 rounded-full bg-purple-400 mb-2"></div>
-        <div class="text-[11px] text-white/40">زمان انقضا</div>
-        <div class="text-xs sm:text-sm font-black text-purple-300 mt-1 truncate">{escape_html(expiry_remaining)}</div>
-      </div>
-    </div>
-
-    <!-- Technical Details -->
-    <div class="p-5 sm:p-6 bg-[#0e121b] border border-white/[0.07] rounded-[24px]">
-      <div class="text-base sm:text-lg font-black mb-4">جزئیات فنی</div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="p-3.5 bg-[#141a26] border border-white/[0.04] rounded-xl">
-          <div class="text-[11px] text-white/40">Protocol</div>
-          <div class="text-xs font-bold font-mono text-white mt-1 ltr text-left">{escape_html(snapshot.get("protocol","vless-ws"))}</div>
-        </div>
-        <div class="p-3.5 bg-[#141a26] border border-white/[0.04] rounded-xl">
-          <div class="text-[11px] text-white/40">Fingerprint</div>
-          <div class="text-xs font-bold font-mono text-white mt-1 ltr text-left">{escape_html(snapshot.get("fingerprint","chrome"))}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Service Links & Copy Buttons -->
-    <div class="p-5 sm:p-6 bg-[#0e121b] border border-white/[0.07] rounded-[24px]">
-      <div class="text-base sm:text-lg font-black mb-4">لینک‌های اتصال</div>
-      <div class="space-y-3">
-        
-        <!-- VLESS Link -->
-        <div class="p-3.5 sm:p-4 bg-[#141a26] border border-white/[0.05] rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div class="min-w-0 flex-1">
-            <div class="text-xs font-bold text-purple-300 mb-1">کانفیگ VLESS</div>
-            <div class="font-mono text-[11px] text-white/70 bg-[#090c12] p-2.5 rounded-xl border border-white/[0.04] truncate ltr text-left select-all">{escape_html(vless_url)}</div>
-          </div>
-          <button onclick="copyText(`{vless_url}`, this)" class="shrink-0 px-4 py-2.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-            کپی VLESS
-          </button>
-        </div>
-
-        <!-- Subscription Link -->
-        <div class="p-3.5 sm:p-4 bg-[#141a26] border border-white/[0.05] rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div class="min-w-0 flex-1">
-            <div class="text-xs font-bold text-blue-300 mb-1">لینک اشتراک (SUB)</div>
-            <div class="font-mono text-[11px] text-white/70 bg-[#090c12] p-2.5 rounded-xl border border-white/[0.04] truncate ltr text-left select-all">{escape_html(sub_url)}</div>
-          </div>
-          <button onclick="copyText(`{sub_url}`, this)" class="shrink-0 px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-            کپی اشتراک
-          </button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Downloads Section -->
-    <div class="p-5 sm:p-6 bg-[#0e121b] border border-white/[0.07] rounded-[24px]">
-      <div class="text-base sm:text-lg font-black mb-4">دانلود برنامه‌های اتصال</div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <a class="p-4 bg-[#141a26] border border-white/[0.04] hover:border-blue-500/30 rounded-2xl flex items-center gap-3.5 transition-all text-white" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer">
-          <div class="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 font-black text-xs">NG</div>
-          <div>
-            <div class="text-xs sm:text-sm font-extrabold">v2rayNG</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Android</div>
-          </div>
-        </a>
-        <a class="p-4 bg-[#141a26] border border-white/[0.04] hover:border-blue-500/30 rounded-2xl flex items-center gap-3.5 transition-all text-white" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer">
-          <div class="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 font-black text-xs">N</div>
-          <div>
-            <div class="text-xs sm:text-sm font-extrabold">v2rayN</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Windows / Linux</div>
-          </div>
-        </a>
-        <a class="p-4 bg-[#141a26] border border-white/[0.04] hover:border-blue-500/30 rounded-2xl flex items-center gap-3.5 transition-all text-white" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer">
-          <div class="w-10 h-10 shrink-0 grid place-items-center rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 font-black text-xs">H</div>
-          <div>
-            <div class="text-xs sm:text-sm font-extrabold">Hiddify</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Cross-platform</div>
-          </div>
-        </a>
-      </div>
-    </div>
-
-    <!-- Footer Channel Notice -->
-    <div class="p-4 bg-emerald-500/[0.05] border border-emerald-500/15 rounded-2xl text-center text-xs text-white/60">
-      پشتیبانی و اطلاعیه‌ها · <b class="text-emerald-400 font-bold">کانال تلگرام: logic_sec</b>
-    </div>
-
+  <!-- Footer -->
+  <div class="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] p-4 text-center text-xs text-white/45">
+    پشتیبانی و اطلاعیه‌ها &nbsp;·&nbsp; <b class="text-emerald-300">کانال تلگرام: logic_sec</b>
   </div>
 
+</div>
 </body>
 </html>"""
     return HTMLResponse(info_html)
