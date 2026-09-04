@@ -1,5 +1,5 @@
 # ============================================================
-# PXPanel 13.0.1 Beta
+# PXpanel 13.0.1 Beta
 # Railway Ready
 # ============================================================
 
@@ -40,7 +40,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # APP
 # ============================================================
 
-APP_NAME = "PXPanel"
+APP_NAME = "PXpanel"
 APP_VERSION = "13.0.1 Beta"
 
 SUPPORT_USERNAME = "@logic_sec"
@@ -93,8 +93,8 @@ DATA_DIR.mkdir(
     exist_ok=True,
 )
 
-DATA_FILE = DATA_DIR / "pixonpanel_state.json"
-SECRET_FILE = DATA_DIR / "pixonpanel_secret.key"
+DATA_FILE = DATA_DIR / "pxpanel_state.json"
+SECRET_FILE = DATA_DIR / "pxpanel_secret.key"
 
 
 # ============================================================
@@ -218,35 +218,7 @@ PROTOCOLS = (
     "xhttp-packet-up",
     "xhttp-stream-up",
     "xhttp-stream-one",
-    "vmess-ws",
-    "trojan-ws",
-    "shadowsocks",
-    "socks5",
-    "http",
-    "hysteria2",
-    "tuic",
-    "wireguard",
 )
-
-PROTOCOL_LABELS = {
-    "vless-ws": "VLESS WebSocket",
-    "xhttp-packet-up": "XHTTP Packet Up",
-    "xhttp-stream-up": "XHTTP Stream Up",
-    "xhttp-stream-one": "XHTTP Stream One",
-    "vmess-ws": "VMess WebSocket",
-    "trojan-ws": "Trojan WebSocket",
-    "shadowsocks": "Shadowsocks",
-    "socks5": "SOCKS5",
-    "http": "HTTP Proxy",
-    "hysteria2": "Hysteria 2",
-    "tuic": "TUIC",
-    "wireguard": "WireGuard",
-}
-
-PROTOCOL_ALIASES = {
-    "vmess": "vmess-ws", "trojan": "trojan-ws", "ss": "shadowsocks",
-    "socks": "socks5", "hy2": "hysteria2", "hysteria": "hysteria2",
-}
 
 DEFAULT_PROTOCOL = "vless-ws"
 
@@ -277,12 +249,6 @@ MIN_PORT = 1
 MAX_PORT = 65535
 
 DEFAULT_SPEED_LIMIT = 0
-
-
-def normalize_protocol(protocol: str | None) -> str:
-    value = str(protocol or DEFAULT_PROTOCOL).strip().lower()
-    value = PROTOCOL_ALIASES.get(value, value)
-    return value if value in PROTOCOLS else DEFAULT_PROTOCOL
 
 
 # ============================================================
@@ -779,7 +745,7 @@ def clear_login_failures(ip: str):
 # SESSION
 # ============================================================
 
-SESSION_COOKIE = "pixonpanel_session"
+SESSION_COOKIE = "pxpanel_session"
 
 SESSION_TTL = (
     60
@@ -894,38 +860,108 @@ def set_auth_cookie(
 # ============================================================
 
 def generate_vless_link(
-    uuid: str, host: str, remark: str = "PXPanel",
-    protocol: str = DEFAULT_PROTOCOL, fingerprint: str | None = None,
-    alpn: str | None = None, port: int | None = None,
+    uuid: str,
+    host: str,
+    remark: str = "PXpanel",
+    protocol: str = DEFAULT_PROTOCOL,
+    fingerprint: str | None = None,
+    alpn: str | None = None,
+    port: int | None = None,
 ):
-    protocol = normalize_protocol(protocol)
-    fp = (fingerprint or DEFAULT_FINGERPRINT).strip().lower()
-    if fp not in FINGERPRINTS: fp = DEFAULT_FINGERPRINT
-    port_value = safe_int(port, DEFAULT_PORT, MIN_PORT, MAX_PORT)
-    alpn_value = (alpn or DEFAULT_ALPN_BY_PROTOCOL.get(protocol, "http/1.1")).strip()
-    label = quote(str(remark or "PXPanel"), safe="")
+
+    fp = (
+        fingerprint
+        or DEFAULT_FINGERPRINT
+    ).strip().lower()
+
+    if fp not in FINGERPRINTS:
+        fp = DEFAULT_FINGERPRINT
+
+    alpn_value = (
+        (
+            alpn
+            or ""
+        ).strip()
+        or DEFAULT_ALPN_BY_PROTOCOL.get(
+            protocol,
+            "http/1.1",
+        )
+    )
+
+    port_value = (
+        port
+        or DEFAULT_PORT
+    )
+
+    if not (
+        MIN_PORT
+        <= port_value
+        <= MAX_PORT
+    ):
+        port_value = DEFAULT_PORT
+
+    # ========================================================
+    # IMPORTANT:
+    # The working VLESS WebSocket core stays unchanged.
+    # ========================================================
+
     if protocol == "vless-ws":
-        q = {"encryption":"none","security":"tls","type":"ws","host":host,"path":f"/ws/{uuid}","sni":host,"fp":fp,"alpn":alpn_value}
-        return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
-    if protocol.startswith("xhttp-"):
-        mode = protocol.replace("xhttp-", "")
-        q = {"encryption":"none","security":"tls","type":"xhttp","mode":mode,"host":host,"path":f"/xhttp-siz10/{mode}/{uuid}","sni":host,"fp":fp,"alpn":alpn_value}
-        return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
-    if protocol == "vmess-ws":
-        raw = {"v":"2","ps":remark,"add":host,"port":port_value,"id":uuid,"aid":0,"scy":"auto","net":"ws","type":"none","host":host,"path":f"/ws/{uuid}","tls":"tls","sni":host,"fp":fp}
-        return "vmess://" + base64.b64encode(json.dumps(raw,separators=(",",":"),ensure_ascii=False).encode()).decode()
-    if protocol == "trojan-ws":
-        return f"trojan://{uuid}@{host}:{port_value}?security=tls&type=ws&host={quote(host)}&path={quote('/ws/'+uuid)}&sni={quote(host)}#{label}"
-    if protocol == "shadowsocks":
-        method = os.getenv("SS_METHOD", "aes-256-gcm")
-        userinfo = base64.urlsafe_b64encode(f"{method}:{uuid}".encode()).decode().rstrip("=")
-        return f"ss://{userinfo}@{host}:{port_value}#{label}"
-    if protocol == "socks5": return f"socks5://{uuid}:{uuid}@{host}:{port_value}#{label}"
-    if protocol == "http": return f"http://{uuid}:{uuid}@{host}:{port_value}#{label}"
-    if protocol == "hysteria2": return f"hysteria2://{uuid}@{host}:{port_value}/?sni={quote(host)}&insecure=0#{label}"
-    if protocol == "tuic": return f"tuic://{uuid}:{uuid}@{host}:{port_value}?sni={quote(host)}&alpn=h3#{label}"
-    if protocol == "wireguard": return f"wireguard://{uuid}@{host}:{port_value}?publicKey={uuid}#{label}"
-    return f"vless://{uuid}@{host}:{port_value}"
+
+        path = (
+            f"/ws/{uuid}"
+        )
+
+        params = {
+            "encryption": "none",
+            "security": "tls",
+            "type": "ws",
+            "host": host,
+            "path": path,
+            "sni": host,
+            "fp": fp,
+            "alpn": alpn_value,
+        }
+
+    else:
+
+        mode = protocol.replace(
+            "xhttp-",
+            "",
+        )
+
+        path = (
+            f"/xhttp-siz10/"
+            f"{mode}/"
+            f"{uuid}"
+        )
+
+        params = {
+            "encryption": "none",
+            "security": "tls",
+            "type": "xhttp",
+            "mode": mode,
+            "host": host,
+            "path": path,
+            "sni": host,
+            "fp": fp,
+            "alpn": alpn_value,
+        }
+
+    query = "&".join(
+        f"{key}="
+        f"{quote(str(value))}"
+        for key, value in params.items()
+    )
+
+    return (
+        f"vless://"
+        f"{uuid}@"
+        f"{host}:"
+        f"{port_value}?"
+        f"{query}#"
+        f"{quote(remark)}"
+    )
+
 
 def vless_link_for_link(
     link: dict,
@@ -936,7 +972,7 @@ def vless_link_for_link(
         uid,
         host,
         remark=(
-            f"px-"
+            f"pxpanel-"
             f"{link.get('label', '')}"
         ),
         protocol=link.get(
@@ -1339,7 +1375,8 @@ async def make_link(
     fragment: str = "off",
 ):
 
-    protocol = normalize_protocol(protocol)
+    if protocol not in PROTOCOLS:
+        protocol = DEFAULT_PROTOCOL
 
     fingerprint = (
         fingerprint
@@ -1433,10 +1470,6 @@ async def make_link(
                 fragment
                 or "off"
             ).strip().lower(),
-
-        "security_profile": "balanced",
-        "multi_login": False,
-        "protocol_label": PROTOCOL_LABELS.get(protocol, protocol),
     }
 
     async with LINKS_LOCK:
@@ -1839,7 +1872,7 @@ LANDING_HTML = r"""
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>PX Panel</title>
+<title>PXpanel</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2043,12 +2076,6 @@ h1{
         flex-direction:column;
     }
 }
-
-/* PXPanel 13.0.1 responsive system */
-html{scroll-behavior:smooth} body{overflow-x:hidden} button,input,select,textarea{touch-action:manipulation} .modal{overscroll-behavior:contain}
-@media(max-width:900px){.container,.shell,.dashboard,.main,.content{max-width:100%!important;width:100%!important}.grid,.stats-grid,.cards-grid,.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sidebar{z-index:1000}}
-@media(max-width:640px){body{padding:10px!important;font-size:14px}.grid,.stats-grid,.cards-grid,.form-grid{grid-template-columns:1fr!important}.card,.panel,.section,.modal{border-radius:18px!important}.modal{max-height:92vh;overflow:auto;padding:14px!important}.header,.topbar,.toolbar,.actions{flex-wrap:wrap!important}.header>* ,.topbar>*{max-width:100%}.btn,button{min-height:44px}.field input,.field select,.field textarea,input,select,textarea{min-height:44px;font-size:16px;max-width:100%}table{display:block;overflow-x:auto;white-space:nowrap}.link-row,.config-row{flex-direction:column!important;align-items:stretch!important}.brand-name{font-size:15px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
 
@@ -2062,7 +2089,7 @@ html{scroll-behavior:smooth} body{overflow-x:hidden} button,input,select,textare
 
 <div>
 <div class="brand-name">
-PX Panel
+PXpanel
 </div>
 
 <div class="version">
@@ -2083,7 +2110,7 @@ PX Panel
 </h1>
 
 <div class="desc">
-این صفحه، درگاه عمومی PX Panel است.
+این صفحه، درگاه عمومی PXpanel است.
 برای دسترسی به داشبورد مدیریت از مسیر ورود استفاده کنید.
 </div>
 
@@ -2114,7 +2141,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PX Panel · 13.0.1 Beta
+PXpanel · 13.0.1 Beta
 </span>
 
 <a
@@ -2189,7 +2216,7 @@ name="viewport"
 content="width=device-width,initial-scale=1"
 >
 
-<title>ورود | PX Panel</title>
+<title>ورود | PXpanel</title>
 
 <link
 rel="preconnect"
@@ -2380,7 +2407,7 @@ P
 </div>
 
 <h1>
-ورود به PX Panel
+ورود به PXpanel
 </h1>
 
 <div class="version">
@@ -3067,43 +3094,92 @@ async def create_auto_link(
     request: Request,
     _=Depends(require_auth),
 ):
+
     try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    if not isinstance(body, dict): body = {}
-    host = get_host(request)
-    protocol = normalize_protocol(body.get("protocol", DEFAULT_PROTOCOL))
-    profile = str(body.get("profile", "balanced")).strip().lower()
-    profiles = {
-        "normal": {"ip":0,"conn":0,"speed":0,"fp":"chrome","fragment":"off"},
-        "balanced": {"ip":2,"conn":4,"speed":0,"fp":"chrome","fragment":"safe"},
-        "gaming": {"ip":1,"conn":2,"speed":0,"fp":"chrome","fragment":"safe"},
-        "maximum": {"ip":0,"conn":0,"speed":0,"fp":"randomized","fragment":"safe"},
-    }
-    cfg = profiles.get(profile, profiles["balanced"])
-    uid, link = await make_link(
-        label=auto_config_name(), limit_bytes=0, expires_at=None,
-        ip_limit=cfg["ip"], speed_limit_bytes=cfg["speed"], connection_limit=cfg["conn"],
-        note=f"Auto generated by PXPanel | profile={profile}",
-        protocol=protocol, fingerprint=cfg["fp"],
-        alpn=DEFAULT_ALPN_BY_PROTOCOL.get(protocol, ""), port=443, fragment=cfg["fragment"],
-    )
-    link["security_profile"] = profile
-    result = {**get_link_info(link, uid, host), "ok": True, "profile": profile}
-    log_activity("link", f"کانفیگ خودکار «{link['label']}» با {PROTOCOL_LABELS.get(protocol, protocol)} ساخته شد", "ok")
-    return result
+
+        host = get_host(request)
+
+        uid, link = await make_link(
+            label=auto_config_name(),
+
+            # Unlimited
+            limit_bytes=0,
+            expires_at=None,
+            ip_limit=0,
+            speed_limit_bytes=0,
+            connection_limit=0,
+
+            note=(
+                "Auto generated by "
+                "PXpanel"
+            ),
+
+            # IMPORTANT:
+            # Keep working protocol.
+            protocol="vless-ws",
+
+            fingerprint="chrome",
+
+            alpn="http/1.1",
+
+            port=443,
+
+            fragment="off",
+        )
+
+        result = {
+            **get_link_info(
+                link,
+                uid,
+                host,
+            ),
+            "ok": True,
+        }
+
+        log_activity(
+            "link",
+            (
+                f"کانفیگ خودکار "
+                f"«{link['label']}» ساخته شد"
+            ),
+            "ok",
+        )
+
+        return result
+
+    except Exception as exc:
+
+        logger.exception(
+            "Auto config creation failed"
+        )
+
+        stats["total_errors"] += 1
+
+        error_logs.append(
+            {
+                "error":
+                    str(exc),
+
+                "path":
+                    "/api/links/auto",
+
+                "time":
+                    datetime.now().isoformat(),
+            }
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "خطا در ساخت کانفیگ: "
+                f"{exc}"
+            ),
+        )
 
 
 # ============================================================
 # LIST LINKS
 # ============================================================
-
-@app.get("/api/protocols")
-async def api_protocols(request: Request):
-    require_auth(request)
-    return {"protocols": [{"id": p, "label": PROTOCOL_LABELS.get(p, p)} for p in PROTOCOLS], "default": DEFAULT_PROTOCOL}
-
 
 @app.get("/api/links")
 async def list_links(
@@ -3743,7 +3819,7 @@ async def subscription_single(
     limit = int(link.get("limit_bytes", 0) or 0)
     volume_text = f"{fmt_bytes(used)}/{fmt_bytes(limit)}" if limit > 0 else f"{fmt_bytes(used)}/∞"
     expiry_text = str(link.get("expires_at") or "∞")
-    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PX')} | کانال تلگرام: logic_sec"
+    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PXpanel')} | کانال تلگرام: logic_sec"
     headers = subscription_metadata_headers(
         used,
         limit,
@@ -3856,514 +3932,123 @@ async def info_page(
 
     status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
     status_class = "good" if status_text == "فعال" else "bad"
-    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
-    connection_limit = "نامحدود" if not snapshot.get("connection_limit", 0) else str(snapshot.get("connection_limit"))
-    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes", 0) else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
-
-    usage_history = snapshot.get("usage_history", [])
-    svg_points = "0,50 300,50"
-    if usage_history and len(usage_history) > 1:
-        max_hist = max(usage_history) if max(usage_history) > 0 else 1
-        pts = []
-        step = 300 / (len(usage_history) - 1)
-        for i, val in enumerate(usage_history):
-            x = i * step
-            y = 60 - min(60, max(4, (val / max_hist) * 52))
-            pts.append(f"{x:.1f},{y:.1f}")
-        svg_points = " ".join(pts)
-    elif usage_history and len(usage_history) == 1:
-        svg_points = f"0,50 300,{60 - min(60, max(4, (usage_history[0] / (limit if limit > 0 else max(used, 1))) * 52)):.1f}"
-
-    status_badge_html = 'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'
-    label_escaped = escape_html(snapshot.get("label", "PXpanel"))
-    uid_escaped = escape_html(uid)
-    app_version_str = escape_html(str(APP_VERSION))
-    used_bytes_str = escape_html(fmt_bytes(used))
-    limit_bytes_str = escape_html(fmt_bytes(limit)) if limit > 0 else '∞'
-    remaining_value_escaped = escape_html(remaining_value)
-    expiry_remaining_escaped = escape_html(expiry_remaining)
-    expiry_display_escaped = escape_html(expiry_display)
-    ip_limit_escaped = escape_html(ip_limit)
-    connection_limit_escaped = escape_html(connection_limit)
-    speed_limit_escaped = escape_html(speed_limit)
-    protocol_escaped = escape_html(snapshot.get("protocol", "vless-ws"))
-    fingerprint_escaped = escape_html(snapshot.get("fingerprint", "chrome"))
-    vless_url_escaped = escape_html(vless_url)
-    sub_url_escaped = escape_html(sub_url)
-    dash_calc_offset = f"{339.29 - (339.29 * min(usage_percent, 100) / 100):.1f}"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit",0) else str(snapshot.get("ip_limit"))
+    connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
+    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
 
     info_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>{label_escaped} | INFO</title>
+<title>{escape_html(snapshot.get("label","PXpanel"))} | INFO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script>
-  tailwind.config = {{
-    theme: {{
-      extend: {{
-        fontFamily: {{ vazir: ['Vazirmatn','system-ui','sans-serif'] }}
-      }}
-    }}
-  }}
-</script>
 <style>
-  :root {{
-    --bg-main: #05060a;
-    --bg-card: rgba(255, 255, 255, 0.04);
-    --bg-card-hover: rgba(255, 255, 255, 0.07);
-    --border-color: rgba(255, 255, 255, 0.1);
-    --text-main: #f1f5f9;
-    --text-muted: rgba(255, 255, 255, 0.4);
-    --bg-sub-card: rgba(0, 0, 0, 0.2);
-    --grad-1: rgba(96,165,250,.16);
-    --grad-2: rgba(167,139,250,.13);
-    --grad-3: rgba(52,211,153,.08);
-  }}
-
-  body.theme-lighter {{
-    --bg-main: #131722;
-    --bg-card: rgba(255, 255, 255, 0.075);
-    --bg-card-hover: rgba(255, 255, 255, 0.115);
-    --border-color: rgba(255, 255, 255, 0.16);
-    --text-main: #ffffff;
-    --text-muted: rgba(255, 255, 255, 0.6);
-    --bg-sub-card: rgba(0, 0, 0, 0.35);
-    --grad-1: rgba(96,165,250,.24);
-    --grad-2: rgba(167,139,250,.20);
-    --grad-3: rgba(52,211,153,.13);
-  }}
-
-  html,body{{background:var(--bg-main); transition: background 0.3s ease, color 0.3s ease;}}
-  body{{
-    background:
-      radial-gradient(ellipse 80% 50% at 10% -10%, var(--grad-1), transparent 50%),
-      radial-gradient(ellipse 60% 40% at 95% 15%, var(--grad-2), transparent 45%),
-      radial-gradient(ellipse 55% 35% at 60% 100%, var(--grad-3), transparent 40%),
-      var(--bg-main);
-  }}
-  .status-dot{{box-shadow:0 0 10px currentColor}}
-  ::-webkit-scrollbar{{width:8px;height:8px}}
-  ::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
-  * {{ box-shadow: none !important; }}
-  .copy-btn svg{{transition:none}}
-  
-  .dynamic-card {{
-    background-color: var(--bg-card);
-    border-color: var(--border-color);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
-  }}
-  .dynamic-card:hover {{
-    background-color: var(--bg-card-hover);
-  }}
-  .sub-box {{
-    background-color: var(--bg-sub-card);
-  }}
+:root{{--bg:#07080d;--panel:rgba(17,19,28,.72);--line:rgba(255,255,255,.08);--muted:rgba(255,255,255,.42);--text:#f6f7fb;--green:#34d399;--blue:#60a5fa;--orange:#f59e0b;--red:#fb7185;--purple:#a78bfa}}
+*{{box-sizing:border-box}}
+html,body{{margin:0;min-height:100%;background:var(--bg)}}
+body{{font-family:"Vazirmatn",sans-serif;color:var(--text);padding:24px;background:radial-gradient(circle at 15% 0%,rgba(96,165,250,.16),transparent 30%),radial-gradient(circle at 95% 30%,rgba(167,139,250,.13),transparent 28%),radial-gradient(circle at 80% 100%,rgba(52,211,153,.08),transparent 30%),#07080d}}
+.page{{width:min(920px,100%);margin:auto}}
+.shell{{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));backdrop-filter:blur(28px);border-radius:30px;box-shadow:0 35px 100px rgba(0,0,0,.38)}}
+.shell:before{{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.04),transparent 35%,rgba(255,255,255,.02))}}
+.hero{{position:relative;padding:25px 25px 20px;border-bottom:1px solid rgba(255,255,255,.06)}}
+.hero-row{{display:flex;align-items:center;justify-content:space-between;gap:16px}}
+.brand{{display:flex;align-items:center;gap:13px}}
+.brand-icon{{width:46px;height:46px;display:grid;place-items:center;border:1px solid rgba(96,165,250,.2);background:linear-gradient(145deg,rgba(96,165,250,.14),rgba(167,139,250,.08));border-radius:15px;color:#93c5fd;font-weight:900;font-size:16px}}
+.hero h1{{margin:0;font-size:21px;font-weight:900;letter-spacing:-.35px}}
+.hero-meta{{margin-top:4px;color:var(--muted);font-size:9px;word-break:break-all}}
+.status{{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:12px;font-size:9px;font-weight:800;white-space:nowrap}}
+.status i{{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}}
+.status.good{{color:#6ee7b7;border:1px solid rgba(52,211,153,.18);background:rgba(52,211,153,.08)}}
+.status.bad{{color:#fda4af;border:1px solid rgba(251,113,133,.18);background:rgba(251,113,133,.08)}}
+.notice{{margin-top:18px;display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid rgba(167,139,250,.17);background:linear-gradient(120deg,rgba(167,139,250,.10),rgba(96,165,250,.04));border-radius:16px;color:rgba(255,255,255,.62);font-size:9px;line-height:2}}
+.notice-icon{{width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;border-radius:9px;background:rgba(167,139,250,.13);border:1px solid rgba(167,139,250,.18);color:#c4b5fd;font-size:12px}}
+.notice strong{{color:#ddd6fe}}
+.dashboard{{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;padding:16px}}
+.usage-card,.side-card{{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:20px}}
+.usage-card{{padding:18px}}
+.section-kicker{{font-size:8px;color:rgba(255,255,255,.30);font-weight:800;letter-spacing:.7px;text-transform:uppercase}}
+.section-title{{margin-top:4px;font-size:13px;font-weight:900}}
+.usage-line{{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:16px}}
+.usage-number{{font-size:22px;font-weight:900;letter-spacing:-.5px}}
+.usage-number span{{font-size:10px;color:var(--muted);font-weight:600}}
+.usage-percent{{font-size:12px;font-weight:900;color:#86efac}}
+.track{{height:12px;margin-top:12px;border-radius:999px;background:rgba(255,255,255,.055);overflow:hidden;border:1px solid rgba(255,255,255,.035)}}
+.track span{{display:block;height:100%;width:{usage_percent}%;border-radius:inherit;background:linear-gradient(90deg,#34d399,#f59e0b);box-shadow:0 0 20px rgba(52,211,153,.18)}}
+.usage-bottom{{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:8px}}
+.side-card{{padding:14px}}
+.side-row{{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}}
+.side-row:last-child{{border-bottom:0;padding-bottom:0}}
+.side-label{{font-size:8px;color:var(--muted)}}
+.side-value{{font-size:9px;font-weight:800}}
+.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px 16px}}
+.metric{{position:relative;overflow:hidden;padding:14px 14px 13px;border-radius:18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}}
+.metric:before{{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.025),transparent 55%)}}
+.metric .dot{{width:8px;height:8px;border-radius:50%;margin-bottom:9px;background:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}}
+.metric-label{{color:var(--muted);font-size:8px}}
+.metric-value{{margin-top:5px;font-size:12px;font-weight:900;color:var(--c);word-break:break-word}}
+.metric.green{{--c:#34d399}} .metric.orange{{--c:#f59e0b}} .metric.blue{{--c:#60a5fa}} .metric.purple{{--c:#a78bfa}}
+.content{{padding:0 16px 18px}}
+.section{{margin-top:10px;padding:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.022);border-radius:20px}}
+.section-head{{display:flex;align-items:end;justify-content:space-between;gap:10px}}
+.section-head .section-title{{margin:0}}
+.section-sub{{color:var(--muted);font-size:8px}}
+.info-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}}
+.info-item{{padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13)}}
+.info-label{{font-size:8px;color:var(--muted)}}
+.info-value{{margin-top:5px;font-size:9px;font-weight:700;color:rgba(255,255,255,.86);word-break:break-word}}
+.code{{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8.5px;color:#c4b5fd;font-weight:500}}
+.link-card{{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.13);margin-top:9px}}
+.link-card:first-child{{margin-top:12px}}
+.link-main{{min-width:0}}
+.link-name{{font-size:8px;color:var(--muted);font-weight:800}}
+.link-url{{margin-top:4px;direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:8px;color:#c4b5fd;word-break:break-all}}
+.copy-hint{{flex:0 0 auto;font-size:8px;color:rgba(255,255,255,.28)}}
+.downloads{{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}}
+.download{{display:flex;align-items:center;gap:10px;min-height:68px;padding:12px;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.07);background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border-radius:16px;transition:transform .2s ease,border-color .2s ease,background .2s ease}}
+.download:hover{{transform:translateY(-2px);border-color:rgba(96,165,250,.28);background:linear-gradient(145deg,rgba(96,165,250,.07),rgba(255,255,255,.02))}}
+.app-icon{{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:10px;background:rgba(96,165,250,.11);border:1px solid rgba(96,165,250,.14);color:#93c5fd;font-size:11px;font-weight:900}}
+.download strong{{display:block;font-size:9px}}
+.download span{{display:block;margin-top:2px;color:var(--muted);font-size:7.5px}}
+.channel{{margin-top:15px;padding:12px 14px;text-align:center;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.045);border-radius:14px;color:var(--muted);font-size:8px}}
+.channel b{{color:#6ee7b7}}
+@media(max-width:760px){{body{{padding:12px}}.dashboard{{grid-template-columns:1fr}}.stats{{grid-template-columns:repeat(2,1fr)}}.downloads{{grid-template-columns:1fr}}.hero-row{{align-items:flex-start;flex-direction:column}}}}
 </style>
 </head>
-<body class="font-vazir text-slate-100 antialiased min-h-screen py-8 px-3 sm:px-4 md:py-14">
+<body>
+<div class="page"><div class="shell">
+<section class="hero">
+<div class="hero-row"><div class="brand"><div class="brand-icon">PX</div><div><h1>{escape_html(snapshot.get("label","PXpanel"))}</h1><div class="hero-meta">0.0.0.0 · UUID: {escape_html(uid)} · PXpanel {APP_VERSION}</div></div></div><div class="status {status_class}"><i></i>{status_text}</div></div>
+<div class="notice"><div class="notice-icon">!</div><div><strong>اطلاعیه اتصال</strong><br>لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید. <strong>کانال تلگرام: logic_sec</strong></div></div>
+</section>
 
-<div class="w-full max-w-4xl mx-auto space-y-5 sm:space-y-6 md:space-y-8">
+<section class="dashboard">
+<div class="usage-card"><div class="section-kicker">Traffic Overview</div><div class="section-title">مصرف سرویس</div><div class="usage-line"><div class="usage-number">{escape_html(fmt_bytes(used))} <span>/ {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span></div><div class="usage-percent">{usage_percent}%</div></div><div class="track"><span></span></div><div class="usage-bottom"><span>باقی‌مانده: {escape_html(remaining_value)}</span><span>زمان: {escape_html(expiry_remaining)}</span></div></div>
+<div class="side-card"><div class="section-kicker">Service</div><div class="side-row"><span class="side-label">انقضا</span><span class="side-value">{escape_html(expiry_display)}</span></div><div class="side-row"><span class="side-label">IP Limit</span><span class="side-value">{escape_html(ip_limit)}</span></div><div class="side-row"><span class="side-label">Connection</span><span class="side-value">{escape_html(connection_limit)}</span></div><div class="side-row"><span class="side-label">Speed</span><span class="side-value">{escape_html(speed_limit)}</span></div></div>
+</section>
 
-  <!-- Top Bar Theme Toggle Button -->
-  <div class="flex justify-end">
-    <button type="button" onclick="toggleTheme()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-extrabold text-amber-300 border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors shadow-lg">
-      <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-      تغییر تم
-    </button>
-  </div>
+<section class="stats">
+<div class="metric green"><div class="dot"></div><div class="metric-label">مصرف فعلی</div><div class="metric-value">{escape_html(fmt_bytes(used))}</div></div>
+<div class="metric orange"><div class="dot"></div><div class="metric-label">باقی‌مانده</div><div class="metric-value">{escape_html(remaining_value)}</div></div>
+<div class="metric blue"><div class="dot"></div><div class="metric-label">اتصالات فعال</div><div class="metric-value">{len(unique_ips_for_uuid(uid))}</div></div>
+<div class="metric purple"><div class="dot"></div><div class="metric-label">زمان باقی‌مانده</div><div class="metric-value">{escape_html(expiry_remaining)}</div></div>
+</section>
 
-  <!-- Hero -->
-  <section class="rounded-[26px] sm:rounded-[28px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-8">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-      <div class="flex items-center gap-4">
-        <div class="w-13 h-13 sm:w-14 sm:h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5.2-3.4 9-8 10-4.6-1-8-4.8-8-10V6l8-4z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
-        </div>
-        <div class="min-w-0">
-          <h1 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight truncate">{label_escaped}</h1>
-          <p class="mt-1.5 text-[10.5px] sm:text-[11px] text-white/40 break-all">UUID: {uid_escaped} &nbsp;·&nbsp; PXpanel {app_version_str}</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-        <button type="button" onclick="openQrModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-purple-300 border border-purple-400/30 bg-purple-400/10 hover:bg-purple-400/20 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          QR Code
-        </button>
-        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-extrabold {status_badge_html}">
-          <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
-          {status_text}
-        </div>
-      </div>
-    </div>
-  </section>
+<div class="content">
+<section class="section"><div class="section-head"><div class="section-title">جزئیات فنی</div><div class="section-sub">Configuration Details</div></div><div class="info-grid"><div class="info-item"><div class="info-label">Protocol</div><div class="info-value code">{escape_html(snapshot.get("protocol","vless-ws"))}</div></div><div class="info-item"><div class="info-label">Fingerprint</div><div class="info-value code">{escape_html(snapshot.get("fingerprint","chrome"))}</div></div><div class="info-item"><div class="info-label">IP Limit</div><div class="info-value">{escape_html(ip_limit)}</div></div><div class="info-item"><div class="info-label">Connection Limit</div><div class="info-value">{escape_html(connection_limit)}</div></div><div class="info-item"><div class="info-label">Speed Limit</div><div class="info-value">{escape_html(speed_limit)}</div></div><div class="info-item"><div class="info-label">تاریخ انقضا</div><div class="info-value">{escape_html(expiry_display)}</div></div></div></section>
 
-  <!-- Usage overview -->
-  <section class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 sm:gap-6">
+<section class="section"><div class="section-head"><div class="section-title">لینک‌های سرویس</div><div class="section-sub">Copy / Import</div></div><div class="link-card"><div class="link-main"><div class="link-name">VLESS</div><div class="link-url">{escape_html(vless_url)}</div></div><div class="copy-hint">VLESS</div></div><div class="link-card"><div class="link-main"><div class="link-name">SUBSCRIPTION</div><div class="link-url">{escape_html(sub_url)}</div></div><div class="copy-hint">SUB</div></div></section>
 
-    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-      <div class="flex items-center gap-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 4-7"/></svg>
-        <div>
-          <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Traffic Overview</p>
-          <p class="mt-0.5 text-sm font-black">مصرف سرویس</p>
-        </div>
-      </div>
+<section class="section"><div class="section-head"><div class="section-title">دانلود برنامه‌ها</div><div class="section-sub">Official Releases</div></div><div class="downloads"><a class="download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">NG</div><div><strong>v2rayNG</strong><span>Android</span></div></a><a class="download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">N</div><div><strong>v2rayN</strong><span>Windows / macOS / Linux</span></div></a><a class="download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><div class="app-icon">H</div><div><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></div></a></div></section>
 
-      <div class="mt-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
-        <div class="relative shrink-0 w-[128px] h-[128px]">
-          <svg width="128" height="128" viewBox="0 0 132 132" class="-rotate-90">
-            <circle cx="66" cy="66" r="54" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
-            <circle cx="66" cy="66" r="54" fill="none" stroke="url(#usageRingGradient)" stroke-width="10" stroke-linecap="round"
-              stroke-dasharray="339.29" stroke-dashoffset="{dash_calc_offset}"/>
-            <defs>
-              <linearGradient id="usageRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#34d399"/>
-                <stop offset="100%" stop-color="#f59e0b"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <div class="absolute inset-0 grid place-items-center">
-            <div class="text-center">
-              <p class="text-xl font-black leading-none">{usage_percent}%</p>
-              <p class="mt-1.5 text-[10px] text-white/40">مصرف‌شده</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex-1 w-full min-w-0">
-          <div class="text-xl sm:text-2xl font-black tracking-tight">
-            {used_bytes_str}
-            <span class="text-sm font-semibold text-white/40"> / {limit_bytes_str}</span>
-          </div>
-
-          <div class="mt-4 rounded-xl border border-white/[0.05] sub-box px-3 pt-3 pb-1.5">
-            <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
-              روند مصرف
-            </p>
-            <svg viewBox="0 0 300 64" class="w-full h-14" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.35"/>
-                  <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <path d="M0,64 L{svg_points} L300,64 Z" fill="url(#trendFill)"/>
-              <path d="M{svg_points}" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between text-[11px] text-white/40 flex-wrap gap-2">
-            <span class="inline-flex items-center gap-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-              باقی‌مانده: <b class="text-white/70 font-bold">{remaining_value_escaped}</b>
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
-              زمان: <b class="text-white/70 font-bold">{expiry_remaining_escaped}</b>
-            </span>
-
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-      <div class="flex items-center gap-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
-        <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
-      </div>
-      <div class="mt-4 divide-y divide-white/[0.06]">
-        <div class="flex items-center justify-between py-3 first:pt-0">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
-            انقضا
-          </span>
-          <span class="text-xs font-extrabold">{expiry_display_escaped}</span>
-        </div>
-        <div class="flex items-center justify-between py-3">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
-            IP Limit
-          </span>
-          <span class="text-xs font-extrabold">{ip_limit_escaped}</span>
-        </div>
-        <div class="flex items-center justify-between py-3">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><rect x="2" y="9" width="20" height="8" rx="2"/><path d="M6 17v2M18 17v2"/></svg>
-            Connection
-          </span>
-          <span class="text-xs font-extrabold">{connection_limit_escaped}</span>
-        </div>
-        <div class="flex items-center justify-between py-3 last:pb-0">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
-            Speed
-          </span>
-          <span class="text-xs font-extrabold">{speed_limit_escaped}</span>
-        </div>
-      </div>
-    </div>
-
-  </section>
-
-  <!-- Stats -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
-
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-emerald-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-400/10 border border-emerald-400/20 text-emerald-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">مصرف فعلی</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-emerald-300 break-words">{used_bytes_str}</p>
-    </div>
-
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-amber-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-amber-400/10 border border-amber-400/20 text-amber-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">باقی‌مانده</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-amber-300 break-words">{remaining_value_escaped}</p>
-    </div>
-
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-blue-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M4 9h16"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">اتصالات فعال</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
-    </div>
-
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-purple-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-purple-400/10 border border-purple-400/20 text-purple-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v6c0 5-3.6 8.7-9 9.5-5.4-.8-9-4.5-9-9.5v-6L12 2z"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">زمان باقی‌مانده</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-purple-300 break-words">{expiry_remaining_escaped}</p>
-    </div>
-
-  </section>
-
-  <!-- Technical details -->
-  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-5">
-      <p class="flex items-center gap-2 text-sm font-black">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M4 21v-7M4 10V3M12 21v-11M12 6V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
-        جزئیات فنی
-      </p>
-      <p class="text-[11px] text-white/40">Configuration Details</p>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Protocol</p>
-        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{protocol_escaped}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Fingerprint</p>
-        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{fingerprint_escaped}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">IP Limit</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{ip_limit_escaped}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Connection Limit</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{connection_limit_escaped}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Speed Limit</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{speed_limit_escaped}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">تاریخ انقضا</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{expiry_display_escaped}</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Links -->
-  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-5">
-      <p class="flex items-center gap-2 text-sm font-black">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.41-1.41"/></svg>
-        لینک‌های سرویس
-      </p>
-      <p class="text-[11px] text-white/40">Copy / Import</p>
-    </div>
-
-    <div class="space-y-3">
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
-        <div class="min-w-0 flex-1">
-          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">VLESS</p>
-          <p id="vlessLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{vless_url_escaped}</p>
-        </div>
-        <button id="vlessCopyBtn" type="button" onclick="pxCopy('vlessLinkText','vlessCopyBtn')"
-          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          <span>کپی</span>
-        </button>
-      </div>
-
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
-        <div class="min-w-0 flex-1">
-          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">SUBSCRIPTION</p>
-          <p id="subLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{sub_url_escaped}</p>
-        </div>
-        <button id="subCopyBtn" type="button" onclick="pxCopy('subLinkText','subCopyBtn')"
-          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          <span>کپی</span>
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Downloads -->
-  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-5">
-      <p class="flex items-center gap-2 text-sm font-black">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-        دانلود برنامه‌ها
-      </p>
-      <p class="text-[11px] text-white/40">Official Releases</p>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-      <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
-        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">NG</div>
-        <div class="min-w-0">
-          <p class="text-xs font-extrabold">v2rayNG</p>
-          <p class="mt-0.5 text-[10px] text-white/40">Android</p>
-        </div>
-      </a>
-      <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
-        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">N</div>
-        <div class="min-w-0">
-          <p class="text-xs font-extrabold">v2rayN</p>
-          <p class="mt-0.5 text-[10px] text-white/40">Windows / macOS / Linux</p>
-        </div>
-      </a>
-      <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
-        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">H</div>
-        <div class="min-w-0">
-          <p class="text-xs font-extrabold">Hiddify</p>
-          <p class="mt-0.5 text-[10px] text-white/40">Android / Windows / macOS / Linux</p>
-        </div>
-      </a>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <div class="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] p-4 text-center text-xs text-white/45">
-    پشتیبانی و اطلاعیه‌ها &nbsp;·&nbsp; <b class="text-emerald-300">کانال تلگرام: logic_sec</b>
-  </div>
-
-</div>
-
-<!-- QR Code Modal Popup -->
-<div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
-  <div class="w-full max-w-sm rounded-[24px] border border-white/15 bg-[#0b0c14] p-6 text-center shadow-2xl relative">
-    <button type="button" onclick="closeQrModal()" class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/5 border border-white/10 grid place-items-center text-white/60 hover:text-white">✕</button>
-    <p class="text-sm font-black text-white/90 mb-2">QR Code اسکن کانفیگ</p>
-    <p class="text-[11px] text-white/40 mb-4">برای اتصال سریع با گوشی موبایل</p>
-    <div id="qrcodeContainer" class="bg-white p-4 rounded-2xl inline-block mx-auto mb-4 border border-white/10"></div>
-    <p id="qrModalText" class="text-[10px] text-purple-300 break-all max-h-16 overflow-y-auto px-2" dir="ltr"></p>
-  </div>
-</div>
-
-<script>
-const vlessUrlData = "{vless_url}";
-
-// Theme toggle logic with localStorage support (2 themes total)
-function toggleTheme() {{
-  const body = document.body;
-  body.classList.toggle('theme-lighter');
-  const isLighter = body.classList.contains('theme-lighter');
-  localStorage.setItem('px_theme', isLighter ? 'lighter' : 'dark');
-}}
-
-// Initialize saved theme on load
-(function() {{
-  if (localStorage.getItem('px_theme') === 'lighter') {{
-    document.body.classList.add('theme-lighter');
-  }}
-}})();
-
-function openQrModal() {{
-  var modal = document.getElementById('qrModal');
-  var container = document.getElementById('qrcodeContainer');
-  var txtEl = document.getElementById('qrModalText');
-  container.innerHTML = "";
-  txtEl.textContent = vlessUrlData;
-  modal.classList.remove('hidden');
-  try {{
-    var typeNumber = 0;
-    var errorCorrectionLevel = 'L';
-    var qr = qrcode(typeNumber, errorCorrectionLevel);
-    qr.addData(vlessUrlData);
-    qr.make();
-    container.innerHTML = qr.createImgTag(5, 8);
-  }} catch (e) {{
-    container.innerHTML = "<p class='text-xs text-black'>خطا در تولید QR Code</p>";
-  }}
-}}
-
-function closeQrModal() {{
-  document.getElementById('qrModal').classList.add('hidden');
-}}
-
-document.getElementById('qrModal').addEventListener('click', function(e) {{
-  if (e.target === this) closeQrModal();
-}});
-
-function pxCopy(textId, btnId) {{
-  var el = document.getElementById(textId);
-  var btn = document.getElementById(btnId);
-  if (!el || !btn) return;
-  var text = el.textContent.textContext || el.textContent.trim();
-  var done = function() {{
-    var original = btn.getAttribute('data-original');
-    if (!original) {{
-      original = btn.innerHTML;
-      btn.setAttribute('data-original', original);
-    }}
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>کپی شد</span>';
-    btn.classList.add('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
-    setTimeout(function() {{
-      btn.innerHTML = original;
-      btn.classList.remove('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
-    }}, 1700);
-  }};
-  if (navigator.clipboard && navigator.clipboard.writeText) {{
-    navigator.clipboard.writeText(text).then(done).catch(function() {{ fallbackCopy(text, done); }});
-  }} else {{
-    fallbackCopy(text, done);
-  }}
-}}
-function fallbackCopy(text, cb) {{
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try {{ document.execCommand('copy'); }} catch (e) {{}}
-  document.body.removeChild(ta);
-  if (cb) cb();
-}}
-</script>
-</body>
-</html>"""
+<div class="channel">پشتیبانی و اطلاعیه‌ها · <b>کانال تلگرام: logic_sec</b></div>
+</div></div></div>
+</body></html>"""
     return HTMLResponse(info_html)
+
+
 # ============================================================
 # SUB GROUP API
 # ============================================================
@@ -4825,7 +4510,7 @@ content="width=device-width,initial-scale=1"
 >
 
 <title>
-PX Panel
+PXpanel
 </title>
 
 <style>
@@ -4920,7 +4605,7 @@ h1{
 <div class="card">
 
 <h1>
-PX Panel
+PXpanel
 </h1>
 
 <div class="version">
@@ -5763,7 +5448,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PX Panel 13.0.1 Beta
+PXpanel 13.0.1 Beta
 </title>
 
 <link
@@ -6562,7 +6247,7 @@ P
 <div>
 
 <div class="brand-name">
-PX Panel
+PXpanel
 </div>
 
 <div class="brand-desc">
@@ -6652,7 +6337,7 @@ class="stat-value"
 
 <div class="stat">
 <div class="stat-label">
-ترافیک مصرفی
+Traffic
 </div>
 <div
 id="traffic"
@@ -6664,7 +6349,7 @@ class="stat-value"
 
 <div class="stat">
 <div class="stat-label">
-ریکویست
+Requests
 </div>
 <div
 id="requests"
@@ -6676,7 +6361,7 @@ class="stat-value"
 
 <div class="stat">
 <div class="stat-label">
-تایم فعال بودن
+Uptime
 </div>
 <div
 id="uptime"
@@ -6696,14 +6381,11 @@ class="stat-value"
 <div>
 
 <div class="panel-title">
-مدیریت کانفیگ‌هـا
+مدیریت کانفیگ‌ها
 </div>
 
-<div class="panel-sub" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); padding: 12px; text-align: center; direction: rtl;">
-  <span style="opacity: 0.8;">پشتیبانــی:</span>
-  <a href="https://t.me/logictop12" target="_blank" rel="noopener noreferrer" style="font-weight: 500; color: #34d399; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#6ee7b7'; this.style.textDecoration='underline';" onmouseout="this.style.color='#34d399'; this.style.textDecoration='none';">
-    @logictop12
-  </a>
+<div class="panel-sub">
+VLESS / SUB / INFO
 </div>
 
 </div>
@@ -6712,7 +6394,7 @@ class="stat-value"
 class="top-btn primary"
 onclick="refresh()"
 >
-↻ بروزرسانـی
+↻ بروزرسانی
 </button>
 
 </div>
@@ -6726,27 +6408,27 @@ onclick="refresh()"
 <tr>
 
 <th>
-نـام
+نام
 </th>
 
 <th>
-پروتـکل
+پروتکل
 </th>
 
 <th>
-وضعیـت
+وضعیت
 </th>
 
 <th>
-مصـرف
+مصرف
 </th>
 
 <th>
-زمـان
+زمان
 </th>
 
 <th>
-اتصـال
+اتصال
 </th>
 
 <th>
@@ -6754,7 +6436,7 @@ VLESS
 </th>
 
 <th>
-عملیـات
+عملیات
 </th>
 
 </tr>
@@ -6778,7 +6460,7 @@ VLESS
 
 <div>
 <div class="panel-title">
-اخریـن فعالیت‌هـا
+آخرین فعالیت‌ها
 </div>
 </div>
 
@@ -6800,7 +6482,7 @@ class="pre"
 
 <div>
 <div class="panel-title">
-دانلود برنامه اتصــال
+دانلود برنامه اتصال
 </div>
 
 <div class="panel-sub">
@@ -6926,16 +6608,16 @@ Windows
 <div class="notice">
 
 <strong>
- مهـم | آپدیـت برنامـه اتصـال
+اطلاعیه مهم | آپدیت برنامه اتصال
 </strong>
 
 <br>
 
-دوستان عزیـز ❤️
-برای اینکـه کانفیگ‌هـای جدیـد بهتریـن
-سازگـــاری، پایداری و عملکرد رو داشته باشن،
-لطفـاً برنامـه‌ای کــــــــه بـرای اتصـال استفـاده می‌کنیـد
-رو بــه آخرین نسخـــه آپدیــت کنیــد. 🔄⚡️
+دوستان عزیز ❤️
+برای اینکه کانفیگ‌های جدید بهترین
+سازگاری، پایداری و عملکرد رو داشته باشن،
+لطفاً برنامه‌ای که برای اتصال استفاده می‌کنید
+رو به آخرین نسخه آپدیت کنید. 🔄⚡️
 
 </div>
 
@@ -6958,11 +6640,14 @@ class="modal-backdrop"
 <div class="modal-head">
 
 <div class="modal-title">
-ساخـت کانفیـگ دستــی
+ساخت کانفیگ دستی
 </div>
 
-<button class="close" onclick="closeManualModal()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; color: rgba(255, 255, 255, 0.7); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.color='rgba(255, 255, 255, 0.7)';">
-  ×
+<button
+class="close"
+onclick="closeManualModal()"
+>
+×
 </button>
 
 </div>
@@ -6972,42 +6657,50 @@ class="modal-backdrop"
 <div class="field">
 
 <label>
-اسـم کانفیـگ
+نام کانفیگ
 </label>
 
 <input
 id="manualName"
-placeholder="اسم کانفیگ"
+placeholder="نام کانفیگ"
 />
 
-</div>
-
-
-<div class="field" style="margin-bottom: 16px;">
-  <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
-    <span>پروتکــل (بتا)</span>
-    <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: XHTTP Packet Up</span>
-  </label>
-  <select id="manualProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-    <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
-    <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up (پیشنهادی)</option>
-    <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
-    <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
-    <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
-    <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
-    <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
-    <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
-    <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
-    <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
-    <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
-  </select>
 </div>
 
 
 <div class="field">
 
 <label>
-حجـم
+پروتکل
+</label>
+
+<select id="manualProtocol">
+
+<option value="vless-ws">
+VLESS WebSocket
+</option>
+
+<option value="xhttp-packet-up">
+XHTTP Packet Up
+</option>
+
+<option value="xhttp-stream-up">
+XHTTP Stream Up
+</option>
+
+<option value="xhttp-stream-one">
+XHTTP Stream One
+</option>
+
+</select>
+
+</div>
+
+
+<div class="field">
+
+<label>
+حجم
 </label>
 
 <input
@@ -7020,23 +6713,35 @@ placeholder="0 = نامحدود"
 </div>
 
 
-<div class="field" style="margin-bottom: 16px;">
-  <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
-    <span>واحد حجـم</span>
-    <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: GB</span>
-  </label>
-  <select id="manualVolumeUnit" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-    <option value="GB" style="background-color: #1f2937; color: #ffffff;">GB</option>
-    <option value="MB" style="background-color: #1f2937; color: #ffffff;">MB</option>
-    <option value="TB" style="background-color: #1f2937; color: #ffffff;">TB</option>
-  </select>
+<div class="field">
+
+<label>
+واحد حجم
+</label>
+
+<select id="manualVolumeUnit">
+
+<option value="GB">
+GB
+</option>
+
+<option value="MB">
+MB
+</option>
+
+<option value="TB">
+TB
+</option>
+
+</select>
+
 </div>
 
 
 <div class="field">
 
 <label>
-تعـداد روز
+تعداد روز
 </label>
 
 <input
@@ -7052,7 +6757,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-محدودیـت IP
+محدودیت IP
 </label>
 
 <input
@@ -7068,7 +6773,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-محدودیـت اتصـال
+محدودیت اتصال
 </label>
 
 <input
@@ -7084,7 +6789,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-محدودیـت سرعـت
+سرعت
 </label>
 
 <input
@@ -7103,17 +6808,48 @@ placeholder="0 = نامحدود"
 Fingerprint
 </label>
 
-<select id="manualFingerprint" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-  <option value="chrome" style="background-color: #1f2937; color: #ffffff;">Chrome</option>
-  <option value="firefox" style="background-color: #1f2937; color: #ffffff;">Firefox</option>
-  <option value="safari" style="background-color: #1f2937; color: #ffffff;">Safari</option>
-  <option value="ios" style="background-color: #1f2937; color: #ffffff;">iOS</option>
-  <option value="android" style="background-color: #1f2937; color: #ffffff;">Android</option>
-  <option value="edge" style="background-color: #1f2937; color: #ffffff;">Edge</option>
-  <option value="360" style="background-color: #1f2937; color: #ffffff;">360</option>
-  <option value="qq" style="background-color: #1f2937; color: #ffffff;">QQ</option>
-  <option value="random" style="background-color: #1f2937; color: #ffffff;">Random</option>
-  <option value="randomized" style="background-color: #1f2937; color: #ffffff;">Randomized</option>
+<select id="manualFingerprint">
+
+<option value="chrome">
+Chrome
+</option>
+
+<option value="firefox">
+Firefox
+</option>
+
+<option value="safari">
+Safari
+</option>
+
+<option value="ios">
+iOS
+</option>
+
+<option value="android">
+Android
+</option>
+
+<option value="edge">
+Edge
+</option>
+
+<option value="360">
+360
+</option>
+
+<option value="qq">
+QQ
+</option>
+
+<option value="random">
+Random
+</option>
+
+<option value="randomized">
+Randomized
+</option>
+
 </select>
 
 </div>
@@ -7121,16 +6857,28 @@ Fingerprint
 
 <div class="field">
 
-<label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
-  <span>Fragment</span>
-  <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: خاموش</span>
+<label>
+Fragment
 </label>
 
-<select id="manualFragment" style="background-color: #1f2937; color: #ffffff; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-  <option value="off" style="background-color: #1f2937; color: #ffffff;">خاموش</option>
-  <option value="safe" style="background-color: #1f2937; color: #ffffff;">Safe</option>
-  <option value="balanced" style="background-color: #1f2937; color: #ffffff;">Balanced</option>
-  <option value="aggressive" style="background-color: #1f2937; color: #ffffff;">Aggressive</option>
+<select id="manualFragment">
+
+<option value="off">
+خاموش
+</option>
+
+<option value="safe">
+Safe
+</option>
+
+<option value="balanced">
+Balanced
+</option>
+
+<option value="aggressive">
+Aggressive
+</option>
+
 </select>
 
 </div>
@@ -7170,7 +6918,7 @@ value="http/1.1"
 <div class="field full">
 
 <label>
-یادداشــت
+یادداشت
 </label>
 
 <textarea
@@ -7204,228 +6952,98 @@ onclick="createManual()"
 
 </div>
 
-<!-- ===================================================== -->
 
+<!-- ===================================================== -->
 <!-- AUTO MODAL -->
-
 <!-- ===================================================== -->
-
-
 
 <div
-
 id="autoModal"
-
 class="modal-backdrop"
-
 >
-
-
 
 <div class="modal">
 
-
-
 <div class="modal-head">
 
-
-
 <div class="modal-title">
-
-ساخـت خودکــار
-
+ساخت خودکار
 </div>
 
-
-
-<button class="close" onclick="closeAutoModal()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; color: rgba(255, 255, 255, 0.7); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.color='rgba(255, 255, 255, 0.7)';">
-  ×
+<button
+class="close"
+onclick="closeAutoModal()"
+>
+×
 </button>
 
-
-
 </div>
-
-
-
-<div class="form-grid" style="margin-top:14px">
-
-<div class="field">
-
-<label>پروتکـل</label>
-
-<select id="autoProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-  <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
-  <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up</option>
-  <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
-  <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
-  <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
-  <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
-  <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
-  <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
-  <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
-  <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
-  <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
-</select>
-
-</div>
-
-<div class="field" style="margin-bottom: 16px;">
-
-  <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
-
-    <span>پروفایـل امنیتـی</span>
-
-    <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: Maximum</span>
-
-  </label>
-
-  <select id="autoProfile" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-
-    <option value="balanced" style="background-color: #1f2937; color: #ffffff;">Balanced</option>
-
-    <option value="gaming" style="background-color: #1f2937; color: #ffffff;">Gaming</option>
-
-    <option value="maximum" style="background-color: #1f2937; color: #ffffff;">Maximum</option>
-
-    <option value="normal" style="background-color: #1f2937; color: #ffffff;">Normal</option>
-
-  </select>
-
-</div>
-
-</div>
-
-
 
 <div
-
 style="
-
 color:rgba(255,255,255,.55);
-
 font-size:11px;
-
 line-height:2;
+"
+>
 
-">
-
-
-
-اسم کانفیگ ها کاملا رندوم
-
+کانفیگ خودکار با نام تصادفی
 <code>pxpanel_********</code>
-
 ساخته می‌شود.
 
+<br>
 
+حجم: <b>نامحدود</b>
 
 <br>
 
-
-
-حجـم: <b>نامحدود</b>
-
-
+زمان: <b>نامحدود</b>
 
 <br>
 
-
-
-زمـان: <b>نامحدود</b>
-
-
+IP: <b>نامحدود</b>
 
 <br>
 
-
-
-محدودیـت ایپـی: <b>نامحدود</b>
-
-
+سرعت: <b>نامحدود</b>
 
 <br>
 
-
-
-محدودیـت سرعـت: <b>نامحدود</b>
-
-
+اتصال: <b>نامحدود</b>
 
 <br>
 
-
-
-محدودیـت اتصال همزمـان: <b>نامحدود</b>
-
-
-
-<br>
-
-
-
-پروتکـل:
-
+پروتکل:
 <b>VLESS WebSocket</b>
 
-
-
 <br>
 
-
-
-پورت:
-
+Port:
 <b>443</b>
 
-
-
 </div>
-
-
 
 <div class="modal-actions">
 
-
-
 <button
-
 class="modal-btn secondary"
-
 onclick="closeAutoModal()"
-
 >
-
-لغو
-
+انصراف
 </button>
-
-
 
 <button
-
 class="modal-btn primary"
-
 onclick="createAuto()"
-
 >
-
-ساخت
-
+ساخت خودکار
 </button>
 
-
+</div>
 
 </div>
 
-
-
 </div>
-
-
-
-</div>
-
 
 
 <!-- ===================================================== -->
@@ -7442,11 +7060,14 @@ class="modal-backdrop"
 <div class="modal-head">
 
 <div class="modal-title">
-تغییر رمز پنـل
+تغییر رمز پنل
 </div>
 
-<button class="close" onclick="closePasswordModal()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; color: rgba(255, 255, 255, 0.7); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.color='rgba(255, 255, 255, 0.7)';">
-  ×
+<button
+class="close"
+onclick="closePasswordModal()"
+>
+×
 </button>
 
 </div>
@@ -7456,7 +7077,7 @@ class="modal-backdrop"
 <div class="field full">
 
 <label>
-رمز فعلـی
+رمز فعلی
 </label>
 
 <input
@@ -7469,7 +7090,7 @@ type="password"
 <div class="field">
 
 <label>
-رمز جدیـد
+رمز جدید
 </label>
 
 <input
@@ -7482,7 +7103,7 @@ type="password"
 <div class="field">
 
 <label>
-تکرار رمز جدیـد
+تکرار رمز جدید
 </label>
 
 <input
@@ -7500,14 +7121,14 @@ type="password"
 class="modal-btn secondary"
 onclick="closePasswordModal()"
 >
-لغو
+انصراف
 </button>
 
 <button
 class="modal-btn primary"
 onclick="changePassword()"
 >
-ذخیره رمـز عبور
+ذخیره رمز
 </button>
 
 </div>
@@ -8299,20 +7920,39 @@ function closePasswordModal(){
 
 
 async function createAuto(){
-    const protocol = document.getElementById("autoProtocol")?.value || "vless-ws";
-    const profile = document.getElementById("autoProfile")?.value || "balanced";
+
     closeAutoModal();
-    showToast("در حال ساخت کانفیگ حرفه‌ای...");
-    const result = await api("/api/links/auto", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({protocol,profile})
-    });
-    if(!result || !result.ok) return;
-    const config = result.config || result.vless || result.link || "";
-    await copyText(config);
-    showToast("کانفیگ ساخته شد و در کلیپ‌بورد قرار گرفت");
+
+    showToast(
+        "در حال ساخت کانفیگ..."
+    );
+
+    const result =
+        await api(
+            "/api/links/auto",
+            {
+                method:"POST"
+            }
+        );
+
+    if(
+        !result
+        ||
+        !result.ok
+    ){
+        return;
+    }
+
+    await copyText(
+        result.vless
+    );
+
+    showToast(
+        "کانفیگ ساخته شد و VLESS کپی شد"
+    );
+
     await refresh();
+
 }
 
 
@@ -8944,7 +8584,7 @@ async def global_exception_handler(
             padding:40px;
         ">
             <h2>
-            خطای داخلی PX Panel
+            خطای داخلی PXpanel
             </h2>
 
             <p>
