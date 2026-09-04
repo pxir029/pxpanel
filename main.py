@@ -3969,19 +3969,57 @@ async def info_page(
   }}
 </script>
 <style>
-  html,body{{background:#05060a}}
+  :root {{
+    --bg-main: #05060a;
+    --bg-card: rgba(255, 255, 255, 0.04);
+    --bg-card-hover: rgba(255, 255, 255, 0.07);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --text-main: #f1f5f9;
+    --text-muted: rgba(255, 255, 255, 0.4);
+    --bg-sub-card: rgba(0, 0, 0, 0.2);
+    --grad-1: rgba(96,165,250,.16);
+    --grad-2: rgba(167,139,250,.13);
+    --grad-3: rgba(52,211,153,.08);
+  }}
+
+  body.theme-lighter {{
+    --bg-main: #121520;
+    --bg-card: rgba(255, 255, 255, 0.07);
+    --bg-card-hover: rgba(255, 255, 255, 0.11);
+    --border-color: rgba(255, 255, 255, 0.16);
+    --text-main: #ffffff;
+    --text-muted: rgba(255, 255, 255, 0.6);
+    --bg-sub-card: rgba(0, 0, 0, 0.35);
+    --grad-1: rgba(96,165,250,.24);
+    --grad-2: rgba(167,139,250,.20);
+    --grad-3: rgba(52,211,153,.13);
+  }}
+
+  html,body{{background:var(--bg-main); transition: background 0.3s ease, color 0.3s ease;}}
   body{{
     background:
-      radial-gradient(ellipse 80% 50% at 10% -10%, rgba(96,165,250,.16), transparent 50%),
-      radial-gradient(ellipse 60% 40% at 95% 15%, rgba(167,139,250,.13), transparent 45%),
-      radial-gradient(ellipse 55% 35% at 60% 100%, rgba(52,211,153,.08), transparent 40%),
-      #05060a;
+      radial-gradient(ellipse 80% 50% at 10% -10%, var(--grad-1), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 95% 15%, var(--grad-2), transparent 45%),
+      radial-gradient(ellipse 55% 35% at 60% 100%, var(--grad-3), transparent 40%),
+      var(--bg-main);
   }}
   .status-dot{{box-shadow:0 0 10px currentColor}}
   ::-webkit-scrollbar{{width:8px;height:8px}}
   ::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
   * {{ box-shadow: none !important; }}
   .copy-btn svg{{transition:none}}
+  
+  .dynamic-card {{
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }}
+  .dynamic-card:hover {{
+    background-color: var(--bg-card-hover);
+  }}
+  .sub-box {{
+    background-color: var(--bg-sub-card);
+  }}
 </style>
 </head>
 <body class="font-vazir text-slate-100 antialiased min-h-screen py-8 px-3 sm:px-4 md:py-14">
@@ -3989,7 +4027,7 @@ async def info_page(
 <div class="w-full max-w-4xl mx-auto space-y-5 sm:space-y-6 md:space-y-8">
 
   <!-- Hero -->
-  <section class="rounded-[26px] sm:rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-8">
+  <section class="rounded-[26px] sm:rounded-[28px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
       <div class="flex items-center gap-4">
         <div class="w-13 h-13 sm:w-14 sm:h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300">
@@ -4001,6 +4039,11 @@ async def info_page(
         </div>
       </div>
       <div class="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+        <!-- Theme Toggle Button -->
+        <button type="button" onclick="toggleTheme()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-amber-300 border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors">
+          <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          تغییر تم
+        </button>
         <button type="button" onclick="openQrModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-purple-300 border border-purple-400/30 bg-purple-400/10 hover:bg-purple-400/20 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           QR Code
@@ -4017,7 +4060,7 @@ async def info_page(
   <!-- Usage overview -->
   <section class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 sm:gap-6">
 
-    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
       <div class="flex items-center gap-2.5">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 4-7"/></svg>
         <div>
@@ -4053,7 +4096,7 @@ async def info_page(
             <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
           </div>
 
-          <div class="mt-4 rounded-xl border border-white/[0.05] bg-black/15 px-3 pt-3 pb-1.5">
+          <div class="mt-4 rounded-xl border border-white/[0.05] sub-box px-3 pt-3 pb-1.5">
             <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
               روند مصرف
@@ -4085,7 +4128,7 @@ async def info_page(
       </div>
     </div>
 
-    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
       <div class="flex items-center gap-2.5">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
         <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
@@ -4127,7 +4170,7 @@ async def info_page(
   <!-- Stats -->
   <section class="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-emerald-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-emerald-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-400/10 border border-emerald-400/20 text-emerald-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>
       </div>
@@ -4135,7 +4178,7 @@ async def info_page(
       <p class="mt-1 text-[14px] sm:text-[15px] font-black text-emerald-300 break-words">{escape_html(fmt_bytes(used))}</p>
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-amber-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-amber-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-amber-400/10 border border-amber-400/20 text-amber-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
       </div>
@@ -4143,7 +4186,7 @@ async def info_page(
       <p class="mt-1 text-[14px] sm:text-[15px] font-black text-amber-300 break-words">{escape_html(remaining_value)}</p>
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-blue-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-blue-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M4 9h16"/></svg>
       </div>
@@ -4151,7 +4194,7 @@ async def info_page(
       <p class="mt-1 text-[14px] sm:text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-purple-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-purple-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-purple-400/10 border border-purple-400/20 text-purple-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v6c0 5-3.6 8.7-9 9.5-5.4-.8-9-4.5-9-9.5v-6L12 2z"/></svg>
       </div>
@@ -4162,7 +4205,7 @@ async def info_page(
   </section>
 
   <!-- Technical details -->
-  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
     <div class="flex items-center justify-between gap-3 mb-5">
       <p class="flex items-center gap-2 text-sm font-black">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M4 21v-7M4 10V3M12 21v-11M12 6V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
@@ -4171,27 +4214,27 @@ async def info_page(
       <p class="text-[11px] text-white/40">Configuration Details</p>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
         <p class="text-[11px] text-white/45">Protocol</p>
         <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("protocol","vless-ws"))}</p>
       </div>
-      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
         <p class="text-[11px] text-white/45">Fingerprint</p>
         <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("fingerprint","chrome"))}</p>
       </div>
-      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
         <p class="text-[11px] text-white/45">IP Limit</p>
         <p class="mt-2 text-xs font-bold text-white/85">{escape_html(ip_limit)}</p>
       </div>
-      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
         <p class="text-[11px] text-white/45">Connection Limit</p>
         <p class="mt-2 text-xs font-bold text-white/85">{escape_html(connection_limit)}</p>
       </div>
-      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
         <p class="text-[11px] text-white/45">Speed Limit</p>
         <p class="mt-2 text-xs font-bold text-white/85">{escape_html(speed_limit)}</p>
       </div>
-      <div class="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
         <p class="text-[11px] text-white/45">تاریخ انقضا</p>
         <p class="mt-2 text-xs font-bold text-white/85">{escape_html(expiry_display)}</p>
       </div>
@@ -4199,7 +4242,7 @@ async def info_page(
   </section>
 
   <!-- Links -->
-  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
     <div class="flex items-center justify-between gap-3 mb-5">
       <p class="flex items-center gap-2 text-sm font-black">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.41-1.41"/></svg>
@@ -4209,7 +4252,7 @@ async def info_page(
     </div>
 
     <div class="space-y-3">
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
         <div class="min-w-0 flex-1">
           <p class="text-[11px] font-extrabold text-white/45 tracking-wide">VLESS</p>
           <p id="vlessLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(vless_url)}</p>
@@ -4221,7 +4264,7 @@ async def info_page(
         </button>
       </div>
 
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
         <div class="min-w-0 flex-1">
           <p class="text-[11px] font-extrabold text-white/45 tracking-wide">SUBSCRIPTION</p>
           <p id="subLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(sub_url)}</p>
@@ -4236,7 +4279,7 @@ async def info_page(
   </section>
 
   <!-- Downloads -->
-  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
     <div class="flex items-center justify-between gap-3 mb-5">
       <p class="flex items-center gap-2 text-sm font-black">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
@@ -4247,7 +4290,7 @@ async def info_page(
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
       <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
+         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
         <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">NG</div>
         <div class="min-w-0">
           <p class="text-xs font-extrabold">v2rayNG</p>
@@ -4255,7 +4298,7 @@ async def info_page(
         </div>
       </a>
       <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
+         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
         <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">N</div>
         <div class="min-w-0">
           <p class="text-xs font-extrabold">v2rayN</p>
@@ -4263,7 +4306,7 @@ async def info_page(
         </div>
       </a>
       <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
+         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
         <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">H</div>
         <div class="min-w-0">
           <p class="text-xs font-extrabold">Hiddify</p>
@@ -4293,6 +4336,21 @@ async def info_page(
 
 <script>
 const vlessUrlData = "{vless_url}";
+
+// Theme toggle logic with localStorage support
+function toggleTheme() {{
+  const body = document.body;
+  body.classList.toggle('theme-lighter');
+  const isLighter = body.classList.contains('theme-lighter');
+  localStorage.setItem('px_theme', isLighter ? 'lighter' : 'dark');
+}}
+
+// Initialize saved theme on load
+(function() {{
+  if (localStorage.getItem('px_theme') === 'lighter') {{
+    document.body.classList.add('theme-lighter');
+  }}
+}})();
 
 function openQrModal() {{
   var modal = document.getElementById('qrModal');
