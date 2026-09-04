@@ -3948,10 +3948,7 @@ async def info_page(
   tailwind.config = {{
     theme: {{
       extend: {{
-        fontFamily: {{ vazir: ['Vazirmatn','system-ui','sans-serif'] }},
-        colors: {{
-          panel: '#05060a'
-        }}
+        fontFamily: {{ vazir: ['Vazirmatn','system-ui','sans-serif'] }}
       }}
     }}
   }}
@@ -3969,83 +3966,146 @@ async def info_page(
   ::-webkit-scrollbar{{width:8px;height:8px}}
   ::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
   * {{ box-shadow: none !important; }}
+  .copy-btn svg{{transition:none}}
 </style>
 </head>
-<body class="font-vazir text-slate-100 antialiased min-h-screen py-10 px-4 md:py-14">
+<body class="font-vazir text-slate-100 antialiased min-h-screen py-8 px-3 sm:px-4 md:py-14">
 
-<div class="w-full max-w-4xl mx-auto space-y-6 md:space-y-8">
+<div class="w-full max-w-4xl mx-auto space-y-5 sm:space-y-6 md:space-y-8">
 
   <!-- Hero -->
-  <section class="rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-8">
+  <section class="rounded-[26px] sm:rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
       <div class="flex items-center gap-4">
-        <div class="w-14 h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300 font-black text-base">
-          PX
+        <div class="w-13 h-13 sm:w-14 sm:h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5.2-3.4 9-8 10-4.6-1-8-4.8-8-10V6l8-4z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
         </div>
-        <div>
-          <h1 class="text-xl md:text-2xl font-black tracking-tight">{escape_html(snapshot.get("label","PXpanel"))}</h1>
-          <p class="mt-1.5 text-[11px] text-white/40 break-all">UUID: {escape_html(uid)} &nbsp;·&nbsp; PXpanel {APP_VERSION}</p>
+        <div class="min-w-0">
+          <h1 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight truncate">{escape_html(snapshot.get("label","PXpanel"))}</h1>
+          <p class="mt-1.5 text-[10.5px] sm:text-[11px] text-white/40 break-all">UUID: {escape_html(uid)} &nbsp;·&nbsp; PXpanel {APP_VERSION}</p>
         </div>
       </div>
-      <div class="status-badge inline-flex items-center gap-2 self-start md:self-auto px-4 py-2 rounded-full text-xs font-extrabold
+      <div class="inline-flex items-center gap-2 self-start md:self-auto px-4 py-2 rounded-full text-xs font-extrabold
                   {'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'}">
         <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
         {status_text}
       </div>
     </div>
 
-    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-purple-400/20 bg-gradient-to-l from-purple-400/10 to-blue-400/5 p-4 md:p-5">
-      <div class="w-8 h-8 shrink-0 grid place-items-center rounded-xl bg-purple-400/15 border border-purple-400/20 text-purple-300 font-extrabold text-sm">!</div>
-      <p class="text-[12.5px] leading-8 text-white/65">
-        <b class="text-purple-200">اطلاعیه اتصال</b><br>
-        لینک SUB را در برنامه‌ای که استفاده می‌کنید به‌عنوان Subscription وارد کنید. برای اتصال مستقیم نیز می‌توانید VLESS را Import کنید.
-        <b class="text-purple-200">کانال تلگرام: logic_sec</b>
+    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-gradient-to-l from-amber-400/[0.12] to-orange-400/[0.04] p-4 sm:p-5">
+      <div class="w-9 h-9 shrink-0 grid place-items-center rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      </div>
+      <p class="text-[12px] sm:text-[12.5px] leading-7 sm:leading-8 text-amber-100/90">
+        <b class="text-amber-200 block mb-1">⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️</b>
+        ممکنه دسترسی دامنه به‌دلیل محدودیت‌های منطقه‌ای، اپراتور یا ISP متفاوت باشه. در این شرایط یک دامنه جدید امتحان کنید.
       </p>
     </div>
   </section>
 
   <!-- Usage overview -->
-  <section class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-6">
+  <section class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 sm:gap-6">
 
-    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
-      <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Traffic Overview</p>
-      <p class="mt-1.5 text-sm font-black">مصرف سرویس</p>
-
-      <div class="mt-6 flex items-end justify-between gap-4">
-        <div class="text-2xl md:text-[28px] font-black tracking-tight">
-          {escape_html(fmt_bytes(used))}
-          <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
+    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+      <div class="flex items-center gap-2.5">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 4-7"/></svg>
+        <div>
+          <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Traffic Overview</p>
+          <p class="mt-0.5 text-sm font-black">مصرف سرویس</p>
         </div>
-        <div class="text-base font-black text-emerald-300">{usage_percent}%</div>
       </div>
 
-      <div class="mt-4 h-2.5 rounded-full bg-white/[0.06] border border-white/[0.04] overflow-hidden">
-        <div class="h-full rounded-full bg-gradient-to-l from-amber-400 to-emerald-400 transition-all duration-500" style="width:{usage_percent}%"></div>
-      </div>
+      <div class="mt-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+        <div class="relative shrink-0 w-[128px] h-[128px]">
+          <svg width="128" height="128" viewBox="0 0 132 132" class="-rotate-90">
+            <circle cx="66" cy="66" r="54" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
+            <circle cx="66" cy="66" r="54" fill="none" stroke="url(#usageRingGradient)" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="339.29" stroke-dashoffset="{339.29 - (339.29 * min(usage_percent, 100) / 100):.1f}"/>
+            <defs>
+              <linearGradient id="usageRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#34d399"/>
+                <stop offset="100%" stop-color="#f59e0b"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="absolute inset-0 grid place-items-center">
+            <div class="text-center">
+              <p class="text-xl font-black leading-none">{usage_percent}%</p>
+              <p class="mt-1.5 text-[10px] text-white/40">مصرف‌شده</p>
+            </div>
+          </div>
+        </div>
 
-      <div class="mt-4 flex items-center justify-between text-[11px] text-white/40">
-        <span>باقی‌مانده: <b class="text-white/70 font-bold">{escape_html(remaining_value)}</b></span>
-        <span>زمان: <b class="text-white/70 font-bold">{escape_html(expiry_remaining)}</b></span>
+        <div class="flex-1 w-full min-w-0">
+          <div class="text-xl sm:text-2xl font-black tracking-tight">
+            {escape_html(fmt_bytes(used))}
+            <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
+          </div>
+
+          <!-- روند مصرف: نمودار خطی نمایشی؛ برای اتصال به دیتای واقعی، points زیر را از تاریخچه‌ی مصرف بساز -->
+          <div class="mt-4 rounded-xl border border-white/[0.05] bg-black/15 px-3 pt-3 pb-1.5">
+            <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+              روند مصرف
+            </p>
+            <svg viewBox="0 0 300 64" class="w-full h-14" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,46 C25,44 35,30 60,32 C85,34 95,20 120,18 C145,16 155,36 180,30 C205,24 215,10 240,12 C260,13.5 270,24 300,16 L300,64 L0,64 Z" fill="url(#trendFill)"/>
+              <path d="M0,46 C25,44 35,30 60,32 C85,34 95,20 120,18 C145,16 155,36 180,30 C205,24 215,10 240,12 C260,13.5 270,24 300,16" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between text-[11px] text-white/40 flex-wrap gap-2">
+            <span class="inline-flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+              باقی‌مانده: <b class="text-white/70 font-bold">{escape_html(remaining_value)}</b>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+              زمان: <b class="text-white/70 font-bold">{escape_html(expiry_remaining)}</b>
+            </span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
-      <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
+    <div class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+      <div class="flex items-center gap-2.5">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+        <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
+      </div>
       <div class="mt-4 divide-y divide-white/[0.06]">
         <div class="flex items-center justify-between py-3 first:pt-0">
-          <span class="text-[11px] text-white/45">انقضا</span>
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+            انقضا
+          </span>
           <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
         </div>
         <div class="flex items-center justify-between py-3">
-          <span class="text-[11px] text-white/45">IP Limit</span>
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
+            IP Limit
+          </span>
           <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
         </div>
         <div class="flex items-center justify-between py-3">
-          <span class="text-[11px] text-white/45">Connection</span>
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><rect x="2" y="9" width="20" height="8" rx="2"/><path d="M6 17v2M18 17v2"/></svg>
+            Connection
+          </span>
           <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
         </div>
         <div class="flex items-center justify-between py-3 last:pb-0">
-          <span class="text-[11px] text-white/45">Speed</span>
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+            Speed
+          </span>
           <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
         </div>
       </div>
@@ -4054,46 +4114,49 @@ async def info_page(
   </section>
 
   <!-- Stats -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-emerald-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-emerald-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-400/10 border border-emerald-400/20 text-emerald-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>
       </div>
       <p class="mt-4 text-[11px] text-white/45">مصرف فعلی</p>
-      <p class="mt-1 text-[15px] font-black text-emerald-300 break-words">{escape_html(fmt_bytes(used))}</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-emerald-300 break-words">{escape_html(fmt_bytes(used))}</p>
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-amber-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-amber-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-amber-400/10 border border-amber-400/20 text-amber-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
       </div>
       <p class="mt-4 text-[11px] text-white/45">باقی‌مانده</p>
-      <p class="mt-1 text-[15px] font-black text-amber-300 break-words">{escape_html(remaining_value)}</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-amber-300 break-words">{escape_html(remaining_value)}</p>
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-blue-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-blue-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M4 9h16"/></svg>
       </div>
       <p class="mt-4 text-[11px] text-white/45">اتصالات فعال</p>
-      <p class="mt-1 text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-5 hover:bg-white/[0.07] hover:border-purple-400/20 transition-colors duration-200">
+    <div class="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5 hover:bg-white/[0.07] hover:border-purple-400/20 transition-colors duration-200">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-purple-400/10 border border-purple-400/20 text-purple-300">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v6c0 5-3.6 8.7-9 9.5-5.4-.8-9-4.5-9-9.5v-6L12 2z"/></svg>
       </div>
       <p class="mt-4 text-[11px] text-white/45">زمان باقی‌مانده</p>
-      <p class="mt-1 text-[15px] font-black text-purple-300 break-words">{escape_html(expiry_remaining)}</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-purple-300 break-words">{escape_html(expiry_remaining)}</p>
     </div>
 
   </section>
 
   <!-- Technical details -->
-  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
-    <div class="flex items-end justify-between gap-3 mb-5">
-      <p class="text-sm font-black">جزئیات فنی</p>
+  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <p class="flex items-center gap-2 text-sm font-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M4 21v-7M4 10V3M12 21v-11M12 6V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
+        جزئیات فنی
+      </p>
       <p class="text-[11px] text-white/40">Configuration Details</p>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -4125,35 +4188,49 @@ async def info_page(
   </section>
 
   <!-- Links -->
-  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
-    <div class="flex items-end justify-between gap-3 mb-5">
-      <p class="text-sm font-black">لینک‌های سرویس</p>
+  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <p class="flex items-center gap-2 text-sm font-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.41-1.41"/></svg>
+        لینک‌های سرویس
+      </p>
       <p class="text-[11px] text-white/40">Copy / Import</p>
     </div>
 
     <div class="space-y-3">
-      <div class="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
         <div class="min-w-0 flex-1">
           <p class="text-[11px] font-extrabold text-white/45 tracking-wide">VLESS</p>
-          <p class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(vless_url)}</p>
+          <p id="vlessLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(vless_url)}</p>
         </div>
-        <span class="shrink-0 text-[10px] font-bold text-white/40 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">VLESS</span>
+        <button id="vlessCopyBtn" type="button" onclick="pxCopy('vlessLinkText','vlessCopyBtn')"
+          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          <span>کپی</span>
+        </button>
       </div>
 
-      <div class="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-purple-400/25 hover:bg-purple-400/[0.05] transition-colors duration-200">
         <div class="min-w-0 flex-1">
           <p class="text-[11px] font-extrabold text-white/45 tracking-wide">SUBSCRIPTION</p>
-          <p class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(sub_url)}</p>
+          <p id="subLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(sub_url)}</p>
         </div>
-        <span class="shrink-0 text-[10px] font-bold text-white/40 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">SUB</span>
+        <button id="subCopyBtn" type="button" onclick="pxCopy('subLinkText','subCopyBtn')"
+          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          <span>کپی</span>
+        </button>
       </div>
     </div>
   </section>
 
   <!-- Downloads -->
-  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 md:p-7">
-    <div class="flex items-end justify-between gap-3 mb-5">
-      <p class="text-sm font-black">دانلود برنامه‌ها</p>
+  <section class="rounded-[22px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <p class="flex items-center gap-2 text-sm font-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        دانلود برنامه‌ها
+      </p>
       <p class="text-[11px] text-white/40">Official Releases</p>
     </div>
 
@@ -4161,7 +4238,7 @@ async def info_page(
       <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
          class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
         <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">NG</div>
-        <div>
+        <div class="min-w-0">
           <p class="text-xs font-extrabold">v2rayNG</p>
           <p class="mt-0.5 text-[10px] text-white/40">Android</p>
         </div>
@@ -4169,7 +4246,7 @@ async def info_page(
       <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
          class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
         <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">N</div>
-        <div>
+        <div class="min-w-0">
           <p class="text-xs font-extrabold">v2rayN</p>
           <p class="mt-0.5 text-[10px] text-white/40">Windows / macOS / Linux</p>
         </div>
@@ -4177,7 +4254,7 @@ async def info_page(
       <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
          class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-blue-400/25 transition-colors duration-200">
         <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">H</div>
-        <div>
+        <div class="min-w-0">
           <p class="text-xs font-extrabold">Hiddify</p>
           <p class="mt-0.5 text-[10px] text-white/40">Android / Windows / macOS / Linux</p>
         </div>
@@ -4191,6 +4268,44 @@ async def info_page(
   </div>
 
 </div>
+
+<script>
+function pxCopy(textId, btnId) {{
+  var el = document.getElementById(textId);
+  var btn = document.getElementById(btnId);
+  if (!el || !btn) return;
+  var text = el.textContent.trim();
+  var done = function() {{
+    var original = btn.getAttribute('data-original');
+    if (!original) {{
+      original = btn.innerHTML;
+      btn.setAttribute('data-original', original);
+    }}
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>کپی شد</span>';
+    btn.classList.add('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
+    setTimeout(function() {{
+      btn.innerHTML = original;
+      btn.classList.remove('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
+    }}, 1700);
+  }};
+  if (navigator.clipboard && navigator.clipboard.writeText) {{
+    navigator.clipboard.writeText(text).then(done).catch(function() {{ fallbackCopy(text, done); }});
+  }} else {{
+    fallbackCopy(text, done);
+  }}
+}}
+function fallbackCopy(text, cb) {{
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {{ document.execCommand('copy'); }} catch (e) {{}}
+  document.body.removeChild(ta);
+  if (cb) cb();
+}}
+</script>
 </body>
 </html>"""
     return HTMLResponse(info_html)
