@@ -1,5 +1,5 @@
 # ============================================================
-# PXpanel 13.0.1 Beta
+# PXpanel 12.1.0 Beta
 # Railway Ready
 # ============================================================
 
@@ -41,7 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ============================================================
 
 APP_NAME = "PXpanel"
-APP_VERSION = "13.0.1 Beta"
+APP_VERSION = "12.1.0 Beta"
 
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
@@ -2093,7 +2093,7 @@ PXpanel
 </div>
 
 <div class="version">
-13.0.1 Beta
+12.1.0 Beta
 </div>
 </div>
 
@@ -2141,7 +2141,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PXpanel · 13.0.1 Beta
+PXpanel · 12.1.0 Beta
 </span>
 
 <a
@@ -2411,7 +2411,7 @@ P
 </h1>
 
 <div class="version">
-13.0.1 Beta
+12.1.0 Beta
 </div>
 
 <div class="desc">
@@ -4609,7 +4609,7 @@ PXpanel
 </h1>
 
 <div class="version">
-13.0.1 Beta
+12.1.0 Beta
 </div>
 
 <div class="text">
@@ -5448,7 +5448,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PXpanel 13.0.1 Beta
+PXpanel 12.1.0 Beta
 </title>
 
 <link
@@ -6255,7 +6255,7 @@ PXpanel
 </div>
 
 <div class="brand-version">
-13.0.1 Beta
+12.1.0 Beta
 </div>
 
 </div>
@@ -7140,60 +7140,31 @@ onclick="changePassword()"
 
     <!-- LOGIN NOTICE START -->
 <div id="loginNoticeModal" class="login-notice-backdrop" role="dialog" aria-modal="true" aria-labelledby="regionNoticeTitle">
-  <div class="login-notice">
-    <div class="login-notice-head">
-      <div class="login-notice-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path d="M12 3a9 9 0 1 0 9 9"/>
-          <path d="M12 7v5l3 2"/>
-          <path d="M16.5 3.5h4v4"/>
-          <path d="m20.5 3.5-5 5"/>
-        </svg>
-      </div>
-      <div>
-        <h3 id="regionNoticeTitle">راهنمای اتصال سرویس</h3>
-        <p>اطلاعیه مهم منطقه‌ای پیش از اتصال کانفیگ‌ها</p>
-      </div>
-    </div>
-    <div class="login-notice-body">
-      <p><b>نکته:</b> برای استفاده، لینک اشتراک (SUB) را در برنامه وارد (Import / Subscription) کرده یا از لینک مستقیم VLESS استفاده کنید.</p>
-      <div class="region-warning" role="alert">
-        <div class="warning-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-            <path d="m12 3 9 17H3L12 3Z"/>
-            <path d="M12 9v5"/>
-            <path d="M12 17h.01"/>
-          </svg>
-          هشدار منطقه‌ای اتصال
-        </div>
-        <p>در صورتی که پنل با موفقیت نصب شد اما کانفیگ‌ها پینگ نداشتند، دامنه مسدود شده است؛ لطفاً دامنه جدیدی بسازید.</p>
-      </div>
-    </div>
-    <div class="notice-downloads">
-      <a class="notice-download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer">
-        <strong>v2rayNG</strong>
-        <span>اندروید</span>
-      </a>
-      <a class="notice-download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer">
-        <strong>v2rayN</strong>
-        <span>ویندوز / مک / لینوکس</span>
-      </a>
-      <a class="notice-download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer">
-        <strong>Hiddify</strong>
-        <span>چندپلتفرمی</span>
-      </a>
-    </div>
-    <div class="login-notice-actions">
-      <button type="button" onclick="closeLoginNotice()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path d="m5 12 4 4L19 6"/>
-        </svg>
-        متوجه شدم
-      </button>
-    </div>
-  </div>
+<div class="login-notice">
+<div class="login-notice-head">
+<div class="login-notice-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/><path d="M16.5 3.5h4v4"/><path d="m20.5 3.5-5 5"/></svg>
 </div>
-<!-- LOGIN NOTICE END -->
+<div>
+<h3 id="regionNoticeTitle">راهنمای اتصال سرویس</h3>
+<p>اطلاعیه مهم منطقه‌ای قبل از اتصال کانفیگ‌ها</p>
+</div>
+</div>
+<div class="login-notice-body">
+<b>نکته:</b> لینک SUB را داخل برنامه Import / Subscription اضافه کنید. برای اتصال مستقیم نیز می‌توانید لینک VLESS را وارد کنید.
+<div class="region-warning">
+<div class="warning-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>هشدار منطقه‌ای اتصال</div>
+⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️
+</div>
+</div>
+<div class="notice-downloads">
+<a class="notice-download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><strong>v2rayNG</strong><span>Android</span></a>
+<a class="notice-download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><strong>v2rayN</strong><span>Windows / macOS / Linux</span></a>
+<a class="notice-download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></a>
+</div>
+<div class="login-notice-actions"><button type="button" onclick="closeLoginNotice()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>متوجه شدم</button></div>
+</div></div>
+    <!-- LOGIN NOTICE END -->
 
 <div
 id="toast"
