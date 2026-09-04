@@ -1,5 +1,5 @@
 # ============================================================
-# PXpanel 12.1.0 Beta
+# PXPanel 13.0.1 Beta
 # Railway Ready
 # ============================================================
 
@@ -40,10 +40,12 @@ from fastapi.middleware.cors import CORSMiddleware
 # APP
 # ============================================================
 
-APP_NAME = "PXpanel"
-APP_VERSION = "12.1.0 Beta"
+APP_NAME = "PXPanel"
+APP_VERSION = "13.0.1 Beta"
+
 SUPPORT_USERNAME = "@logic_sec"
 SUPPORT_URL = "https://t.me/logic_sec"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -91,8 +93,8 @@ DATA_DIR.mkdir(
     exist_ok=True,
 )
 
-DATA_FILE = DATA_DIR / "pxpanel_state.json"
-SECRET_FILE = DATA_DIR / "pxpanel_secret.key"
+DATA_FILE = DATA_DIR / "pixonpanel_state.json"
+SECRET_FILE = DATA_DIR / "pixonpanel_secret.key"
 
 
 # ============================================================
@@ -216,7 +218,35 @@ PROTOCOLS = (
     "xhttp-packet-up",
     "xhttp-stream-up",
     "xhttp-stream-one",
+    "vmess-ws",
+    "trojan-ws",
+    "shadowsocks",
+    "socks5",
+    "http",
+    "hysteria2",
+    "tuic",
+    "wireguard",
 )
+
+PROTOCOL_LABELS = {
+    "vless-ws": "VLESS WebSocket",
+    "xhttp-packet-up": "XHTTP Packet Up",
+    "xhttp-stream-up": "XHTTP Stream Up",
+    "xhttp-stream-one": "XHTTP Stream One",
+    "vmess-ws": "VMess WebSocket",
+    "trojan-ws": "Trojan WebSocket",
+    "shadowsocks": "Shadowsocks",
+    "socks5": "SOCKS5",
+    "http": "HTTP Proxy",
+    "hysteria2": "Hysteria 2",
+    "tuic": "TUIC",
+    "wireguard": "WireGuard",
+}
+
+PROTOCOL_ALIASES = {
+    "vmess": "vmess-ws", "trojan": "trojan-ws", "ss": "shadowsocks",
+    "socks": "socks5", "hy2": "hysteria2", "hysteria": "hysteria2",
+}
 
 DEFAULT_PROTOCOL = "vless-ws"
 
@@ -247,6 +277,12 @@ MIN_PORT = 1
 MAX_PORT = 65535
 
 DEFAULT_SPEED_LIMIT = 0
+
+
+def normalize_protocol(protocol: str | None) -> str:
+    value = str(protocol or DEFAULT_PROTOCOL).strip().lower()
+    value = PROTOCOL_ALIASES.get(value, value)
+    return value if value in PROTOCOLS else DEFAULT_PROTOCOL
 
 
 # ============================================================
@@ -743,7 +779,7 @@ def clear_login_failures(ip: str):
 # SESSION
 # ============================================================
 
-SESSION_COOKIE = "pxpanel_session"
+SESSION_COOKIE = "pixonpanel_session"
 
 SESSION_TTL = (
     60
@@ -858,108 +894,38 @@ def set_auth_cookie(
 # ============================================================
 
 def generate_vless_link(
-    uuid: str,
-    host: str,
-    remark: str = "PXpanel",
-    protocol: str = DEFAULT_PROTOCOL,
-    fingerprint: str | None = None,
-    alpn: str | None = None,
-    port: int | None = None,
+    uuid: str, host: str, remark: str = "PXPanel",
+    protocol: str = DEFAULT_PROTOCOL, fingerprint: str | None = None,
+    alpn: str | None = None, port: int | None = None,
 ):
-
-    fp = (
-        fingerprint
-        or DEFAULT_FINGERPRINT
-    ).strip().lower()
-
-    if fp not in FINGERPRINTS:
-        fp = DEFAULT_FINGERPRINT
-
-    alpn_value = (
-        (
-            alpn
-            or ""
-        ).strip()
-        or DEFAULT_ALPN_BY_PROTOCOL.get(
-            protocol,
-            "http/1.1",
-        )
-    )
-
-    port_value = (
-        port
-        or DEFAULT_PORT
-    )
-
-    if not (
-        MIN_PORT
-        <= port_value
-        <= MAX_PORT
-    ):
-        port_value = DEFAULT_PORT
-
-    # ========================================================
-    # IMPORTANT:
-    # The working VLESS WebSocket core stays unchanged.
-    # ========================================================
-
+    protocol = normalize_protocol(protocol)
+    fp = (fingerprint or DEFAULT_FINGERPRINT).strip().lower()
+    if fp not in FINGERPRINTS: fp = DEFAULT_FINGERPRINT
+    port_value = safe_int(port, DEFAULT_PORT, MIN_PORT, MAX_PORT)
+    alpn_value = (alpn or DEFAULT_ALPN_BY_PROTOCOL.get(protocol, "http/1.1")).strip()
+    label = quote(str(remark or "PXPanel"), safe="")
     if protocol == "vless-ws":
-
-        path = (
-            f"/ws/{uuid}"
-        )
-
-        params = {
-            "encryption": "none",
-            "security": "tls",
-            "type": "ws",
-            "host": host,
-            "path": path,
-            "sni": host,
-            "fp": fp,
-            "alpn": alpn_value,
-        }
-
-    else:
-
-        mode = protocol.replace(
-            "xhttp-",
-            "",
-        )
-
-        path = (
-            f"/xhttp-siz10/"
-            f"{mode}/"
-            f"{uuid}"
-        )
-
-        params = {
-            "encryption": "none",
-            "security": "tls",
-            "type": "xhttp",
-            "mode": mode,
-            "host": host,
-            "path": path,
-            "sni": host,
-            "fp": fp,
-            "alpn": alpn_value,
-        }
-
-    query = "&".join(
-        f"{key}="
-        f"{quote(str(value))}"
-        for key, value in params.items()
-    )
-
-    return (
-        f"vless://"
-        f"{uuid}@"
-        f"{host}:"
-        f"{port_value}?"
-        f"{query}#"
-        f"{quote(remark)}"
-    )
-
+        q = {"encryption":"none","security":"tls","type":"ws","host":host,"path":f"/ws/{uuid}","sni":host,"fp":fp,"alpn":alpn_value}
+        return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
+    if protocol.startswith("xhttp-"):
+        mode = protocol.replace("xhttp-", "")
+        q = {"encryption":"none","security":"tls","type":"xhttp","mode":mode,"host":host,"path":f"/xhttp-siz10/{mode}/{uuid}","sni":host,"fp":fp,"alpn":alpn_value}
+        return "vless://" + uuid + "@" + host + ":" + str(port_value) + "?" + "&".join(f"{k}={quote(str(v), safe=',/') }" for k,v in q.items()) + "#" + label
+    if protocol == "vmess-ws":
+        raw = {"v":"2","ps":remark,"add":host,"port":port_value,"id":uuid,"aid":0,"scy":"auto","net":"ws","type":"none","host":host,"path":f"/ws/{uuid}","tls":"tls","sni":host,"fp":fp}
+        return "vmess://" + base64.b64encode(json.dumps(raw,separators=(",",":"),ensure_ascii=False).encode()).decode()
+    if protocol == "trojan-ws":
+        return f"trojan://{uuid}@{host}:{port_value}?security=tls&type=ws&host={quote(host)}&path={quote('/ws/'+uuid)}&sni={quote(host)}#{label}"
+    if protocol == "shadowsocks":
+        method = os.getenv("SS_METHOD", "aes-256-gcm")
+        userinfo = base64.urlsafe_b64encode(f"{method}:{uuid}".encode()).decode().rstrip("=")
+        return f"ss://{userinfo}@{host}:{port_value}#{label}"
+    if protocol == "socks5": return f"socks5://{uuid}:{uuid}@{host}:{port_value}#{label}"
+    if protocol == "http": return f"http://{uuid}:{uuid}@{host}:{port_value}#{label}"
+    if protocol == "hysteria2": return f"hysteria2://{uuid}@{host}:{port_value}/?sni={quote(host)}&insecure=0#{label}"
+    if protocol == "tuic": return f"tuic://{uuid}:{uuid}@{host}:{port_value}?sni={quote(host)}&alpn=h3#{label}"
+    if protocol == "wireguard": return f"wireguard://{uuid}@{host}:{port_value}?publicKey={uuid}#{label}"
+    return f"vless://{uuid}@{host}:{port_value}"
 
 def vless_link_for_link(
     link: dict,
@@ -970,7 +936,7 @@ def vless_link_for_link(
         uid,
         host,
         remark=(
-            f"pxpanel-"
+            f"px-"
             f"{link.get('label', '')}"
         ),
         protocol=link.get(
@@ -1373,8 +1339,7 @@ async def make_link(
     fragment: str = "off",
 ):
 
-    if protocol not in PROTOCOLS:
-        protocol = DEFAULT_PROTOCOL
+    protocol = normalize_protocol(protocol)
 
     fingerprint = (
         fingerprint
@@ -1468,6 +1433,10 @@ async def make_link(
                 fragment
                 or "off"
             ).strip().lower(),
+
+        "security_profile": "balanced",
+        "multi_login": False,
+        "protocol_label": PROTOCOL_LABELS.get(protocol, protocol),
     }
 
     async with LINKS_LOCK:
@@ -1870,7 +1839,7 @@ LANDING_HTML = r"""
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>PXpanel</title>
+<title>PX Panel</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2074,6 +2043,12 @@ h1{
         flex-direction:column;
     }
 }
+
+/* PXPanel 13.0.1 responsive system */
+html{scroll-behavior:smooth} body{overflow-x:hidden} button,input,select,textarea{touch-action:manipulation} .modal{overscroll-behavior:contain}
+@media(max-width:900px){.container,.shell,.dashboard,.main,.content{max-width:100%!important;width:100%!important}.grid,.stats-grid,.cards-grid,.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sidebar{z-index:1000}}
+@media(max-width:640px){body{padding:10px!important;font-size:14px}.grid,.stats-grid,.cards-grid,.form-grid{grid-template-columns:1fr!important}.card,.panel,.section,.modal{border-radius:18px!important}.modal{max-height:92vh;overflow:auto;padding:14px!important}.header,.topbar,.toolbar,.actions{flex-wrap:wrap!important}.header>* ,.topbar>*{max-width:100%}.btn,button{min-height:44px}.field input,.field select,.field textarea,input,select,textarea{min-height:44px;font-size:16px;max-width:100%}table{display:block;overflow-x:auto;white-space:nowrap}.link-row,.config-row{flex-direction:column!important;align-items:stretch!important}.brand-name{font-size:15px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
 
@@ -2087,11 +2062,11 @@ h1{
 
 <div>
 <div class="brand-name">
-PXpanel
+PX Panel
 </div>
 
 <div class="version">
-12.1.0 Beta
+13.0.1 Beta
 </div>
 </div>
 
@@ -2108,7 +2083,7 @@ PXpanel
 </h1>
 
 <div class="desc">
-این صفحه، درگاه عمومی PXpanel است.
+این صفحه، درگاه عمومی PX Panel است.
 برای دسترسی به داشبورد مدیریت از مسیر ورود استفاده کنید.
 </div>
 
@@ -2139,7 +2114,7 @@ class="btn secondary"
 <div class="footer">
 
 <span>
-PXpanel · 12.1.0 Beta
+PX Panel · 13.0.1 Beta
 </span>
 
 <a
@@ -2214,7 +2189,7 @@ name="viewport"
 content="width=device-width,initial-scale=1"
 >
 
-<title>ورود | PXpanel</title>
+<title>ورود | PX Panel</title>
 
 <link
 rel="preconnect"
@@ -2405,11 +2380,11 @@ P
 </div>
 
 <h1>
-ورود به PXpanel
+ورود به PX Panel
 </h1>
 
 <div class="version">
-12.1.0 Beta
+13.0.1 Beta
 </div>
 
 <div class="desc">
@@ -3092,92 +3067,43 @@ async def create_auto_link(
     request: Request,
     _=Depends(require_auth),
 ):
-
     try:
-
-        host = get_host(request)
-
-        uid, link = await make_link(
-            label=auto_config_name(),
-
-            # Unlimited
-            limit_bytes=0,
-            expires_at=None,
-            ip_limit=0,
-            speed_limit_bytes=0,
-            connection_limit=0,
-
-            note=(
-                "Auto generated by "
-                "PXpanel"
-            ),
-
-            # IMPORTANT:
-            # Keep working protocol.
-            protocol="vless-ws",
-
-            fingerprint="chrome",
-
-            alpn="http/1.1",
-
-            port=443,
-
-            fragment="off",
-        )
-
-        result = {
-            **get_link_info(
-                link,
-                uid,
-                host,
-            ),
-            "ok": True,
-        }
-
-        log_activity(
-            "link",
-            (
-                f"کانفیگ خودکار "
-                f"«{link['label']}» ساخته شد"
-            ),
-            "ok",
-        )
-
-        return result
-
-    except Exception as exc:
-
-        logger.exception(
-            "Auto config creation failed"
-        )
-
-        stats["total_errors"] += 1
-
-        error_logs.append(
-            {
-                "error":
-                    str(exc),
-
-                "path":
-                    "/api/links/auto",
-
-                "time":
-                    datetime.now().isoformat(),
-            }
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "خطا در ساخت کانفیگ: "
-                f"{exc}"
-            ),
-        )
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict): body = {}
+    host = get_host(request)
+    protocol = normalize_protocol(body.get("protocol", DEFAULT_PROTOCOL))
+    profile = str(body.get("profile", "balanced")).strip().lower()
+    profiles = {
+        "normal": {"ip":0,"conn":0,"speed":0,"fp":"chrome","fragment":"off"},
+        "balanced": {"ip":2,"conn":4,"speed":0,"fp":"chrome","fragment":"safe"},
+        "gaming": {"ip":1,"conn":2,"speed":0,"fp":"chrome","fragment":"safe"},
+        "maximum": {"ip":0,"conn":0,"speed":0,"fp":"randomized","fragment":"safe"},
+    }
+    cfg = profiles.get(profile, profiles["balanced"])
+    uid, link = await make_link(
+        label=auto_config_name(), limit_bytes=0, expires_at=None,
+        ip_limit=cfg["ip"], speed_limit_bytes=cfg["speed"], connection_limit=cfg["conn"],
+        note=f"Auto generated by PXPanel | profile={profile}",
+        protocol=protocol, fingerprint=cfg["fp"],
+        alpn=DEFAULT_ALPN_BY_PROTOCOL.get(protocol, ""), port=443, fragment=cfg["fragment"],
+    )
+    link["security_profile"] = profile
+    result = {**get_link_info(link, uid, host), "ok": True, "profile": profile}
+    log_activity("link", f"کانفیگ خودکار «{link['label']}» با {PROTOCOL_LABELS.get(protocol, protocol)} ساخته شد", "ok")
+    return result
 
 
 # ============================================================
 # LIST LINKS
 # ============================================================
+
+@app.get("/api/protocols")
+async def api_protocols(request: Request):
+    require_auth(request)
+    return {"protocols": [{"id": p, "label": PROTOCOL_LABELS.get(p, p)} for p in PROTOCOLS], "default": DEFAULT_PROTOCOL}
+
 
 @app.get("/api/links")
 async def list_links(
@@ -3817,7 +3743,7 @@ async def subscription_single(
     limit = int(link.get("limit_bytes", 0) or 0)
     volume_text = f"{fmt_bytes(used)}/{fmt_bytes(limit)}" if limit > 0 else f"{fmt_bytes(used)}/∞"
     expiry_text = str(link.get("expires_at") or "∞")
-    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PXpanel')} | کانال تلگرام: logic_sec"
+    profile_title = f"0.0.0.0 | {volume_text} | {expiry_text} | {link.get('label','PX')} | کانال تلگرام: logic_sec"
     headers = subscription_metadata_headers(
         used,
         limit,
@@ -3881,74 +3807,74 @@ async def subscription_all(
 # ============================================================
 
 @app.get(
-    "/info/{uid}",
-    response_class=HTMLResponse,
+    "/info/{uid}",
+    response_class=HTMLResponse,
 )
 async def info_page(
-    uid: str,
-    request: Request,
+    uid: str,
+    request: Request,
 ):
-    async with LINKS_LOCK:
-        link = LINKS.get(uid)
-        if not link:
-            return HTMLResponse("<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>", status_code=404)
-        snapshot = dict(link)
+    async with LINKS_LOCK:
+        link = LINKS.get(uid)
+        if not link:
+            return HTMLResponse("<html lang=\"fa\" dir=\"rtl\"><body style=\"margin:0;background:#07070a;color:#fff;font-family:sans-serif;padding:40px\"><h2>کانفیگ پیدا نشد</h2></body></html>", status_code=404)
+        snapshot = dict(link)
 
-    host = get_host(request)
-    vless_url = vless_link_for_link(snapshot, uid, host)
-    sub_url = f"https://{host}/sub/{uid}"
-    used = int(snapshot.get("used_bytes", 0) or 0)
-    limit = int(snapshot.get("limit_bytes", 0) or 0)
-    if limit > 0:
-        usage_percent = max(0, min(100, round((used / limit) * 100, 1)))
-        usage_value = f"{fmt_bytes(used)} / {fmt_bytes(limit)}"
-        remaining_value = fmt_bytes(max(0, limit - used))
-    else:
-        usage_percent = 0
-        usage_value = f"{fmt_bytes(used)} / نامحدود"
-        remaining_value = "نامحدود"
+    host = get_host(request)
+    vless_url = vless_link_for_link(snapshot, uid, host)
+    sub_url = f"https://{host}/sub/{uid}"
+    used = int(snapshot.get("used_bytes", 0) or 0)
+    limit = int(snapshot.get("limit_bytes", 0) or 0)
+    if limit > 0:
+        usage_percent = max(0, min(100, round((used / limit) * 100, 1)))
+        usage_value = f"{fmt_bytes(used)} / {fmt_bytes(limit)}"
+        remaining_value = fmt_bytes(max(0, limit - used))
+    else:
+        usage_percent = 0
+        usage_value = f"{fmt_bytes(used)} / نامحدود"
+        remaining_value = "نامحدود"
 
-    expires_at = snapshot.get("expires_at")
-    if expires_at:
-        try:
-            expiry_dt = datetime.fromisoformat(str(expires_at))
-            now_dt = datetime.now(expiry_dt.tzinfo) if expiry_dt.tzinfo else datetime.now()
-            seconds = int((expiry_dt - now_dt).total_seconds())
-            if seconds <= 0:
-                expiry_remaining = "منقضی شده"
-            else:
-                days, rem = divmod(seconds, 86400)
-                hours, rem = divmod(rem, 3600)
-                minutes, _ = divmod(rem, 60)
-                expiry_remaining = f"{days} روز و {hours} ساعت" if days else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
-        except Exception:
-            expiry_remaining = "نامشخص"
-        expiry_display = str(expires_at)
-    else:
-        expiry_remaining = "نامحدود"
-        expiry_display = "نامحدود"
+    expires_at = snapshot.get("expires_at")
+    if expires_at:
+        try:
+            expiry_dt = datetime.fromisoformat(str(expires_at))
+            now_dt = datetime.now(expiry_dt.tzinfo) if expiry_dt.tzinfo else datetime.now()
+            seconds = int((expiry_dt - now_dt).total_seconds())
+            if seconds <= 0:
+                expiry_remaining = "منقضی شده"
+            else:
+                days, rem = divmod(seconds, 86400)
+                hours, rem = divmod(rem, 3600)
+                minutes, _ = divmod(rem, 60)
+                expiry_remaining = f"{days} روز و {hours} ساعت" if days else (f"{hours} ساعت و {minutes} دقیقه" if hours else f"{minutes} دقیقه")
+        except Exception:
+            expiry_remaining = "نامشخص"
+        expiry_display = str(expires_at)
+    else:
+        expiry_remaining = "نامحدود"
+        expiry_display = "نامحدود"
 
-    status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
-    status_class = "good" if status_text == "فعال" else "bad"
-    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
-    connection_limit = "نامحدود" if not snapshot.get("connection_limit", 0) else str(snapshot.get("connection_limit"))
-    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes", 0) else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
+    status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
+    status_class = "good" if status_text == "فعال" else "bad"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
+    connection_limit = "نامحدود" if not snapshot.get("connection_limit", 0) else str(snapshot.get("connection_limit"))
+    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes", 0) else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
 
-    usage_history = snapshot.get("usage_history", [])
-    svg_points = "0,50 300,50"
-    if usage_history and len(usage_history) > 1:
-        max_hist = max(usage_history) if max(usage_history) > 0 else 1
-        pts = []
-        step = 300 / (len(usage_history) - 1)
-        for i, val in enumerate(usage_history):
-            x = i * step
-            y = 60 - min(60, max(4, (val / max_hist) * 52))
-            pts.append(f"{x:.1f},{y:.1f}")
-        svg_points = " ".join(pts)
-    elif usage_history and len(usage_history) == 1:
-        svg_points = f"0,50 300,{60 - min(60, max(4, (usage_history[0] / (limit if limit > 0 else max(used, 1))) * 52)):.1f}"
+    usage_history = snapshot.get("usage_history", [])
+    svg_points = "0,50 300,50"
+    if usage_history and len(usage_history) > 1:
+        max_hist = max(usage_history) if max(usage_history) > 0 else 1
+        pts = []
+        step = 300 / (len(usage_history) - 1)
+        for i, val in enumerate(usage_history):
+            x = i * step
+            y = 60 - min(60, max(4, (val / max_hist) * 52))
+            pts.append(f"{x:.1f},{y:.1f}")
+        svg_points = " ".join(pts)
+    elif usage_history and len(usage_history) == 1:
+        svg_points = f"0,50 300,{60 - min(60, max(4, (usage_history[0] / (limit if limit > 0 else max(used, 1))) * 52)):.1f}"
 
-    info_html = f"""<!DOCTYPE html>
+    info_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -3960,381 +3886,384 @@ async def info_page(
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
-  tailwind.config = {{
-    theme: {{
-      extend: {{
-        fontFamily: {{ vazir: ['Vazirmatn','system-ui','sans-serif'] }}
-      }}
-    }}
-  }}
+  tailwind.config = {{
+    theme: {{
+      extend: {{
+        fontFamily: {{ vazir: ['Vazirmatn','system-ui','sans-serif'] }}
+      }}
+    }}
+  }}
 </script>
 <style>
-  :root {{
-    --bg-main: #05060a;
-    --bg-card: rgba(255, 255, 255, 0.04);
-    --bg-card-hover: rgba(255, 255, 255, 0.07);
-    --border-color: rgba(255, 255, 255, 0.1);
-    --text-main: #f1f5f9;
-    --text-muted: rgba(255, 255, 255, 0.4);
-    --bg-sub-card: rgba(0, 0, 0, 0.2);
-    --grad-1: rgba(96,165,250,.16);
-    --grad-2: rgba(167,139,250,.13);
-    --grad-3: rgba(52,211,153,.08);
-  }}
+  :root {{
+    --bg-main: #05060a;
+    --bg-card: rgba(255, 255, 255, 0.04);
+    --bg-card-hover: rgba(255, 255, 255, 0.07);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --text-main: #f1f5f9;
+    --text-muted: rgba(255, 255, 255, 0.4);
+    --bg-sub-card: rgba(0, 0, 0, 0.2);
+    --grad-1: rgba(96,165,250,.16);
+    --grad-2: rgba(167,139,250,.13);
+    --grad-3: rgba(52,211,153,.08);
+  }}
 
-  body.theme-lighter {{
-    --bg-main: #131722;
-    --bg-card: rgba(255, 255, 255, 0.075);
-    --bg-card-hover: rgba(255, 255, 255, 0.115);
-    --border-color: rgba(255, 255, 255, 0.16);
-    --text-main: #ffffff;
-    --text-muted: rgba(255, 255, 255, 0.6);
-    --bg-sub-card: rgba(0, 0, 0, 0.35);
-    --grad-1: rgba(96,165,250,.24);
-    --grad-2: rgba(167,139,250,.20);
-    --grad-3: rgba(52,211,153,.13);
-  }}
+  body.theme-lighter {{
+    --bg-main: #131722;
+    --bg-card: rgba(255, 255, 255, 0.075);
+    --bg-card-hover: rgba(255, 255, 255, 0.115);
+    --border-color: rgba(255, 255, 255, 0.16);
+    --text-main: #ffffff;
+    --text-muted: rgba(255, 255, 255, 0.6);
+    --bg-sub-card: rgba(0, 0, 0, 0.35);
+    --grad-1: rgba(96,165,250,.24);
+    --grad-2: rgba(167,139,250,.20);
+    --grad-3: rgba(52,211,153,.13);
+  }}
 
-  html,body{{background:var(--bg-main); transition: background 0.3s ease, color 0.3s ease;}}
-  body{{
-    background:
-      radial-gradient(ellipse 80% 50% at 10% -10%, var(--grad-1), transparent 50%),
-      radial-gradient(ellipse 60% 40% at 95% 15%, var(--grad-2), transparent 45%),
-      radial-gradient(ellipse 55% 35% at 60% 100%, var(--grad-3), transparent 40%),
-      var(--bg-main);
-  }}
-  .status-dot{{box-shadow:0 0 10px currentColor}}
-  ::-webkit-scrollbar{{width:8px;height:8px}}
-  ::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
-  * {{ box-shadow: none !important; }}
-  .copy-btn svg{{transition:none}}
-  
-  .dynamic-card {{
-    background-color: var(--bg-card);
-    border-color: var(--border-color);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
-  }}
-  .dynamic-card:hover {{
-    background-color: var(--bg-card-hover);
-  }}
-  .sub-box {{
-    background-color: var(--bg-sub-card);
-  }}
+  html,body{{background:var(--bg-main); transition: background 0.3s ease, color 0.3s ease;}}
+  body{{
+    background:
+      radial-gradient(ellipse 80% 50% at 10% -10%, var(--grad-1), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 95% 15%, var(--grad-2), transparent 45%),
+      radial-gradient(ellipse 55% 35% at 60% 100%, var(--grad-3), transparent 40%),
+      var(--bg-main);
+  }}
+  .status-dot{{box-shadow:0 0 10px currentColor}}
+  ::-webkit-scrollbar{{width:8px;height:8px}}
+  ::-webkit-scrollbar-thumb{{background:rgba(255,255,255,.12);border-radius:99px}}
+  * {{ box-shadow: none !important; }}
+  .copy-btn svg{{transition:none}}
+  
+  .dynamic-card {{
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }}
+  .dynamic-card:hover {{
+    background-color: var(--bg-card-hover);
+  }}
+  .sub-box {{
+    background-color: var(--bg-sub-card);
+  }}
 </style>
 </head>
 <body class="font-vazir text-slate-100 antialiased min-h-screen py-8 px-3 sm:px-4 md:py-14">
 
 <div class="w-full max-w-4xl mx-auto space-y-5 sm:space-y-6 md:space-y-8">
 
-  <!-- Top Bar Theme Toggle Button -->
-  <div class="flex justify-end">
-    <button type="button" onclick="toggleTheme()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-extrabold text-amber-300 border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors shadow-lg">
-      <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-      تغییر تم
-    </button>
-  </div>
+  <!-- Top Bar Theme Toggle Button -->
+  <div class="flex justify-end">
+    <button type="button" onclick="toggleTheme()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-extrabold text-amber-300 border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors shadow-lg">
+      <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      تغییر تم
+    </button>
+  </div>
 
-  <!-- Hero -->
-  <section class="rounded-[26px] sm:rounded-[28px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-8">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-      <div class="flex items-center gap-4">
-        <div class="w-13 h-13 sm:w-14 sm:h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5.2-3.4 9-8 10-4.6-1-8-4.8-8-10V6l8-4z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
-        </div>
-        <div class="min-w-0">
-          <h1 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight truncate">{escape_html(snapshot.get("label","PXpanel"))}</h1>
-          <p class="mt-1.5 text-[10.5px] sm:text-[11px] text-white/40 break-all">UUID: {escape_html(uid)} &nbsp;·&nbsp; PXpanel {APP_VERSION}</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-        <button type="button" onclick="openQrModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-purple-300 border border-purple-400/30 bg-purple-400/10 hover:bg-purple-400/20 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          QR Code
-        </button>
-        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-extrabold
-              {'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'}">
-          <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
-          {status_text}
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- Hero -->
+  <section class="rounded-[26px] sm:rounded-[28px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+      <div class="flex items-center gap-4">
+        <div class="w-13 h-13 sm:w-14 sm:h-14 shrink-0 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-400/20 to-purple-400/10 border border-blue-400/25 text-blue-300">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5.2-3.4 9-8 10-4.6-1-8-4.8-8-10V6l8-4z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight truncate">{escape_html(snapshot.get("label","PXpanel"))}</h1>
+          <p class="mt-1.5 text-[10.5px] sm:text-[11px] text-white/40 break-all">UUID: {escape_html(uid)} &nbsp;·&nbsp; PXpanel {APP_VERSION}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+        <button type="button" onclick="openQrModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-purple-300 border border-purple-400/30 bg-purple-400/10 hover:bg-purple-400/20 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          QR Code
+        </button>
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-extrabold
+              {'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'}">
+          <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
+          {status_text}
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <!-- Usage overview -->
-  <section class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 sm:gap-6">
+  <!-- Usage overview -->
+  <section class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 sm:gap-6">
 
-    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-      <div class="flex items-center gap-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 4-7"/></svg>
-        <div>
-          <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Traffic Overview</p>
-          <p class="mt-0.5 text-sm font-black">مصرف سرویس</p>
-        </div>
-      </div>
+    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+      <div class="flex items-center gap-2.5">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 4-7"/></svg>
+        <div>
+          <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Traffic Overview</p>
+          <p class="mt-0.5 text-sm font-black">مصرف سرویس</p>
+        </div>
+      </div>
 
-      <div class="mt-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
-        <div class="relative shrink-0 w-[128px] h-[128px]">
-          <svg width="128" height="128" viewBox="0 0 132 132" class="-rotate-90">
-            <circle cx="66" cy="66" r="54" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
-            <circle cx="66" cy="66" r="54" fill="none" stroke="url(#usageRingGradient)" stroke-width="10" stroke-linecap="round"
-              stroke-dasharray="339.29" stroke-dashoffset="{339.29 - (339.29 * min(usage_percent, 100) / 100):.1f}"/>
-            <defs>
-              <linearGradient id="usageRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#34d399"/>
-                <stop offset="100%" stop-color="#f59e0b"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <div class="absolute inset-0 grid place-items-center">
-            <div class="text-center">
-              <p class="text-xl font-black leading-none">{usage_percent}%</p>
-              <p class="mt-1.5 text-[10px] text-white/40">مصرف‌شده</p>
-            </div>
-          </div>
-        </div>
+      <div class="mt-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+        <div class="relative shrink-0 w-[128px] h-[128px]">
+          <svg width="128" height="128" viewBox="0 0 132 132" class="-rotate-90">
+            <circle cx="66" cy="66" r="54" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
+            <circle cx="66" cy="66" r="54" fill="none" stroke="url(#usageRingGradient)" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="339.29" stroke-dashoffset="{339.29 - (339.29 * min(usage_percent, 100) / 100):.1f}"/>
+            <defs>
+              <linearGradient id="usageRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#34d399"/>
+                <stop offset="100%" stop-color="#f59e0b"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="absolute inset-0 grid place-items-center">
+            <div class="text-center">
+              <p class="text-xl font-black leading-none">{usage_percent}%</p>
+              <p class="mt-1.5 text-[10px] text-white/40">مصرف‌شده</p>
+            </div>
+          </div>
+        </div>
 
-        <div class="flex-1 w-full min-w-0">
-          <div class="text-xl sm:text-2xl font-black tracking-tight">
-            {escape_html(fmt_bytes(used))}
-            <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
-          </div>
+        <div class="flex-1 w-full min-w-0">
+          <div class="text-xl sm:text-2xl font-black tracking-tight">
+            {escape_html(fmt_bytes(used))}
+            <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
+          </div>
 
-          <div class="mt-4 rounded-xl border border-white/[0.05] sub-box px-3 pt-3 pb-1.5">
-            <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
-              روند مصرف
-            </p>
-            <svg viewBox="0 0 300 64" class="w-full h-14" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.35"/>
-                  <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <path d="M0,64 L{svg_points} L300,64 Z" fill="url(#trendFill)"/>
-              <path d="M{svg_points}" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
+          <div class="mt-4 rounded-xl border border-white/[0.05] sub-box px-3 pt-3 pb-1.5">
+            <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+              روند مصرف
+            </p>
+            <svg viewBox="0 0 300 64" class="w-full h-14" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,64 L{svg_points} L300,64 Z" fill="url(#trendFill)"/>
+              <path d="M{svg_points}" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
 
-          <div class="mt-4 flex items-center justify-between text-[11px] text-white/40 flex-wrap gap-2">
-            <span class="inline-flex items-center gap-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-              باقی‌مانده: <b class="text-white/70 font-bold">{escape_html(remaining_value)}</b>
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
-              زمان: <b class="text-white/70 font-bold">{escape_html(expiry_remaining)}</b>
-            </span>
+          <div class="mt-4 flex items-center justify-between text-[11px] text-white/40 flex-wrap gap-2">
+            <span class="inline-flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+              باقی‌مانده: <b class="text-white/70 font-bold">{escape_html(remaining_value)}</b>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+              زمان: <b class="text-white/70 font-bold">{escape_html(expiry_remaining)}</b>
+            </span>
 
-          </div>
-        </div>
-      </div>
-    </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-      <div class="flex items-center gap-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
-        <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
-      </div>
-      <div class="mt-4 divide-y divide-white/[0.06]">
-        <div class="flex items-center justify-between py-3 first:pt-0">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
-            انقضا
-          </span>
-          <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
-        </div>
-        <div class="flex items-center justify-between py-3">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
-            IP Limit
-          </span>
-          <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
-        </div>
-        <div class="flex items-center justify-between py-3">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><rect x="2" y="9" width="20" height="8" rx="2"/><path d="M6 17v2M18 17v2"/></svg>
-            Connection
-          </span>
-          <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
-        </div>
-        <div class="flex items-center justify-between py-3 last:pb-0">
-          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
-            Speed
-          </span>
-          <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
-        </div>
-      </div>
-    </div>
+    <div class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+      <div class="flex items-center gap-2.5">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/35"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+        <p class="text-[10px] font-extrabold tracking-widest uppercase text-white/30">Service</p>
+      </div>
+      <div class="mt-4 divide-y divide-white/[0.06]">
+        <div class="flex items-center justify-between py-3 first:pt-0">
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+            انقضا
+          </span>
+          <span class="text-xs font-extrabold">{escape_html(expiry_display)}</span>
+        </div>
+        <div class="flex items-center justify-between py-3">
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
+            IP Limit
+          </span>
+          <span class="text-xs font-extrabold">{escape_html(ip_limit)}</span>
+        </div>
+        <div class="flex items-center justify-between py-3">
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><rect x="2" y="9" width="20" height="8" rx="2"/><path d="M6 17v2M18 17v2"/></svg>
+            Connection
+          </span>
+          <span class="text-xs font-extrabold">{escape_html(connection_limit)}</span>
+        </div>
+        <div class="flex items-center justify-between py-3 last:pb-0">
+          <span class="inline-flex items-center gap-2 text-[11px] text-white/45">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+            Speed
+          </span>
+          <span class="text-xs font-extrabold">{escape_html(speed_limit)}</span>
+        </div>
+      </div>
+    </div>
 
-  </section>
+  </section>
 
-  <!-- Stats -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
+  <!-- Stats -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
 
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-emerald-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-400/10 border border-emerald-400/20 text-emerald-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">مصرف فعلی</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-emerald-300 break-words">{escape_html(fmt_bytes(used))}</p>
-    </div>
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-emerald-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-400/10 border border-emerald-400/20 text-emerald-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">مصرف فعلی</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-emerald-300 break-words">{escape_html(fmt_bytes(used))}</p>
+    </div>
 
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-amber-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-amber-400/10 border border-amber-400/20 text-amber-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">باقی‌مانده</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-amber-300 break-words">{escape_html(remaining_value)}</p>
-    </div>
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-amber-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-amber-400/10 border border-amber-400/20 text-amber-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">باقی‌مانده</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-amber-300 break-words">{escape_html(remaining_value)}</p>
+    </div>
 
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-blue-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M4 9h16"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">اتصالات فعال</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
-    </div>
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-blue-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M4 9h16"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">اتصالات فعال</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-blue-300 break-words">{len(unique_ips_for_uuid(uid))}</p>
+    </div>
 
-    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-purple-400/20 transition-colors duration-200">
-      <div class="w-9 h-9 rounded-xl grid place-items-center bg-purple-400/10 border border-purple-400/20 text-purple-300">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v6c0 5-3.6 8.7-9 9.5-5.4-.8-9-4.5-9-9.5v-6L12 2z"/></svg>
-      </div>
-      <p class="mt-4 text-[11px] text-white/45">زمان باقی‌مانده</p>
-      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-purple-300 break-words">{escape_html(expiry_remaining)}</p>
-    </div>
+    <div class="rounded-2xl border dynamic-card backdrop-blur-xl p-4 sm:p-5 hover:border-purple-400/20 transition-colors duration-200">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-purple-400/10 border border-purple-400/20 text-purple-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v6c0 5-3.6 8.7-9 9.5-5.4-.8-9-4.5-9-9.5v-6L12 2z"/></svg>
+      </div>
+      <p class="mt-4 text-[11px] text-white/45">زمان باقی‌مانده</p>
+      <p class="mt-1 text-[14px] sm:text-[15px] font-black text-purple-300 break-words">{escape_html(expiry_remaining)}</p>
+    </div>
 
-  </section>
+  </section>
 
-  <!-- Technical details -->
-  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-5">
-      <p class="flex items-center gap-2 text-sm font-black">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M4 21v-7M4 10V3M12 21v-11M12 6V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
-        جزئیات فنی
-      </p>
-      <p class="text-[11px] text-white/40">Configuration Details</p>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Protocol</p>
-        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("protocol","vless-ws"))}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Fingerprint</p>
-        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("fingerprint","chrome"))}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">IP Limit</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(ip_limit)}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Connection Limit</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(connection_limit)}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">Speed Limit</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(speed_limit)}</p>
-      </div>
-      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
-        <p class="text-[11px] text-white/45">تاریخ انقضا</p>
-        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(expiry_display)}</p>
-      </div>
-    </div>
-  </section>
+  <!-- Technical details -->
+  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <p class="flex items-center gap-2 text-sm font-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M4 21v-7M4 10V3M12 21v-11M12 6V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
+        جزئیات فنی
+      </p>
+      <p class="text-[11px] text-white/40">Configuration Details</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
+        <p class="text-[11px] text-white/45">Protocol</p>
+        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("protocol","vless-ws"))}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
+        <p class="text-[11px] text-white/45">Fingerprint</p>
+        <p class="mt-2 text-[11px] font-medium text-purple-300 tracking-wide" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(snapshot.get("fingerprint","chrome"))}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
+        <p class="text-[11px] text-white/45">IP Limit</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(ip_limit)}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
+        <p class="text-[11px] text-white/45">Connection Limit</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(connection_limit)}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
+        <p class="text-[11px] text-white/45">Speed Limit</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(speed_limit)}</p>
+      </div>
+      <div class="rounded-2xl border border-white/[0.06] sub-box p-4">
+        <p class="text-[11px] text-white/45">تاریخ انقضا</p>
+        <p class="mt-2 text-xs font-bold text-white/85">{escape_html(expiry_display)}</p>
+      </div>
+    </div>
+  </section>
 
-  <!-- Links -->
-  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-5">
-      <p class="flex items-center gap-2 text-sm font-black">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.41-1.41"/></svg>
-        لینک‌های سرویس
-      </p>
-      <p class="text-[11px] text-white/40">Copy / Import</p>
-    </div>
+  <!-- Links -->
+  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <p class="flex items-center gap-2 text-sm font-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.41-1.41"/></svg>
+        لینک‌های سرویس
+      </p>
+      <p class="text-[11px] text-white/40">Copy / Import</p>
+    </div>
 
-    <div class="space-y-3">
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
-        <div class="min-w-0 flex-1">
-          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">VLESS</p>
-          <p id="vlessLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(vless_url)}</p>
-        </div>
-        <button id="vlessCopyBtn" type="button" onclick="pxCopy('vlessLinkText','vlessCopyBtn')"
-          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          <span>کپی</span>
-        </button>
-      </div>
+    <div class="space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">VLESS</p>
+          <p id="vlessLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(vless_url)}</p>
+        </div>
+        <button id="vlessCopyBtn" type="button" onclick="pxCopy('vlessLinkText','vlessCopyBtn')"
+          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          <span>کپی</span>
+        </button>
+      </div>
 
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
-        <div class="min-w-0 flex-1">
-          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">SUBSCRIPTION</p>
-          <p id="subLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(sub_url)}</p>
-        </div>
-        <button id="subCopyBtn" type="button" onclick="pxCopy('subLinkText','subCopyBtn')"
-          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          <span>کپی</span>
-        </button>
-      </div>
-    </div>
-  </section>
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border border-white/[0.06] sub-box p-4 hover:border-purple-400/25 transition-colors duration-200">
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] font-extrabold text-white/45 tracking-wide">SUBSCRIPTION</p>
+          <p id="subLinkText" class="mt-1.5 text-[11px] text-purple-300 break-all leading-6" dir="ltr" style="font-family:ui-monospace,Consolas,monospace">{escape_html(sub_url)}</p>
+        </div>
+        <button id="subCopyBtn" type="button" onclick="pxCopy('subLinkText','subCopyBtn')"
+          class="copy-btn shrink-0 self-start sm:self-center inline-flex items-center gap-1.5 text-[11px] font-bold text-white/60 px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] hover:text-white transition-colors duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          <span>کپی</span>
+        </button>
+      </div>
+    </div>
+  </section>
 
-  <!-- Downloads -->
-  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-5">
-      <p class="flex items-center gap-2 text-sm font-black">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-        دانلود برنامه‌ها
-      </p>
-      <p class="text-[11px] text-white/40">Official Releases</p>
-    </div>
+  <!-- Downloads -->
+  <section class="rounded-[22px] border dynamic-card backdrop-blur-2xl p-5 sm:p-6 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <p class="flex items-center gap-2 text-sm font-black">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-white/40"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        دانلود برنامه‌ها
+      </p>
+      <p class="text-[11px] text-white/40">Official Releases</p>
+    </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-      <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
-        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">NG</div>
-        <div class="min-w-0">
-          <p class="text-xs font-extrabold">v2rayNG</p>
-          <p class="mt-0.5 text-[10px] text-white/40">Android</p>
-        </div>
-      </a>
-      <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
-        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">N</div>
-        <div class="min-w-0">
-          <p class="text-xs font-extrabold">v2rayN</p>
-          <p class="mt-0.5 text-[10px] text-white/40">Windows / macOS / Linux</p>
-        </div>
-      </a>
-      <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
-         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
-        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">H</div>
-        <div class="min-w-0">
-          <p class="text-xs font-extrabold">Hiddify</p>
-          <p class="mt-0.5 text-[10px] text-white/40">Android / Windows / macOS / Linux</p>
-        </div>
-      </a>
-    </div>
-  </section>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      <a href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">NG</div>
+        <div class="min-w-0">
+          <p class="text-xs font-extrabold">v2rayNG</p>
+          <p class="mt-0.5 text-[10px] text-white/40">Android</p>
+        </div>
+      </a>
+      <a href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">N</div>
+        <div class="min-w-0">
+          <p class="text-xs font-extrabold">v2rayN</p>
+          <p class="mt-0.5 text-[10px] text-white/40">Windows / macOS / Linux</p>
+        </div>
+      </a>
+      <a href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"
+         class="flex items-center gap-3 rounded-2xl border border-white/10 sub-box p-4 hover:border-blue-400/25 transition-colors duration-200">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-blue-400/10 border border-blue-400/20 text-blue-300 font-black text-[11px]">H</div>
+        <div class="min-w-0">
+          <p class="text-xs font-extrabold">Hiddify</p>
+          <p class="mt-0.5 text-[10px] text-white/40">Android / Windows / macOS / Linux</p>
+        </div>
+      </a>
+    </div>
+  </section>
 
-  <!-- Footer -->
-  <div class="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] p-4 text-center text-xs text-white/45">
-    پشتیبانی و اطلاعیه‌ها &nbsp;·&nbsp; <b class="text-emerald-300">کانال تلگرام: logic_sec</b>
-  </div>
+  <!-- Footer -->
+ <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.08] p-4 text-center text-xs text-white/60 transition-all duration-300 hover:border-emerald-500/40">
+  توسعه‌یافته با تخصص تیم 
+  <a href="https://t.me/logic_sec" target="_blank" rel="noopener noreferrer" class="font-medium text-emerald-400 transition-colors hover:text-emerald-300 hover:underline">
+    LogicSec
+  </a>
+</div>
 
 </div>
 
 <!-- QR Code Modal Popup -->
 <div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
-  <div class="w-full max-w-sm rounded-[24px] border border-white/15 bg-[#0b0c14] p-6 text-center shadow-2xl relative">
-    <button type="button" onclick="closeQrModal()" class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/5 border border-white/10 grid place-items-center text-white/60 hover:text-white">✕</button>
-    <p class="text-sm font-black text-white/90 mb-2">QR Code اسکن کانفیگ</p>
-    <p class="text-[11px] text-white/40 mb-4">برای اتصال سریع با گوشی موبایل</p>
-    <div id="qrcodeContainer" class="bg-white p-4 rounded-2xl inline-block mx-auto mb-4 border border-white/10"></div>
-    <p id="qrModalText" class="text-[10px] text-purple-300 break-all max-h-16 overflow-y-auto px-2" dir="ltr"></p>
-  </div>
+  <div class="w-full max-w-sm rounded-[24px] border border-white/15 bg-[#0b0c14] p-6 text-center shadow-2xl relative">
+    <button type="button" onclick="closeQrModal()" class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/5 border border-white/10 grid place-items-center text-white/60 hover:text-white">✕</button>
+    <p class="text-sm font-black text-white/90 mb-2">QR Code اسکن کانفیگ</p>
+    <p class="text-[11px] text-white/40 mb-4">برای اتصال سریع با گوشی موبایل</p>
+    <div id="qrcodeContainer" class="bg-white p-4 rounded-2xl inline-block mx-auto mb-4 border border-white/10"></div>
+    <p id="qrModalText" class="text-[10px] text-purple-300 break-all max-h-16 overflow-y-auto px-2" dir="ltr"></p>
+  </div>
 </div>
 
 <script>
@@ -4342,85 +4271,86 @@ const vlessUrlData = "{vless_url}";
 
 // Theme toggle logic with localStorage support (2 themes total)
 function toggleTheme() {{
-  const body = document.body;
-  body.classList.toggle('theme-lighter');
-  const isLighter = body.classList.contains('theme-lighter');
-  localStorage.setItem('px_theme', isLighter ? 'lighter' : 'dark');
+  const body = document.body;
+  body.classList.toggle('theme-lighter');
+  const isLighter = body.classList.contains('theme-lighter');
+  localStorage.setItem('px_theme', isLighter ? 'lighter' : 'dark');
 }}
 
 // Initialize saved theme on load
 (function() {{
-  if (localStorage.getItem('px_theme') === 'lighter') {{
-    document.body.classList.add('theme-lighter');
-  }}
+  if (localStorage.getItem('px_theme') === 'lighter') {{
+    document.body.classList.add('theme-lighter');
+  }}
 }})();
 
 function openQrModal() {{
-  var modal = document.getElementById('qrModal');
-  var container = document.getElementById('qrcodeContainer');
-  var txtEl = document.getElementById('qrModalText');
-  container.innerHTML = "";
-  txtEl.textContent = vlessUrlData;
-  modal.classList.remove('hidden');
-  try {{
-    var typeNumber = 0;
-    var errorCorrectionLevel = 'L';
-    var qr = qrcode(typeNumber, errorCorrectionLevel);
-    qr.addData(vlessUrlData);
-    qr.make();
-    container.innerHTML = qr.createImgTag(5, 8);
-  }} catch (e) {{
-    container.innerHTML = "<p class='text-xs text-black'>خطا در تولید QR Code</p>";
-  }}
+  var modal = document.getElementById('qrModal');
+  var container = document.getElementById('qrcodeContainer');
+  var txtEl = document.getElementById('qrModalText');
+  container.innerHTML = "";
+  txtEl.textContent = vlessUrlData;
+  modal.classList.remove('hidden');
+  try {{
+    var typeNumber = 0;
+    var errorCorrectionLevel = 'L';
+    var qr = qrcode(typeNumber, errorCorrectionLevel);
+    qr.addData(vlessUrlData);
+    qr.make();
+    container.innerHTML = qr.createImgTag(5, 8);
+  }} catch (e) {{
+    container.innerHTML = "<p class='text-xs text-black'>خطا در تولید QR Code</p>";
+  }}
 }}
 
 function closeQrModal() {{
-  document.getElementById('qrModal').classList.add('hidden');
+  document.getElementById('qrModal').classList.add('hidden');
 }}
 
 document.getElementById('qrModal').addEventListener('click', function(e) {{
-  if (e.target === this) closeQrModal();
+  if (e.target === this) closeQrModal();
 }});
 
 function pxCopy(textId, btnId) {{
-  var el = document.getElementById(textId);
-  var btn = document.getElementById(btnId);
-  if (!el || !btn) return;
-  var text = el.textContent.trim();
-  var done = function() {{
-    var original = btn.getAttribute('data-original');
-    if (!original) {{
-      original = btn.innerHTML;
-      btn.setAttribute('data-original', original);
-    }}
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>کپی شد</span>';
-    btn.classList.add('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
-    setTimeout(function() {{
-      btn.innerHTML = original;
-      btn.classList.remove('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
-    }}, 1700);
-  }};
-  if (navigator.clipboard && navigator.clipboard.writeText) {{
-    navigator.clipboard.writeText(text).then(done).catch(function() {{ fallbackCopy(text, done); }});
-  }} else {{
-    fallbackCopy(text, done);
-  }}
+  var el = document.getElementById(textId);
+  var btn = document.getElementById(btnId);
+  if (!el || !btn) return;
+  var text = el.textContent.trim();
+  var done = function() {{
+    var original = btn.getAttribute('data-original');
+    if (!original) {{
+      original = btn.innerHTML;
+      btn.setAttribute('data-original', original);
+    }}
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>کپی شد</span>';
+    btn.classList.add('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
+    setTimeout(function() {{
+      btn.innerHTML = original;
+      btn.classList.remove('text-emerald-300','border-emerald-400/30','bg-emerald-400/10');
+    }}, 1700);
+  }};
+  if (navigator.clipboard && navigator.clipboard.writeText) {{
+    navigator.clipboard.writeText(text).then(done).catch(function() {{ fallbackCopy(text, done); }});
+  }} else {{
+    fallbackCopy(text, done);
+  }}
 }}
 function fallbackCopy(text, cb) {{
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try {{ document.execCommand('copy'); }} catch (e) {{}}
-  document.body.removeChild(ta);
-  if (cb) cb();
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {{ document.execCommand('copy'); }} catch (e) {{}}
+  document.body.removeChild(ta);
+  if (cb) cb();
 }}
 </script>
 </body>
 </html>"""
-    return HTMLResponse(info_html)
+    return HTMLResponse(info_html)
+
 # ============================================================
 # SUB GROUP API
 # ============================================================
@@ -4882,7 +4812,7 @@ content="width=device-width,initial-scale=1"
 >
 
 <title>
-PXpanel
+PX Panel
 </title>
 
 <style>
@@ -4977,11 +4907,11 @@ h1{
 <div class="card">
 
 <h1>
-PXpanel
+PX Panel
 </h1>
 
 <div class="version">
-12.1.0 Beta
+13.0.1 Beta
 </div>
 
 <div class="text">
@@ -5801,65 +5731,6 @@ async def http_proxy(
         )
 
 
-
-# ============================================================
-# TELEGRAM PROXY GENERATOR
-# ============================================================
-
-FAKE_TLS_DOMAINS = (
-    "cloudflare.com",
-    "www.cloudflare.com",
-    "www.google.com",
-    "www.microsoft.com",
-    "www.apple.com",
-    "cdnjs.cloudflare.com",
-    "www.amazon.com",
-    "www.github.com",
-)
-
-
-@app.post("/api/telegram-proxy")
-async def create_telegram_proxy(
-    request: Request,
-    _=Depends(require_auth),
-):
-    host = get_host(request)
-    port = 443
-
-    raw_secret = secrets.token_hex(16)
-    domain = secrets.choice(FAKE_TLS_DOMAINS)
-    domain_hex = domain.encode("utf-8").hex()
-    secret = f"ee{raw_secret}{domain_hex}"
-
-    tg_link = (
-        f"tg://proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
-
-    web_link = (
-        f"https://t.me/proxy?server={host}"
-        f"&port={port}"
-        f"&secret={secret}"
-    )
-
-    log_activity(
-        "telegram",
-        f"پروکسی تلگرام ساخته شد → {host}:{port} ({domain})",
-        "info",
-    )
-
-    return {
-        "ok": True,
-        "server": host,
-        "port": port,
-        "secret": secret,
-        "domain": domain,
-        "tg_link": tg_link,
-        "web_link": web_link,
-    }
-
-
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -5879,7 +5750,7 @@ content="width=device-width,initial-scale=1"
 />
 
 <title>
-PXpanel 12.1.0 Beta
+PX Panel 13.0.1 Beta
 </title>
 
 <link
@@ -6028,17 +5899,6 @@ body{
 .top-btn.danger{
     color:#fca5a5;
 }
-
-.top-btn.tg-proxy{
-    background:linear-gradient(135deg,#0ea5e9,#2563eb);
-    border-color:transparent;
-    color:#fff;
-    font-weight:700;
-}
-.top-btn.tg-proxy:hover{
-    filter:brightness(1.08);
-}
-
 
 .stats-grid{
     display:grid;
@@ -6689,7 +6549,7 @@ P
 <div>
 
 <div class="brand-name">
-PXpanel
+PX Panel
 </div>
 
 <div class="brand-desc">
@@ -6697,7 +6557,7 @@ PXpanel
 </div>
 
 <div class="brand-version">
-12.1.0 Beta
+13.0.1 Beta
 </div>
 
 </div>
@@ -6711,13 +6571,6 @@ class="top-btn primary"
 onclick="openAutoModal()"
 ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
 ساخت خودکار
-</button>
-
-<button
-class="top-btn tg-proxy"
-onclick="createTelegramProxy()"
-><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 5L2 12.5l7 1.5L18 8l-7 7.5 1.5 6.5L21 5Z"/></svg>
-ساخت پروکسی تلگرام
 </button>
 
 <button
@@ -6786,7 +6639,7 @@ class="stat-value"
 
 <div class="stat">
 <div class="stat-label">
-Traffic
+ترافیک مصرفی
 </div>
 <div
 id="traffic"
@@ -6798,7 +6651,7 @@ class="stat-value"
 
 <div class="stat">
 <div class="stat-label">
-Requests
+ریکویست
 </div>
 <div
 id="requests"
@@ -6810,7 +6663,7 @@ class="stat-value"
 
 <div class="stat">
 <div class="stat-label">
-Uptime
+تایم فعال بودن
 </div>
 <div
 id="uptime"
@@ -6830,11 +6683,14 @@ class="stat-value"
 <div>
 
 <div class="panel-title">
-مدیریت کانفیگ‌ها
+مدیریت کانفیگ‌هـا
 </div>
 
-<div class="panel-sub">
-VLESS / SUB / INFO
+<div class="panel-sub" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); padding: 12px; text-align: center; direction: rtl;">
+  <span style="opacity: 0.8;">پشتیبانــی:</span>
+  <a href="https://t.me/logictop12" target="_blank" rel="noopener noreferrer" style="font-weight: 500; color: #34d399; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#6ee7b7'; this.style.textDecoration='underline';" onmouseout="this.style.color='#34d399'; this.style.textDecoration='none';">
+    @logictop12
+  </a>
 </div>
 
 </div>
@@ -6843,7 +6699,7 @@ VLESS / SUB / INFO
 class="top-btn primary"
 onclick="refresh()"
 >
-↻ بروزرسانی
+↻ بروزرسانـی
 </button>
 
 </div>
@@ -6857,27 +6713,27 @@ onclick="refresh()"
 <tr>
 
 <th>
-نام
+نـام
 </th>
 
 <th>
-پروتکل
+پروتـکل
 </th>
 
 <th>
-وضعیت
+وضعیـت
 </th>
 
 <th>
-مصرف
+مصـرف
 </th>
 
 <th>
-زمان
+زمـان
 </th>
 
 <th>
-اتصال
+اتصـال
 </th>
 
 <th>
@@ -6885,7 +6741,7 @@ VLESS
 </th>
 
 <th>
-عملیات
+عملیـات
 </th>
 
 </tr>
@@ -6909,7 +6765,7 @@ VLESS
 
 <div>
 <div class="panel-title">
-آخرین فعالیت‌ها
+اخریـن فعالیت‌هـا
 </div>
 </div>
 
@@ -6931,7 +6787,7 @@ class="pre"
 
 <div>
 <div class="panel-title">
-دانلود برنامه اتصال
+دانلود برنامه اتصــال
 </div>
 
 <div class="panel-sub">
@@ -7057,16 +6913,16 @@ Windows
 <div class="notice">
 
 <strong>
-اطلاعیه مهم | آپدیت برنامه اتصال
+ مهـم | آپدیـت برنامـه اتصـال
 </strong>
 
 <br>
 
-دوستان عزیز ❤️
-برای اینکه کانفیگ‌های جدید بهترین
-سازگاری، پایداری و عملکرد رو داشته باشن،
-لطفاً برنامه‌ای که برای اتصال استفاده می‌کنید
-رو به آخرین نسخه آپدیت کنید. 🔄⚡️
+دوستان عزیـز ❤️
+برای اینکـه کانفیگ‌هـای جدیـد بهتریـن
+سازگـــاری، پایداری و عملکرد رو داشته باشن،
+لطفـاً برنامـه‌ای کــــــــه بـرای اتصـال استفـاده می‌کنیـد
+رو بــه آخرین نسخـــه آپدیــت کنیــد. 🔄⚡️
 
 </div>
 
@@ -7089,7 +6945,7 @@ class="modal-backdrop"
 <div class="modal-head">
 
 <div class="modal-title">
-ساخت کانفیگ دستی
+ساخـت کانفیـگ دستــی
 </div>
 
 <button
@@ -7106,12 +6962,12 @@ onclick="closeManualModal()"
 <div class="field">
 
 <label>
-نام کانفیگ
+اسـم کانفیـگ
 </label>
 
 <input
 id="manualName"
-placeholder="نام کانفیگ"
+placeholder="اسم کانفیگ"
 />
 
 </div>
@@ -7120,26 +6976,22 @@ placeholder="نام کانفیگ"
 <div class="field">
 
 <label>
-پروتکل
+پروتکــل (بتا)
 </label>
 
 <select id="manualProtocol">
 
-<option value="vless-ws">
-VLESS WebSocket
-</option>
-
-<option value="xhttp-packet-up">
-XHTTP Packet Up
-</option>
-
-<option value="xhttp-stream-up">
-XHTTP Stream Up
-</option>
-
-<option value="xhttp-stream-one">
-XHTTP Stream One
-</option>
+<option value="vless-ws">VLESS WebSocket</option>
+<option value="xhttp-packet-up">XHTTP Packet Up (پیشنهادی)</option>
+<option value="xhttp-stream-up">XHTTP Stream Up</option>
+<option value="xhttp-stream-one">XHTTP Stream One</option>
+<option value="vmess-ws">VMess WebSocket</option>
+<option value="trojan-ws">Trojan WebSocket</option>
+<option value="shadowsocks">Shadowsocks</option>
+<option value="socks5">SOCKS5</option>
+<option value="http">HTTP Proxy</option>
+<option value="hysteria2">Hysteria 2</option>
+<option value="tuic">TUIC</option>
 
 </select>
 
@@ -7149,7 +7001,7 @@ XHTTP Stream One
 <div class="field">
 
 <label>
-حجم
+حجـم
 </label>
 
 <input
@@ -7165,7 +7017,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-واحد حجم
+واحد حجـم
 </label>
 
 <select id="manualVolumeUnit">
@@ -7190,7 +7042,7 @@ TB
 <div class="field">
 
 <label>
-تعداد روز
+تعـداد روز
 </label>
 
 <input
@@ -7206,7 +7058,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-محدودیت IP
+محدودیـت IP
 </label>
 
 <input
@@ -7222,7 +7074,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-محدودیت اتصال
+محدودیـت اتصـال
 </label>
 
 <input
@@ -7238,7 +7090,7 @@ placeholder="0 = نامحدود"
 <div class="field">
 
 <label>
-سرعت
+محدودیـت سرعـت
 </label>
 
 <input
@@ -7257,48 +7109,17 @@ placeholder="0 = نامحدود"
 Fingerprint
 </label>
 
-<select id="manualFingerprint">
-
-<option value="chrome">
-Chrome
-</option>
-
-<option value="firefox">
-Firefox
-</option>
-
-<option value="safari">
-Safari
-</option>
-
-<option value="ios">
-iOS
-</option>
-
-<option value="android">
-Android
-</option>
-
-<option value="edge">
-Edge
-</option>
-
-<option value="360">
-360
-</option>
-
-<option value="qq">
-QQ
-</option>
-
-<option value="random">
-Random
-</option>
-
-<option value="randomized">
-Randomized
-</option>
-
+<select id="manualFingerprint" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+  <option value="chrome" style="background-color: #1f2937; color: #ffffff;">Chrome</option>
+  <option value="firefox" style="background-color: #1f2937; color: #ffffff;">Firefox</option>
+  <option value="safari" style="background-color: #1f2937; color: #ffffff;">Safari</option>
+  <option value="ios" style="background-color: #1f2937; color: #ffffff;">iOS</option>
+  <option value="android" style="background-color: #1f2937; color: #ffffff;">Android</option>
+  <option value="edge" style="background-color: #1f2937; color: #ffffff;">Edge</option>
+  <option value="360" style="background-color: #1f2937; color: #ffffff;">360</option>
+  <option value="qq" style="background-color: #1f2937; color: #ffffff;">QQ</option>
+  <option value="random" style="background-color: #1f2937; color: #ffffff;">Random</option>
+  <option value="randomized" style="background-color: #1f2937; color: #ffffff;">Randomized</option>
 </select>
 
 </div>
@@ -7306,28 +7127,16 @@ Randomized
 
 <div class="field">
 
-<label>
-Fragment
+<label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
+  <span>Fragment</span>
+  <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: خاموش</span>
 </label>
 
-<select id="manualFragment">
-
-<option value="off">
-خاموش
-</option>
-
-<option value="safe">
-Safe
-</option>
-
-<option value="balanced">
-Balanced
-</option>
-
-<option value="aggressive">
-Aggressive
-</option>
-
+<select id="manualFragment" style="background-color: #1f2937; color: #ffffff; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+  <option value="off" style="background-color: #1f2937; color: #ffffff;">خاموش</option>
+  <option value="safe" style="background-color: #1f2937; color: #ffffff;">Safe</option>
+  <option value="balanced" style="background-color: #1f2937; color: #ffffff;">Balanced</option>
+  <option value="aggressive" style="background-color: #1f2937; color: #ffffff;">Aggressive</option>
 </select>
 
 </div>
@@ -7367,7 +7176,7 @@ value="http/1.1"
 <div class="field full">
 
 <label>
-یادداشت
+یادداشــت
 </label>
 
 <textarea
@@ -7401,184 +7210,108 @@ onclick="createManual()"
 
 </div>
 
-
-
-<!-- ===================================================== -->
-<!-- TELEGRAM PROXY MODAL -->
-<!-- ===================================================== -->
-
-<div
-id="tgProxyModal"
-class="modal-backdrop"
->
-
-<div class="modal" style="max-width:540px">
-
-<div class="modal-head">
-
-<div class="modal-title">
-پروکسی تلگرام ساخته شد
-</div>
-
-<button
-class="close"
-onclick="closeTgProxyModal()"
->
-×
-</button>
-
-</div>
-
-<div style="color:rgba(255,255,255,.55);font-size:11px;line-height:1.9;margin-bottom:14px">
-لینک آماده استفاده در تلگرام. روی لینک بزنید تا خودکار اضافه شود.
-</div>
-
-<div class="field full" style="margin-bottom:14px">
-<label>لینک مستقیم تلگرام (پیشنهادی)</label>
-<div style="display:flex;gap:8px;align-items:center">
-<input id="tgLinkDirect" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
-<button class="modal-btn primary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkDirect')">کپی</button>
-</div>
-</div>
-
-<div class="field full" style="margin-bottom:14px">
-<label>لینک t.me</label>
-<div style="display:flex;gap:8px;align-items:center">
-<input id="tgLinkWeb" readonly style="direction:ltr;text-align:left;font-size:11px;flex:1" />
-<button class="modal-btn secondary" style="padding:10px 14px;white-space:nowrap" onclick="copyTgLink('tgLinkWeb')">کپی</button>
-</div>
-</div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-<div class="field">
-<label>سرور</label>
-<input id="tgServer" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field">
-<label>پورت</label>
-<input id="tgPort" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field full">
-<label>Secret (FakeTLS)</label>
-<input id="tgSecret" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-<div class="field full">
-<label>دامنه FakeTLS</label>
-<input id="tgDomain" readonly style="direction:ltr;text-align:left;font-size:11px" />
-</div>
-</div>
-
-<div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.18);border-radius:12px;padding:12px 14px;font-size:10.5px;line-height:1.85;color:rgba(255,255,255,.65)">
-<strong style="color:#7dd3fc">نکته مهم:</strong>
-این لینک با استاندارد FakeTLS ساخته شده است. برای کارکرد واقعی باید روی همین سرور یک سرویس MTProto (مثل mtg یا teleproxy) روی پورت ۴۴۳ در حال اجرا باشد. در غیر این صورت لینک فقط برای اشتراک‌گذاری آماده است.
-</div>
-
-<div class="modal-actions" style="margin-top:18px">
-<button class="modal-btn secondary" onclick="closeTgProxyModal()">
-بستن
-</button>
-<button class="modal-btn primary" onclick="copyTgLink('tgLinkDirect')">
-کپی لینک اصلی
-</button>
-</div>
-
-</div>
-
-</div>
-
-
 <!-- ===================================================== -->
 <!-- AUTO MODAL -->
 <!-- ===================================================== -->
 
-<div
-id="autoModal"
-class="modal-backdrop"
->
+<div id="autoModal" class="modal-backdrop" style="direction: rtl;">
+  <div class="modal" style="background-color: #111827; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 24px; max-width: 480px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+    
+    <!-- Modal Header -->
+    <div class="modal-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 14px; margin-bottom: 16px;">
+      <div class="modal-title" style="font-size: 1.125rem; font-weight: 700; color: #ffffff;">
+        ساخـت خودکــار
+      </div>
+      <button class="close" onclick="closeAutoModal()" style="background: none; border: none; color: rgba(255, 255, 255, 0.6); font-size: 1.25rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#ffffff';" onmouseout="this.style.color='rgba(255, 255, 255, 0.6)';">
+        ×
+      </button>
+    </div>
 
-<div class="modal">
+    <!-- Quick Auto Setup Action Button -->
+    <div style="margin-bottom: 16px;">
+      <button type="button" onclick="setBestAutoSettings()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.1)); border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399; padding: 10px 16px; border-radius: 10px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='linear-gradient(135deg, rgba(52, 211, 153, 0.3), rgba(16, 185, 129, 0.2))'; this.style.borderColor='rgba(52, 211, 153, 0.6)';" onmouseout="this.style.background='linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.1))'; this.style.borderColor='rgba(52, 211, 153, 0.4)';">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+        چینش هوشمند بهترین تنظیمات (پیشنهادی)
+      </button>
+    </div>
 
-<div class="modal-head">
+    <!-- Form Grid -->
+    <div class="form-grid" style="display: flex; flex-direction: column; gap: 14px;">
+      
+      <!-- Protocol Field -->
+      <div class="field">
+        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
+          <span>پروتکـل</span>
+          <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: XHTTP</span>
+        </label>
+        <select id="autoProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+          <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
+          <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up</option>
+          <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
+          <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
+          <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
+          <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
+          <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
+          <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
+          <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
+          <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
+          <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
+          <option value="wireguard" style="background-color: #1f2937; color: #ffffff;">WireGuard</option>
+        </select>
+      </div>
 
-<div class="modal-title">
-ساخت خودکار
+      <!-- Security Profile Field -->
+      <div class="field">
+        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
+          <span>پروفایـل امنیتـی</span>
+          <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: Maximum</span>
+        </label>
+        <select id="autoProfile" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+          <option value="balanced" style="background-color: #1f2937; color: #ffffff;">Balanced</option>
+          <option value="gaming" style="background-color: #1f2937; color: #ffffff;">Gaming</option>
+          <option value="maximum" style="background-color: #1f2937; color: #ffffff;">Maximum</option>
+          <option value="normal" style="background-color: #1f2937; color: #ffffff;">Normal</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div style="margin-top: 16px; padding: 12px; background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; color: rgba(255, 255, 255, 0.65); font-size: 0.75rem; line-height: 2;">
+      <div>اسم کانفیگ‌ها کاملاً رندوم <code style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #34d399;">pxpanel_********</code> ساخته می‌شود.</div>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin-top: 4px;">
+        <div>حجـم: <b style="color: #fff;">نامحدود</b></div>
+        <div>زمـان: <b style="color: #fff;">نامحدود</b></div>
+        <div>محدودیـت ایپـی: <b style="color: #fff;">نامحدود</b></div>
+        <div>محدودیـت سرعـت: <b style="color: #fff;">نامحدود</b></div>
+        <div>تکمیل اتصال: <b style="color: #fff;">نامحدود</b></div>
+        <div>پورت: <b style="color: #fff;">443</b></div>
+      </div>
+    </div>
+
+    <!-- Modal Actions -->
+    <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="modal-btn secondary" onclick="closeAutoModal()" style="flex: 1; background-color: rgba(255, 255, 255, 0.08); border: none; color: #ffffff; padding: 10px; border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.12)';" onmouseout="this.style.background='rgba(255, 255, 255, 0.08)';">
+        لغو
+      </button>
+      <button class="modal-btn primary" onclick="createAuto()" style="flex: 1; background-color: #10b981; border: none; color: #ffffff; padding: 10px; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
+        ساخت
+      </button>
+    </div>
+
+  </div>
 </div>
 
-<button
-class="close"
-onclick="closeAutoModal()"
->
-×
-</button>
-
-</div>
-
-<div
-style="
-color:rgba(255,255,255,.55);
-font-size:11px;
-line-height:2;
-"
->
-
-کانفیگ خودکار با نام تصادفی
-<code>pxpanel_********</code>
-ساخته می‌شود.
-
-<br>
-
-حجم: <b>نامحدود</b>
-
-<br>
-
-زمان: <b>نامحدود</b>
-
-<br>
-
-IP: <b>نامحدود</b>
-
-<br>
-
-سرعت: <b>نامحدود</b>
-
-<br>
-
-اتصال: <b>نامحدود</b>
-
-<br>
-
-پروتکل:
-<b>VLESS WebSocket</b>
-
-<br>
-
-Port:
-<b>443</b>
-
-</div>
-
-<div class="modal-actions">
-
-<button
-class="modal-btn secondary"
-onclick="closeAutoModal()"
->
-انصراف
-</button>
-
-<button
-class="modal-btn primary"
-onclick="createAuto()"
->
-ساخت خودکار
-</button>
-
-</div>
-
-</div>
-
-</div>
-
+<script>
+  // Function to automatically set best configuration options
+  function setBestAutoSettings() {
+    const protocolSelect = document.getElementById('autoProtocol');
+    const profileSelect = document.getElementById('autoProfile');
+    
+    if (protocolSelect) protocolSelect.value = 'xhttp-packet-up';
+    if (profileSelect) profileSelect.value = 'maximum';
+  }
+</script>
+<!-- ===================================================== -->
 
 <!-- ===================================================== -->
 <!-- PASSWORD MODAL -->
@@ -7594,7 +7327,7 @@ class="modal-backdrop"
 <div class="modal-head">
 
 <div class="modal-title">
-تغییر رمز پنل
+تغییر رمز پنـل
 </div>
 
 <button
@@ -7611,7 +7344,7 @@ onclick="closePasswordModal()"
 <div class="field full">
 
 <label>
-رمز فعلی
+رمز فعلـی
 </label>
 
 <input
@@ -7624,7 +7357,7 @@ type="password"
 <div class="field">
 
 <label>
-رمز جدید
+رمز جدیـد
 </label>
 
 <input
@@ -7637,7 +7370,7 @@ type="password"
 <div class="field">
 
 <label>
-تکرار رمز جدید
+تکرار رمز جدیـد
 </label>
 
 <input
@@ -7655,14 +7388,14 @@ type="password"
 class="modal-btn secondary"
 onclick="closePasswordModal()"
 >
-انصراف
+لغو
 </button>
 
 <button
 class="modal-btn primary"
 onclick="changePassword()"
 >
-ذخیره رمز
+ذخیره رمـز عبور
 </button>
 
 </div>
@@ -7674,31 +7407,60 @@ onclick="changePassword()"
 
     <!-- LOGIN NOTICE START -->
 <div id="loginNoticeModal" class="login-notice-backdrop" role="dialog" aria-modal="true" aria-labelledby="regionNoticeTitle">
-<div class="login-notice">
-<div class="login-notice-head">
-<div class="login-notice-icon">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/><path d="M16.5 3.5h4v4"/><path d="m20.5 3.5-5 5"/></svg>
+  <div class="login-notice">
+    <div class="login-notice-head">
+      <div class="login-notice-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M12 3a9 9 0 1 0 9 9"/>
+          <path d="M12 7v5l3 2"/>
+          <path d="M16.5 3.5h4v4"/>
+          <path d="m20.5 3.5-5 5"/>
+        </svg>
+      </div>
+      <div>
+        <h3 id="regionNoticeTitle">راهنمای اتصال سرویس</h3>
+        <p>اطلاعیه مهم منطقه‌ای پیش از اتصال کانفیگ‌ها</p>
+      </div>
+    </div>
+    <div class="login-notice-body">
+      <p><b>نکته:</b> برای استفاده، لینک اشتراک (SUB) را در برنامه وارد (Import / Subscription) کرده یا از لینک مستقیم VLESS استفاده کنید.</p>
+      <div class="region-warning" role="alert">
+        <div class="warning-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+            <path d="m12 3 9 17H3L12 3Z"/>
+            <path d="M12 9v5"/>
+            <path d="M12 17h.01"/>
+          </svg>
+          هشدار منطقه‌ای اتصال
+        </div>
+        <p>در صورتی که پنل با موفقیت نصب شد اما کانفیگ‌ها پینگ نداشتند، دامنه مسدود شده است؛ لطفاً دامنه جدیدی بسازید.</p>
+      </div>
+    </div>
+    <div class="notice-downloads">
+      <a class="notice-download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer">
+        <strong>v2rayNG</strong>
+        <span>اندروید</span>
+      </a>
+      <a class="notice-download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer">
+        <strong>v2rayN</strong>
+        <span>ویندوز / مک / لینوکس</span>
+      </a>
+      <a class="notice-download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer">
+        <strong>Hiddify</strong>
+        <span>چندپلتفرمی</span>
+      </a>
+    </div>
+    <div class="login-notice-actions">
+      <button type="button" onclick="closeLoginNotice()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="m5 12 4 4L19 6"/>
+        </svg>
+        متوجه شدم
+      </button>
+    </div>
+  </div>
 </div>
-<div>
-<h3 id="regionNoticeTitle">راهنمای اتصال سرویس</h3>
-<p>اطلاعیه مهم منطقه‌ای قبل از اتصال کانفیگ‌ها</p>
-</div>
-</div>
-<div class="login-notice-body">
-<b>نکته:</b> لینک SUB را داخل برنامه Import / Subscription اضافه کنید. برای اتصال مستقیم نیز می‌توانید لینک VLESS را وارد کنید.
-<div class="region-warning">
-<div class="warning-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>هشدار منطقه‌ای اتصال</div>
-⚠️⚠️ اگه براتون پنل نصب شد ولی کانفیگ ها پینگ ندادن — دامنه فیلتر شده — دوباره بسازید ⚠️⚠️
-</div>
-</div>
-<div class="notice-downloads">
-<a class="notice-download" href="https://github.com/2dust/v2rayNG/releases/latest" target="_blank" rel="noopener noreferrer"><strong>v2rayNG</strong><span>Android</span></a>
-<a class="notice-download" href="https://github.com/2dust/v2rayN/releases/latest" target="_blank" rel="noopener noreferrer"><strong>v2rayN</strong><span>Windows / macOS / Linux</span></a>
-<a class="notice-download" href="https://github.com/hiddify/hiddify-app/releases/latest" target="_blank" rel="noopener noreferrer"><strong>Hiddify</strong><span>Android / Windows / macOS / Linux</span></a>
-</div>
-<div class="login-notice-actions"><button type="button" onclick="closeLoginNotice()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>متوجه شدم</button></div>
-</div></div>
-    <!-- LOGIN NOTICE END -->
+<!-- LOGIN NOTICE END -->
 
 <div
 id="toast"
@@ -8424,82 +8186,21 @@ function closePasswordModal(){
 }
 
 
-
-function openTgProxyModal(){
-    document.getElementById("tgProxyModal").classList.add("open");
-}
-
-function closeTgProxyModal(){
-    document.getElementById("tgProxyModal").classList.remove("open");
-}
-
-async function createTelegramProxy(){
-    showToast("در حال ساخت پروکسی تلگرام...");
-
-    const result = await api("/api/telegram-proxy", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: "{}"
-    });
-
-    if (!result || !result.ok) {
-        showToast("خطا در ساخت پروکسی تلگرام");
-        return;
-    }
-
-    document.getElementById("tgServer").value = result.server || "";
-    document.getElementById("tgPort").value = result.port || "";
-    document.getElementById("tgSecret").value = result.secret || "";
-    document.getElementById("tgDomain").value = result.domain || "";
-    document.getElementById("tgLinkDirect").value = result.tg_link || "";
-    document.getElementById("tgLinkWeb").value = result.web_link || "";
-
-    openTgProxyModal();
-    showToast("پروکسی تلگرام آماده شد");
-}
-
-async function copyTgLink(id){
-    const el = document.getElementById(id);
-    if (el && el.value) {
-        await copyText(el.value);
-    }
-}
-
-
 async function createAuto(){
-
+    const protocol = document.getElementById("autoProtocol")?.value || "vless-ws";
+    const profile = document.getElementById("autoProfile")?.value || "balanced";
     closeAutoModal();
-
-    showToast(
-        "در حال ساخت کانفیگ..."
-    );
-
-    const result =
-        await api(
-            "/api/links/auto",
-            {
-                method:"POST"
-            }
-        );
-
-    if(
-        !result
-        ||
-        !result.ok
-    ){
-        return;
-    }
-
-    await copyText(
-        result.vless
-    );
-
-    showToast(
-        "کانفیگ ساخته شد و VLESS کپی شد"
-    );
-
+    showToast("در حال ساخت کانفیگ حرفه‌ای...");
+    const result = await api("/api/links/auto", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({protocol,profile})
+    });
+    if(!result || !result.ok) return;
+    const config = result.config || result.vless || result.link || "";
+    await copyText(config);
+    showToast("کانفیگ ساخته شد و در کلیپ‌بورد قرار گرفت");
     await refresh();
-
 }
 
 
@@ -9131,7 +8832,7 @@ async def global_exception_handler(
             padding:40px;
         ">
             <h2>
-            خطای داخلی PXpanel
+            خطای داخلی PX Panel
             </h2>
 
             <p>
