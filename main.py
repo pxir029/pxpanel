@@ -4246,12 +4246,9 @@ async def info_page(
   </section>
 
   <!-- Footer -->
- <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.08] p-4 text-center text-xs text-white/60 transition-all duration-300 hover:border-emerald-500/40">
-  توسعه‌یافته با تخصص تیم 
-  <a href="https://t.me/logic_sec" target="_blank" rel="noopener noreferrer" class="font-medium text-emerald-400 transition-colors hover:text-emerald-300 hover:underline">
-    LogicSec
-  </a>
-</div>
+  <div class="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] p-4 text-center text-xs text-white/45">
+    پشتیبانی و اطلاعیه‌ها &nbsp;·&nbsp; <b class="text-emerald-300">کانال تلگرام: logic_sec</b>
+  </div>
 
 </div>
 
@@ -4350,7 +4347,6 @@ function fallbackCopy(text, cb) {{
 </body>
 </html>"""
     return HTMLResponse(info_html)
-
 # ============================================================
 # SUB GROUP API
 # ============================================================
@@ -7210,108 +7206,7 @@ onclick="createManual()"
 
 </div>
 
-<!-- ===================================================== -->
-<!-- AUTO MODAL -->
-<!-- ===================================================== -->
 
-<div id="autoModal" class="modal-backdrop" style="direction: rtl;">
-  <div class="modal" style="background-color: #111827; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 24px; max-width: 480px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
-    
-    <!-- Modal Header -->
-    <div class="modal-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 14px; margin-bottom: 16px;">
-      <div class="modal-title" style="font-size: 1.125rem; font-weight: 700; color: #ffffff;">
-        ساخـت خودکــار
-      </div>
-      <button class="close" onclick="closeAutoModal()" style="background: none; border: none; color: rgba(255, 255, 255, 0.6); font-size: 1.25rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#ffffff';" onmouseout="this.style.color='rgba(255, 255, 255, 0.6)';">
-        ×
-      </button>
-    </div>
-
-    <!-- Quick Auto Setup Action Button -->
-    <div style="margin-bottom: 16px;">
-      <button type="button" onclick="setBestAutoSettings()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.1)); border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399; padding: 10px 16px; border-radius: 10px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='linear-gradient(135deg, rgba(52, 211, 153, 0.3), rgba(16, 185, 129, 0.2))'; this.style.borderColor='rgba(52, 211, 153, 0.6)';" onmouseout="this.style.background='linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.1))'; this.style.borderColor='rgba(52, 211, 153, 0.4)';">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-        چینش هوشمند بهترین تنظیمات (پیشنهادی)
-      </button>
-    </div>
-
-    <!-- Form Grid -->
-    <div class="form-grid" style="display: flex; flex-direction: column; gap: 14px;">
-      
-      <!-- Protocol Field -->
-      <div class="field">
-        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
-          <span>پروتکـل</span>
-          <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: XHTTP</span>
-        </label>
-        <select id="autoProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-          <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
-          <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up</option>
-          <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
-          <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
-          <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
-          <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
-          <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
-          <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
-          <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
-          <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
-          <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
-          <option value="wireguard" style="background-color: #1f2937; color: #ffffff;">WireGuard</option>
-        </select>
-      </div>
-
-      <!-- Security Profile Field -->
-      <div class="field">
-        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
-          <span>پروفایـل امنیتـی</span>
-          <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: Maximum</span>
-        </label>
-        <select id="autoProfile" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
-          <option value="balanced" style="background-color: #1f2937; color: #ffffff;">Balanced</option>
-          <option value="gaming" style="background-color: #1f2937; color: #ffffff;">Gaming</option>
-          <option value="maximum" style="background-color: #1f2937; color: #ffffff;">Maximum</option>
-          <option value="normal" style="background-color: #1f2937; color: #ffffff;">Normal</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Info Box -->
-    <div style="margin-top: 16px; padding: 12px; background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; color: rgba(255, 255, 255, 0.65); font-size: 0.75rem; line-height: 2;">
-      <div>اسم کانفیگ‌ها کاملاً رندوم <code style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #34d399;">pxpanel_********</code> ساخته می‌شود.</div>
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin-top: 4px;">
-        <div>حجـم: <b style="color: #fff;">نامحدود</b></div>
-        <div>زمـان: <b style="color: #fff;">نامحدود</b></div>
-        <div>محدودیـت ایپـی: <b style="color: #fff;">نامحدود</b></div>
-        <div>محدودیـت سرعـت: <b style="color: #fff;">نامحدود</b></div>
-        <div>تکمیل اتصال: <b style="color: #fff;">نامحدود</b></div>
-        <div>پورت: <b style="color: #fff;">443</b></div>
-      </div>
-    </div>
-
-    <!-- Modal Actions -->
-    <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
-      <button class="modal-btn secondary" onclick="closeAutoModal()" style="flex: 1; background-color: rgba(255, 255, 255, 0.08); border: none; color: #ffffff; padding: 10px; border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.12)';" onmouseout="this.style.background='rgba(255, 255, 255, 0.08)';">
-        لغو
-      </button>
-      <button class="modal-btn primary" onclick="createAuto()" style="flex: 1; background-color: #10b981; border: none; color: #ffffff; padding: 10px; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
-        ساخت
-      </button>
-    </div>
-
-  </div>
-</div>
-
-<script>
-  // Function to automatically set best configuration options
-  function setBestAutoSettings() {
-    const protocolSelect = document.getElementById('autoProtocol');
-    const profileSelect = document.getElementById('autoProfile');
-    
-    if (protocolSelect) protocolSelect.value = 'xhttp-packet-up';
-    if (profileSelect) profileSelect.value = 'maximum';
-  }
-</script>
-<!-- ===================================================== -->
 
 <!-- ===================================================== -->
 <!-- PASSWORD MODAL -->
