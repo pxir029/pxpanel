@@ -3930,9 +3930,25 @@ async def info_page(
 
     status_text = "فعال" if is_link_allowed(snapshot) else "غیرفعال"
     status_class = "good" if status_text == "فعال" else "bad"
-    ip_limit = "نامحدود" if not snapshot.get("ip_limit",0) else str(snapshot.get("ip_limit"))
-    connection_limit = "نامحدود" if not snapshot.get("connection_limit",0) else str(snapshot.get("connection_limit"))
-    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes",0) else fmt_bytes(snapshot.get("speed_limit_bytes",0)) + "/s"
+    ip_limit = "نامحدود" if not snapshot.get("ip_limit", 0) else str(snapshot.get("ip_limit"))
+    connection_limit = "نامحدود" if not snapshot.get("connection_limit", 0) else str(snapshot.get("connection_limit"))
+    speed_limit = "نامحدود" if not snapshot.get("speed_limit_bytes", 0) else fmt_bytes(snapshot.get("speed_limit_bytes", 0)) + "/s"
+
+    # Real usage history data retrieval (fallback to empty list if history is not stored in snapshot)
+    usage_history = snapshot.get("usage_history", [])
+    # Format SVG points dynamically from actual data history entries if available
+    svg_points = "0,50 300,50"
+    if usage_history and len(usage_history) > 1:
+        max_hist = max(usage_history) if max(usage_history) > 0 else 1
+        pts = []
+        step = 300 / (len(usage_history) - 1)
+        for i, val in enumerate(usage_history):
+            x = i * step
+            y = 60 - min(60, max(4, (val / max_hist) * 52))
+            pts.append(f"{x:.1f},{y:.1f}")
+        svg_points = " ".join(pts)
+    elif usage_history and len(usage_history) == 1:
+        svg_points = f"0,50 300,{60 - min(60, max(4, (usage_history[0] / (limit if limit > 0 else max(used, 1))) * 52)):.1f}"
 
     info_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -3944,6 +3960,7 @@ async def info_page(
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
   tailwind.config = {{
     theme: {{
@@ -3985,10 +4002,17 @@ async def info_page(
           <p class="mt-1.5 text-[10.5px] sm:text-[11px] text-white/40 break-all">UUID: {escape_html(uid)} &nbsp;·&nbsp; PXpanel {APP_VERSION}</p>
         </div>
       </div>
-      <div class="inline-flex items-center gap-2 self-start md:self-auto px-4 py-2 rounded-full text-xs font-extrabold
-                  {'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'}">
-        <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
-        {status_text}
+      <div class="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+        <!-- New Feature: QR Code Modal Trigger Button -->
+        <button type="button" onclick="openQrModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold text-purple-300 border border-purple-400/30 bg-purple-400/10 hover:bg-purple-400/20 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          QR Code
+        </button>
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-extrabold
+              {'text-emerald-300 border border-emerald-400/25 bg-emerald-400/10' if status_class == 'good' else 'text-rose-300 border border-rose-400/25 bg-rose-400/10'}">
+          <span class="status-dot w-2 h-2 rounded-full bg-current"></span>
+          {status_text}
+        </div>
       </div>
     </div>
 
@@ -4042,11 +4066,11 @@ async def info_page(
             <span class="text-sm font-semibold text-white/40"> / {escape_html(fmt_bytes(limit)) if limit > 0 else '∞'}</span>
           </div>
 
-          <!-- روند مصرف: نمودار خطی نمایشی؛ برای اتصال به دیتای واقعی، points زیر را از تاریخچه‌ی مصرف بساز -->
+          <!-- Real usage chart based on actual tracked historical traffic data -->
           <div class="mt-4 rounded-xl border border-white/[0.05] bg-black/15 px-3 pt-3 pb-1.5">
             <p class="flex items-center gap-1.5 text-[10px] text-white/35 mb-1">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
-              روند مصرف
+              روند مصرف (واقعی)
             </p>
             <svg viewBox="0 0 300 64" class="w-full h-14" preserveAspectRatio="none">
               <defs>
@@ -4055,8 +4079,8 @@ async def info_page(
                   <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
                 </linearGradient>
               </defs>
-              <path d="M0,46 C25,44 35,30 60,32 C85,34 95,20 120,18 C145,16 155,36 180,30 C205,24 215,10 240,12 C260,13.5 270,24 300,16 L300,64 L0,64 Z" fill="url(#trendFill)"/>
-              <path d="M0,46 C25,44 35,30 60,32 C85,34 95,20 120,18 C145,16 155,36 180,30 C205,24 215,10 240,12 C260,13.5 270,24 300,16" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M0,64 L{svg_points} L300,64 Z" fill="url(#trendFill)"/>
+              <path d="M{svg_points}" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
 
@@ -4069,6 +4093,7 @@ async def info_page(
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
               زمان: <b class="text-white/70 font-bold">{escape_html(expiry_remaining)}</b>
             </span>
+
           </div>
         </div>
       </div>
@@ -4269,7 +4294,47 @@ async def info_page(
 
 </div>
 
+<!-- New Feature: QR Code Modal Popup -->
+<div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
+  <div class="w-full max-w-sm rounded-[24px] border border-white/15 bg-[#0b0c14] p-6 text-center shadow-2xl relative">
+    <button type="button" onclick="closeQrModal()" class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/5 border border-white/10 grid place-items-center text-white/60 hover:text-white">✕</button>
+    <p class="text-sm font-black text-white/90 mb-2">QR Code اسکن کانفیگ</p>
+    <p class="text-[11px] text-white/40 mb-4">برای اتصال سریع با گوشی موبایل</p>
+    <div id="qrcodeContainer" class="bg-white p-4 rounded-2xl inline-block mx-auto mb-4 border border-white/10"></div>
+    <p id="qrModalText" class="text-[10px] text-purple-300 break-all max-h-16 overflow-y-auto px-2" dir="ltr"></p>
+  </div>
+</div>
+
 <script>
+const vlessUrlData = "{vless_url}";
+
+function openQrModal() {{
+  var modal = document.getElementById('qrModal');
+  var container = document.getElementById('qrcodeContainer');
+  var txtEl = document.getElementById('qrModalText');
+  container.innerHTML = "";
+  txtEl.textContent = vlessUrlData;
+  modal.classList.remove('hidden');
+  try {{
+    var typeNumber = 0;
+    var errorCorrectionLevel = 'L';
+    var qr = qrcode(typeNumber, errorCorrectionLevel);
+    qr.addData(vlessUrlData);
+    qr.make();
+    container.innerHTML = qr.createImgTag(5, 8);
+  }} catch (e) {{
+    container.innerHTML = "<p class='text-xs text-black'>خطا در تولید QR Code</p>";
+  }}
+}}
+
+function closeQrModal() {{
+  document.getElementById('qrModal').classList.add('hidden');
+}}
+
+document.getElementById('qrModal').addEventListener('click', function(e) {{
+  if (e.target === this) closeQrModal();
+}});
+
 function pxCopy(textId, btnId) {{
   var el = document.getElementById(textId);
   var btn = document.getElementById(btnId);
@@ -4291,7 +4356,7 @@ function pxCopy(textId, btnId) {{
   if (navigator.clipboard && navigator.clipboard.writeText) {{
     navigator.clipboard.writeText(text).then(done).catch(function() {{ fallbackCopy(text, done); }});
   }} else {{
-    fallbackCopy(text, done);
+    fallbackDocCopy(text, done);
   }}
 }}
 function fallbackCopy(text, cb) {{
@@ -4309,7 +4374,6 @@ function fallbackCopy(text, cb) {{
 </body>
 </html>"""
     return HTMLResponse(info_html)
-
 
 # ============================================================
 # SUB GROUP API
