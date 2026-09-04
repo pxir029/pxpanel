@@ -6986,28 +6986,24 @@ placeholder="اسم کانفیگ"
 </div>
 
 
-<div class="field">
-
-<label>
-پروتکــل (بتا)
-</label>
-
-<select id="manualProtocol">
-
-<option value="vless-ws">VLESS WebSocket</option>
-<option value="xhttp-packet-up">XHTTP Packet Up (پیشنهادی)</option>
-<option value="xhttp-stream-up">XHTTP Stream Up</option>
-<option value="xhttp-stream-one">XHTTP Stream One</option>
-<option value="vmess-ws">VMess WebSocket</option>
-<option value="trojan-ws">Trojan WebSocket</option>
-<option value="shadowsocks">Shadowsocks</option>
-<option value="socks5">SOCKS5</option>
-<option value="http">HTTP Proxy</option>
-<option value="hysteria2">Hysteria 2</option>
-<option value="tuic">TUIC</option>
-
-</select>
-
+<div class="field" style="margin-bottom: 16px;">
+  <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
+    <span>پروتکــل (بتا)</span>
+    <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: XHTTP Packet Up</span>
+  </label>
+  <select id="manualProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+    <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
+    <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up (پیشنهادی)</option>
+    <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
+    <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
+    <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
+    <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
+    <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
+    <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
+    <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
+    <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
+    <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
+  </select>
 </div>
 
 
@@ -7027,28 +7023,16 @@ placeholder="0 = نامحدود"
 </div>
 
 
-<div class="field">
-
-<label>
-واحد حجـم
-</label>
-
-<select id="manualVolumeUnit">
-
-<option value="GB">
-GB
-</option>
-
-<option value="MB">
-MB
-</option>
-
-<option value="TB">
-TB
-</option>
-
-</select>
-
+<div class="field" style="margin-bottom: 16px;">
+  <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
+    <span>واحد حجـم</span>
+    <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: GB</span>
+  </label>
+  <select id="manualVolumeUnit" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+    <option value="GB" style="background-color: #1f2937; color: #ffffff;">GB</option>
+    <option value="MB" style="background-color: #1f2937; color: #ffffff;">MB</option>
+    <option value="TB" style="background-color: #1f2937; color: #ffffff;">TB</option>
+  </select>
 </div>
 
 
@@ -7220,6 +7204,250 @@ onclick="createManual()"
 </div>
 
 </div>
+
+</div>
+
+<!-- ===================================================== -->
+
+<!-- AUTO MODAL -->
+
+<!-- ===================================================== -->
+
+
+
+<div
+
+id="autoModal"
+
+class="modal-backdrop"
+
+>
+
+
+
+<div class="modal">
+
+
+
+<div class="modal-head">
+
+
+
+<div class="modal-title">
+
+ساخـت خودکــار
+
+</div>
+
+
+
+<button
+
+class="close"
+
+onclick="closeAutoModal()"
+
+>
+
+×
+
+</button>
+
+
+
+</div>
+
+
+
+<div class="form-grid" style="margin-top:14px">
+
+<div class="field">
+
+<label>پروتکـل</label>
+
+<select id="autoProtocol" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+
+  <option value="vless-ws" style="background-color: #1f2937; color: #ffffff;">VLESS WebSocket</option>
+
+  <option value="xhttp-packet-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Packet Up</option>
+
+  <option value="xhttp-stream-up" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream Up</option>
+
+  <option value="xhttp-stream-one" style="background-color: #1f2937; color: #ffffff;">XHTTP Stream One</option>
+
+  <option value="vmess-ws" style="background-color: #1f2937; color: #ffffff;">VMess WebSocket</option>
+
+  <option value="trojan-ws" style="background-color: #1f2937; color: #ffffff;">Trojan WebSocket</option>
+
+  <option value="shadowsocks" style="background-color: #1f2937; color: #ffffff;">Shadowsocks</option>
+
+  <option value="socks5" style="background-color: #1f2937; color: #ffffff;">SOCKS5</option>
+
+  <option value="http" style="background-color: #1f2937; color: #ffffff;">HTTP Proxy</option>
+
+  <option value="hysteria2" style="background-color: #1f2937; color: #ffffff;">Hysteria 2</option>
+
+  <option value="tuic" style="background-color: #1f2937; color: #ffffff;">TUIC</option>
+
+  <option value="wireguard" style="background-color: #1f2937; color: #ffffff;">WireGuard</option>
+
+</select>
+
+</div>
+
+<div class="field" style="margin-bottom: 16px;">
+
+  <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; color: #ffffff; margin-bottom: 6px;">
+
+    <span>پروفایـل امنیتـی</span>
+
+    <span style="font-size: 0.75rem; color: #34d399; background-color: rgba(52, 211, 153, 0.1); padding: 2px 8px; border-radius: 9999px;">پیشنهادی: Maximum</span>
+
+  </label>
+
+  <select id="autoProfile" style="width: 100%; background-color: #1f2937; color: #ffffff; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; font-size: 0.875rem; outline: none; cursor: pointer;">
+
+    <option value="balanced" style="background-color: #1f2937; color: #ffffff;">Balanced</option>
+
+    <option value="gaming" style="background-color: #1f2937; color: #ffffff;">Gaming</option>
+
+    <option value="maximum" style="background-color: #1f2937; color: #ffffff;">Maximum</option>
+
+    <option value="normal" style="background-color: #1f2937; color: #ffffff;">Normal</option>
+
+  </select>
+
+</div>
+
+</div>
+
+
+
+<div
+
+style="
+
+color:rgba(255,255,255,.55);
+
+font-size:11px;
+
+line-height:2;
+
+">
+
+
+
+اسم کانفیگ ها کاملا رندوم
+
+<code>pxpanel_********</code>
+
+ساخته می‌شود.
+
+
+
+<br>
+
+
+
+حجـم: <b>نامحدود</b>
+
+
+
+<br>
+
+
+
+زمـان: <b>نامحدود</b>
+
+
+
+<br>
+
+
+
+محدودیـت ایپـی: <b>نامحدود</b>
+
+
+
+<br>
+
+
+
+محدودیـت سرعـت: <b>نامحدود</b>
+
+
+
+<br>
+
+
+
+محدودیـت اتصال همزمـان: <b>نامحدود</b>
+
+
+
+<br>
+
+
+
+پروتکـل:
+
+<b>VLESS WebSocket</b>
+
+
+
+<br>
+
+
+
+پورت:
+
+<b>443</b>
+
+
+
+</div>
+
+
+
+<div class="modal-actions">
+
+
+
+<button
+
+class="modal-btn secondary"
+
+onclick="closeAutoModal()"
+
+>
+
+لغو
+
+</button>
+
+
+
+<button
+
+class="modal-btn primary"
+
+onclick="createAuto()"
+
+>
+
+ساخت
+
+</button>
+
+
+
+</div>
+
+
+
+</div>
+
+
 
 </div>
 
